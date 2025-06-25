@@ -46,7 +46,7 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     """Authenticate user and return access token"""
     user = db.query(User).filter(User.username == form_data.username).first()
     
-    if not user or not verify_password(form_data.password, user.hashed_password):
+    if not user or not verify_password(form_data.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
@@ -95,7 +95,7 @@ async def register_user(user_data: UserCreate, db: Session = Depends(get_db), cu
         username=user_data.username,
         email=user_data.email,
         full_name=user_data.full_name,
-        hashed_password=hashed_password,
+        password_hash=hashed_password,
         role=user_data.role,
         is_active=user_data.is_active
     )
