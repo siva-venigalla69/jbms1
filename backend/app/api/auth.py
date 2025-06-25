@@ -7,6 +7,11 @@ from ..core.security import verify_password, create_access_token, verify_token, 
 from ..core.config import settings
 from ..models.models import User
 from ..schemas.schemas import Token, UserResponse, UserCreate, LoginRequest
+import logging
+import traceback
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -44,27 +49,68 @@ async def get_current_active_user(current_user: User = Depends(get_current_user)
 @router.post("/login", response_model=Token)
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     """Authenticate user and return access token"""
-    user = db.query(User).filter(User.username == form_data.username).first()
-    
-    if not user or not verify_password(form_data.password, user.password_hash):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
+    try:
+        logger.info(f"Login attempt for username: {form_data.username}")
+        
+        # Query user
+        user = db.query(User).filter(User.username == form_data.username).first()
+        logger.info(f"User query result: {'Found' if user else 'Not found'}")
+        
+        if not user:
+            logger.info(f"User {form_data.username} not found in database")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect username or password",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        # Log user details (safely)
+        logger.info(f"User found - ID: {user.id}, Active: {user.is_active}, Role: {user.role}")
+        logger.info(f"Password hash exists: {bool(user.password_hash)}")
+        logger.info(f"Password hash length: {len(user.password_hash) if user.password_hash else 0}")
+        
+        # Verify password
+        logger.info("Starting password verification")
+        password_valid = verify_password(form_data.password, user.password_hash)
+        logger.info(f"Password verification result: {password_valid}")
+        
+        if not password_valid:
+            logger.info(f"Password verification failed for user: {form_data.username}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect username or password",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        # Check if user is active
+        if not user.is_active:
+            logger.info(f"User {form_data.username} is inactive")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Inactive user"
+            )
+        
+        # Create access token
+        logger.info("Creating access token")
+        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={"sub": user.username}, expires_delta=access_token_expires
         )
-    
-    if not user.is_active:
+        logger.info("Access token created successfully")
+        
+        return {"access_token": access_token, "token_type": "bearer"}
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions (401, 400) 
+        raise
+    except Exception as e:
+        # Log and handle unexpected errors
+        logger.error(f"Unexpected error during login: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Inactive user"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An unexpected error occurred during authentication: {str(e)}"
         )
-    
-    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": user.username}, expires_delta=access_token_expires
-    )
-    
-    return {"access_token": access_token, "token_type": "bearer"}
 
 @router.post("/register", response_model=UserResponse)
 async def register_user(user_data: UserCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):

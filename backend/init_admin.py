@@ -62,7 +62,7 @@ def create_admin_user():
     except Exception as e:
         print(f"❌ Error creating admin user: {e}")
         db.rollback()
-    finally:
+    finally:psql
         db.close()
 
 if __name__ == "__main__":

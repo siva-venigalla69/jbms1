@@ -36,14 +36,34 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     Raises:
         ValueError: If inputs are invalid
     """
-    if not plain_password or not hashed_password:
-        logger.warning("Password verification attempted with empty values")
-        return False
-    
     try:
-        return pwd_context.verify(plain_password, hashed_password)
+        logger.info(f"Password verification - Plain password length: {len(plain_password) if plain_password else 0}")
+        logger.info(f"Password verification - Hash length: {len(hashed_password) if hashed_password else 0}")
+        logger.info(f"Password verification - Hash starts with: {hashed_password[:10] if hashed_password else 'None'}")
+        
+        if not plain_password or not hashed_password:
+            logger.warning("Password verification attempted with empty values")
+            return False
+        
+        # Check if hash format looks correct (bcrypt should start with $2b$ and be ~60 chars)
+        if not hashed_password.startswith('$2b$') and not hashed_password.startswith('$2a$'):
+            logger.error(f"Invalid hash format - does not start with $2b$ or $2a$: {hashed_password[:20]}")
+            return False
+            
+        if len(hashed_password) != 60:
+            logger.error(f"Invalid hash length - should be 60 chars, got {len(hashed_password)}")
+            return False
+        
+        logger.info("Hash format validation passed, attempting verification")
+        result = pwd_context.verify(plain_password, hashed_password)
+        logger.info(f"Password verification result: {result}")
+        return result
+        
     except Exception as e:
         logger.error(f"Password verification error: {str(e)}")
+        logger.error(f"Error type: {type(e).__name__}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         return False
 
 def get_password_hash(password: str) -> str:
