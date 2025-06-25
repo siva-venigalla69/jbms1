@@ -67,6 +67,17 @@ class CustomerResponse(CustomerBase):
     created_at: datetime
     updated_at: datetime
 
+class CustomerSearchResult(BaseSchema):
+    id: int
+    name: str
+    phone: Optional[str] = None
+    email: Optional[str] = None
+
+class CustomerSearchResponse(BaseSchema):
+    query: str
+    count: int
+    results: List[CustomerSearchResult]
+
 # Order schemas
 class OrderItemBase(BaseSchema):
     material_type: MaterialType
