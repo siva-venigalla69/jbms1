@@ -1,0 +1,137 @@
+import logging
+from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, status, Query
+from sqlalchemy.orm import Session
+from sqlalchemy import and_
+from ..core.database import get_db
+from ..core.security import get_current_active_user
+from ..models.models import User, Inventory
+from ..schemas.schemas import InventoryCreate, InventoryUpdate, InventoryResponse
+from datetime import datetime
+
+logger = logging.getLogger(__name__)
+router = APIRouter(prefix="/inventory", tags=["Inventory Management"])
+
+@router.get("/", response_model=List[InventoryResponse])
+async def list_inventory(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
+    category: Optional[str] = Query(None),
+    low_stock: bool = Query(False),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """List inventory items"""
+    try:
+        query = db.query(Inventory).filter(
+            and_(Inventory.is_deleted == False, Inventory.is_active == True)
+        )
+        
+        if category:
+            query = query.filter(Inventory.category.ilike(f"%{category}%"))
+        
+        if low_stock:
+            query = query.filter(Inventory.current_stock <= Inventory.reorder_level)
+        
+        items = query.order_by(Inventory.item_name).offset(skip).limit(limit).all()
+        return items
+    except Exception as e:
+        logger.error(f"Error retrieving inventory: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve inventory")
+
+@router.post("/", response_model=InventoryResponse, status_code=201)
+async def create_inventory_item(
+    item_data: InventoryCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Create new inventory item"""
+    try:
+        # Check for duplicate item name
+        existing = db.query(Inventory).filter(
+            and_(
+                Inventory.item_name.ilike(item_data.item_name),
+                Inventory.is_deleted == False
+            )
+        ).first()
+        
+        if existing:
+            raise HTTPException(status_code=400, detail="Item name already exists")
+        
+        db_item = Inventory(
+            item_name=item_data.item_name,
+            category=item_data.category,
+            current_stock=item_data.current_stock,
+            unit=item_data.unit,
+            reorder_level=item_data.reorder_level,
+            cost_per_unit=item_data.cost_per_unit,
+            supplier_info=item_data.supplier_info,
+            updated_by_user_id=current_user.id
+        )
+        
+        db.add(db_item)
+        db.commit()
+        db.refresh(db_item)
+        return db_item
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error creating inventory item: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create inventory item")
+
+@router.put("/{item_id}", response_model=InventoryResponse)
+async def update_inventory_item(
+    item_id: str,
+    item_update: InventoryUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Update inventory item"""
+    try:
+        item = db.query(Inventory).filter(
+            and_(Inventory.id == item_id, Inventory.is_deleted == False)
+        ).first()
+        
+        if not item:
+            raise HTTPException(status_code=404, detail="Inventory item not found")
+        
+        # Update fields
+        update_data = item_update.dict(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(item, field, value)
+        
+        item.updated_by_user_id = current_user.id
+        item.updated_at = datetime.utcnow()
+        
+        db.commit()
+        db.refresh(item)
+        return item
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error updating inventory: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to update inventory")
+
+@router.get("/low-stock", response_model=List[InventoryResponse])
+async def get_low_stock_items(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Get items below reorder level"""
+    try:
+        items = db.query(Inventory).filter(
+            and_(
+                Inventory.is_deleted == False,
+                Inventory.is_active == True,
+                Inventory.current_stock <= Inventory.reorder_level
+            )
+        ).order_by(Inventory.current_stock.asc()).all()
+        
+        return items
+    except Exception as e:
+        logger.error(f"Error retrieving low stock items: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve low stock items")

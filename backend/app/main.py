@@ -11,7 +11,7 @@ from starlette.middleware.gzip import GZipMiddleware
 from sqlalchemy.exc import SQLAlchemyError
 from .core.config import settings, get_cors_config, get_security_headers
 from .core.database import engine, Base
-from .api import auth, customers
+from .api import auth, customers, challans, invoices, inventory, payments, materials, orders
 
 # Configure logging
 logging.basicConfig(
@@ -239,6 +239,12 @@ async def get_version():
 # Include routers
 app.include_router(auth.router, prefix="/api")
 app.include_router(customers.router, prefix="/api")
+app.include_router(challans.router, prefix="/api")
+app.include_router(invoices.router, prefix="/api")
+app.include_router(inventory.router, prefix="/api")
+app.include_router(payments.router, prefix="/api")
+app.include_router(materials.router, prefix="/api")
+app.include_router(orders.router, prefix="/api")
 
 # Root endpoint
 @app.get("/", tags=["Root"])
@@ -263,9 +269,15 @@ async def catch_all(request: Request, path: str):
             "detail": f"Endpoint not found: {request.method} /{path}",
             "available_endpoints": [
                 "/docs",
-                "/health",
+                "/health", 
                 "/api/auth/login",
-                "/api/customers"
+                "/api/customers",
+                "/api/orders",
+                "/api/challans",
+                "/api/invoices",
+                "/api/payments",
+                "/api/inventory",
+                "/api/materials"
             ] if settings.DEBUG else "Contact support for available endpoints"
         }
     ) 
