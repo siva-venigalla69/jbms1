@@ -1,8 +1,7 @@
 import os
 import secrets
 from typing import List, Optional
-from pydantic_settings import BaseSettings
-from pydantic import Field, validator, AnyHttpUrl
+from pydantic import BaseSettings, Field, validator
 import logging
 
 logger = logging.getLogger(__name__)
@@ -133,7 +132,6 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = False
-        validate_assignment = True
 
 # Create settings instance
 try:
