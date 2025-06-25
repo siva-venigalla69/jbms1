@@ -3,11 +3,17 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from fastapi import HTTPException, status
+from fastapi import HTTPException, status, Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from sqlalchemy.orm import Session
 from .config import settings
+from .database import get_db
 
 # Configure logging
 logger = logging.getLogger(__name__)
+
+# Security scheme
+security = HTTPBearer()
 
 # Password hashing context with improved configuration
 pwd_context = CryptContext(
@@ -163,6 +169,71 @@ def verify_token(token: str) -> Optional[Dict[str, Any]]:
     except Exception as e:
         logger.error(f"Token verification error: {str(e)}")
         return None
+
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db)
+):
+    """
+    Get current user from JWT token
+    
+    Args:
+        credentials: HTTP Authorization credentials
+        db: Database session
+        
+    Returns:
+        User: The current authenticated user
+        
+    Raises:
+        HTTPException: If authentication fails
+    """
+    from ..models.models import User  # Import here to avoid circular imports
+    
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    
+    try:
+        # Verify token
+        payload = verify_token(credentials.credentials)
+        if payload is None:
+            raise credentials_exception
+            
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+            
+    except JWTError:
+        raise credentials_exception
+    
+    # Get user from database
+    user = db.query(User).filter(User.username == username).first()
+    if user is None:
+        raise credentials_exception
+        
+    return user
+
+def get_current_active_user(current_user = Depends(get_current_user)):
+    """
+    Get current active user
+    
+    Args:
+        current_user: Current authenticated user
+        
+    Returns:
+        User: The current active user
+        
+    Raises:
+        HTTPException: If user is inactive
+    """
+    if not current_user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="Inactive user"
+        )
+    return current_user
 
 def validate_password_strength(password: str) -> Dict[str, Any]:
     """
