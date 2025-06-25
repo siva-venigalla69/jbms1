@@ -20,4 +20,4 @@ services:
       - key: ENVIRONMENT
         value: production
       - key: CORS_ORIGINS
-        value: "https://your-frontend.netlify.app,http://localhost:3000" 
+        value: "https://textile-printing-app.netlify.app,http://localhost:3000" 
