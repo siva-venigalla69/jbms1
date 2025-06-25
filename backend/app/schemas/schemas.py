@@ -28,7 +28,7 @@ class UserUpdate(BaseSchema):
     is_active: Optional[bool] = None
 
 class UserResponse(UserBase):
-    id: int
+    id: str  # UUID as string
     created_at: datetime
     updated_at: datetime
 
@@ -63,12 +63,12 @@ class CustomerUpdate(BaseSchema):
     gst_number: Optional[str] = Field(None, max_length=15)
 
 class CustomerResponse(CustomerBase):
-    id: int
+    id: str  # UUID as string
     created_at: datetime
     updated_at: datetime
 
 class CustomerSearchResult(BaseSchema):
-    id: int
+    id: str  # UUID as string
     name: str
     phone: Optional[str] = None
     email: Optional[str] = None
@@ -96,8 +96,8 @@ class OrderItemUpdate(BaseSchema):
     current_stage: Optional[ProductionStage] = None
 
 class OrderItemResponse(OrderItemBase):
-    id: int
-    order_id: int
+    id: str  # UUID as string
+    order_id: str  # UUID as string
     current_stage: ProductionStage
     pre_treatment_completed_at: Optional[datetime] = None
     printing_completed_at: Optional[datetime] = None
@@ -105,7 +105,7 @@ class OrderItemResponse(OrderItemBase):
     created_at: datetime
 
 class OrderBase(BaseSchema):
-    customer_id: int
+    customer_id: str  # UUID as string
     order_date: Optional[datetime] = None
     status: OrderStatus = OrderStatus.PENDING
     notes: Optional[str] = None
@@ -114,12 +114,12 @@ class OrderCreate(OrderBase):
     order_items: List[OrderItemCreate]
 
 class OrderUpdate(BaseSchema):
-    customer_id: Optional[int] = None
+    customer_id: Optional[str] = None  # UUID as string
     status: Optional[OrderStatus] = None
     notes: Optional[str] = None
 
 class OrderResponse(OrderBase):
-    id: int
+    id: str  # UUID as string
     order_number: str
     total_amount: Decimal
     order_items: List[OrderItemResponse]
@@ -129,7 +129,7 @@ class OrderResponse(OrderBase):
 
 # Material In schemas
 class MaterialInBase(BaseSchema):
-    order_id: Optional[int] = None
+    order_id: Optional[str] = None  # UUID as string
     material_type: MaterialType
     quantity: int = Field(..., gt=0)
     unit: str = Field(..., min_length=1, max_length=20)
@@ -140,30 +140,30 @@ class MaterialInCreate(MaterialInBase):
     pass
 
 class MaterialInResponse(MaterialInBase):
-    id: int
+    id: str  # UUID as string
     created_at: datetime
 
 # Production Stage Update
 class ProductionStageUpdate(BaseSchema):
-    order_item_id: int
+    order_item_id: str  # UUID as string
     stage: ProductionStage
     notes: Optional[str] = None
 
 # Delivery Challan schemas
 class ChallanItemBase(BaseSchema):
-    order_item_id: int
+    order_item_id: str  # UUID as string
     quantity: int = Field(..., gt=0)
 
 class ChallanItemCreate(ChallanItemBase):
     pass
 
 class ChallanItemResponse(ChallanItemBase):
-    id: int
-    challan_id: int
+    id: str  # UUID as string
+    challan_id: str  # UUID as string
     order_item: OrderItemResponse
 
 class DeliveryChallanBase(BaseSchema):
-    customer_id: int
+    customer_id: str  # UUID as string
     challan_date: Optional[datetime] = None
     delivery_status: str = "pending"
     notes: Optional[str] = None
@@ -172,12 +172,12 @@ class DeliveryChallanCreate(DeliveryChallanBase):
     challan_items: List[ChallanItemCreate]
 
 class DeliveryChallanUpdate(BaseSchema):
-    customer_id: Optional[int] = None
+    customer_id: Optional[str] = None  # UUID as string
     delivery_status: Optional[str] = None
     notes: Optional[str] = None
 
 class DeliveryChallanResponse(DeliveryChallanBase):
-    id: int
+    id: str  # UUID as string
     challan_number: str
     total_quantity: int
     challan_items: List[ChallanItemResponse]
@@ -186,7 +186,7 @@ class DeliveryChallanResponse(DeliveryChallanBase):
 
 # Material Out schemas
 class MaterialOutBase(BaseSchema):
-    challan_id: int
+    challan_id: str  # UUID as string
     material_type: MaterialType
     quantity: int = Field(..., gt=0)
     dispatch_date: Optional[datetime] = None
@@ -195,43 +195,40 @@ class MaterialOutCreate(MaterialOutBase):
     pass
 
 class MaterialOutResponse(MaterialOutBase):
-    id: int
+    id: str  # UUID as string
     created_at: datetime
 
-# GST Invoice schemas
-class InvoiceItemBase(BaseSchema):
-    challan_id: int
-    description: Optional[str] = None
-    quantity: int = Field(..., gt=0)
-    unit_price: Decimal = Field(..., gt=0)
-    amount: Decimal = Field(..., gt=0)
+# GST Invoice schemas - Updated to use InvoiceChallan instead of InvoiceItem
+class InvoiceChallanBase(BaseSchema):
+    challan_id: str  # UUID as string
+    challan_amount: Decimal = Field(default=0, ge=0)
 
-class InvoiceItemCreate(InvoiceItemBase):
+class InvoiceChallanCreate(InvoiceChallanBase):
     pass
 
-class InvoiceItemResponse(InvoiceItemBase):
-    id: int
-    invoice_id: int
+class InvoiceChallanResponse(InvoiceChallanBase):
+    id: str  # UUID as string
+    invoice_id: str  # UUID as string
     challan: DeliveryChallanResponse
 
 class GSTInvoiceBase(BaseSchema):
-    customer_id: int
+    customer_id: str  # UUID as string
     invoice_date: Optional[datetime] = None
     cgst_rate: Decimal = Field(default=9.00, ge=0, le=30)
     sgst_rate: Decimal = Field(default=9.00, ge=0, le=30)
     igst_rate: Decimal = Field(default=0.00, ge=0, le=30)
 
 class GSTInvoiceCreate(GSTInvoiceBase):
-    challan_ids: List[int]
+    challan_ids: List[str]  # List of UUID strings
 
 class GSTInvoiceUpdate(BaseSchema):
-    customer_id: Optional[int] = None
+    customer_id: Optional[str] = None  # UUID as string
     cgst_rate: Optional[Decimal] = Field(None, ge=0, le=30)
     sgst_rate: Optional[Decimal] = Field(None, ge=0, le=30)
     igst_rate: Optional[Decimal] = Field(None, ge=0, le=30)
 
 class GSTInvoiceResponse(GSTInvoiceBase):
-    id: int
+    id: str  # UUID as string
     invoice_number: str
     subtotal: Decimal
     cgst_amount: Decimal
@@ -239,13 +236,13 @@ class GSTInvoiceResponse(GSTInvoiceBase):
     igst_amount: Decimal
     total_amount: Decimal
     outstanding_amount: Decimal
-    invoice_items: List[InvoiceItemResponse]
+    invoice_challans: List[InvoiceChallanResponse]  # Updated from invoice_items
     customer: CustomerResponse
     created_at: datetime
 
 # Payment schemas
 class PaymentBase(BaseSchema):
-    invoice_id: int
+    invoice_id: str  # UUID as string
     payment_date: Optional[datetime] = None
     amount: Decimal = Field(..., gt=0)
     payment_method: PaymentMethod
@@ -256,25 +253,25 @@ class PaymentCreate(PaymentBase):
     pass
 
 class PaymentResponse(PaymentBase):
-    id: int
+    id: str  # UUID as string
     created_at: datetime
 
-# Customer Return schemas
-class CustomerReturnBase(BaseSchema):
-    order_item_id: int
+# Return schemas - Updated from CustomerReturn to Return
+class ReturnBase(BaseSchema):
+    order_item_id: str  # UUID as string
     return_date: Optional[datetime] = None
-    returned_quantity: int = Field(..., gt=0)
-    return_reason: ReturnReason
+    quantity: int = Field(..., gt=0)  # Updated from returned_quantity
+    reason: ReturnReason  # Updated from return_reason
     refund_amount: Decimal = Field(default=0, ge=0)
     is_adjustment: bool = False
+    adjustment_amount: Decimal = Field(default=0, ge=0)  # Added field
     notes: Optional[str] = None
 
-class CustomerReturnCreate(CustomerReturnBase):
+class ReturnCreate(ReturnBase):
     pass
 
-class CustomerReturnResponse(CustomerReturnBase):
-    id: int
-    refund_processed: bool
+class ReturnResponse(ReturnBase):
+    id: str  # UUID as string
     order_item: OrderItemResponse
     created_at: datetime
 
@@ -301,7 +298,8 @@ class InventoryUpdate(BaseSchema):
     supplier_info: Optional[str] = None
 
 class InventoryResponse(InventoryBase):
-    id: int
+    id: str  # UUID as string
+    is_active: bool  # Added field
     updated_at: datetime
     created_at: datetime
 
@@ -312,14 +310,14 @@ class ExpenseBase(BaseSchema):
     description: str = Field(..., min_length=1)
     amount: Decimal = Field(..., gt=0)
     payment_method: PaymentMethod
-    receipt_number: Optional[str] = None
+    reference_number: Optional[str] = None  # Updated from receipt_number
     notes: Optional[str] = None
 
 class ExpenseCreate(ExpenseBase):
     pass
 
 class ExpenseResponse(ExpenseBase):
-    id: int
+    id: str  # UUID as string
     created_at: datetime
 
 # Report schemas
@@ -328,7 +326,7 @@ class DateRangeFilter(BaseSchema):
     end_date: Optional[datetime] = None
 
 class PendingOrdersReport(BaseSchema):
-    order_id: int
+    order_id: str  # UUID as string
     order_number: str
     customer_name: str
     order_date: datetime
@@ -336,7 +334,7 @@ class PendingOrdersReport(BaseSchema):
     current_status: OrderStatus
 
 class ProductionStatusReport(BaseSchema):
-    order_item_id: int
+    order_item_id: str  # UUID as string
     order_number: str
     customer_name: str
     material_type: MaterialType
@@ -345,7 +343,7 @@ class ProductionStatusReport(BaseSchema):
     stage_completed_at: Optional[datetime]
 
 class PendingReceivablesReport(BaseSchema):
-    invoice_id: int
+    invoice_id: str  # UUID as string
     invoice_number: str
     customer_name: str
     invoice_date: datetime
@@ -354,7 +352,7 @@ class PendingReceivablesReport(BaseSchema):
     days_outstanding: int
 
 class StockHoldingReport(BaseSchema):
-    item_id: int
+    item_id: str  # UUID as string
     item_name: str
     category: str
     current_stock: Decimal
@@ -363,7 +361,7 @@ class StockHoldingReport(BaseSchema):
     is_low_stock: bool
     stock_value: Decimal
 
-# Response wrapper
+# Response wrappers
 class ResponseWrapper(BaseSchema):
     success: bool = True
     message: str = "Success"

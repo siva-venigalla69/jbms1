@@ -180,8 +180,8 @@ async def create_customer(
             email=customer_data.email.strip().lower() if customer_data.email else None,
             address=customer_data.address.strip() if customer_data.address else None,
             gst_number=customer_data.gst_number.strip().upper() if customer_data.gst_number else None,
-            created_by=current_user.id,
-            updated_by=current_user.id
+            created_by_user_id=current_user.id,
+            updated_by_user_id=current_user.id
         )
         
         db.add(db_customer)
@@ -204,7 +204,7 @@ async def create_customer(
 
 @router.get("/{customer_id}", response_model=CustomerResponse)
 async def get_customer(
-    customer_id: int,
+    customer_id: str,  # UUID as string
     include_stats: bool = Query(False, description="Include order statistics"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
@@ -248,7 +248,7 @@ async def get_customer(
 
 @router.put("/{customer_id}", response_model=CustomerResponse)
 async def update_customer(
-    customer_id: int,
+    customer_id: str,  # UUID as string
     customer_update: CustomerUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
@@ -315,7 +315,7 @@ async def update_customer(
                 
                 setattr(customer, field, value)
         
-        customer.updated_by = current_user.id
+        customer.updated_by_user_id = current_user.id
         customer.updated_at = datetime.utcnow()
         
         db.commit()
@@ -336,7 +336,7 @@ async def update_customer(
 
 @router.delete("/{customer_id}")
 async def delete_customer(
-    customer_id: int,
+    customer_id: str,  # UUID as string
     force: bool = Query(False, description="Force delete even with existing orders"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
@@ -369,7 +369,7 @@ async def delete_customer(
         
         # Soft delete
         customer.is_deleted = True
-        customer.updated_by = current_user.id
+        customer.updated_by_user_id = current_user.id
         customer.updated_at = datetime.utcnow()
         
         db.commit()
@@ -393,7 +393,7 @@ async def delete_customer(
 
 @router.get("/{customer_id}/orders")
 async def get_customer_orders(
-    customer_id: int,
+    customer_id: str,  # UUID as string
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
