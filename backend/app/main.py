@@ -243,11 +243,12 @@ async def debug_enum_check():
     from .models.models import UserRole
     import time
     return {
-        "app_version": "1.0.1",
+        "app_version": "1.0.2",
         "user_role_values": [role.value for role in UserRole],
         "user_role_admin": UserRole.ADMIN.value,
         "timestamp": time.time(),
-        "deployment_status": "enum_fix_applied"
+        "deployment_status": "string_column_fix_applied",
+        "fix_description": "Changed role column from Enum to String to avoid SQLAlchemy metadata cache issues"
     }
 
 # Include routers
