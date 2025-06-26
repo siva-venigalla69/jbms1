@@ -37,6 +37,8 @@ async def list_customers(
     - **sort_order**: Sort direction (asc/desc)
     """
     try:
+        logger.info(f"User {current_user.username} requesting customers list with skip={skip}, limit={limit}, search='{search}'")
+        
         # Build base query
         query = db.query(Customer).filter(Customer.is_deleted == False)
         
@@ -51,14 +53,11 @@ async def list_customers(
                 )
             )
         
-        # Apply active status filter
-        if is_active is not None:
-            # Assuming active status is determined by recent activity or explicit field
-            if hasattr(Customer, 'is_active'):
-                query = query.filter(Customer.is_active == is_active)
+        # Note: Customer model doesn't have is_active field, skipping that filter
+        # The is_active parameter is accepted but ignored for now
         
-        # Apply sorting
-        if hasattr(Customer, sort_by):
+        # Apply sorting - be more defensive about field existence
+        if sort_by and hasattr(Customer, sort_by):
             if sort_order == "desc":
                 query = query.order_by(getattr(Customer, sort_by).desc())
             else:
@@ -71,13 +70,29 @@ async def list_customers(
         customers = query.offset(skip).limit(limit).all()
         
         logger.info(f"User {current_user.username} retrieved {len(customers)} customers")
-        return customers
+        
+        # Convert to response format manually to avoid Pydantic issues
+        response_data = []
+        for customer in customers:
+            customer_dict = {
+                "id": str(customer.id),  # Ensure UUID is converted to string
+                "name": customer.name,
+                "phone": customer.phone,
+                "email": customer.email,
+                "address": customer.address,
+                "gst_number": customer.gst_number,
+                "created_at": customer.created_at,
+                "updated_at": customer.updated_at
+            }
+            response_data.append(customer_dict)
+        
+        return response_data
         
     except Exception as e:
-        logger.error(f"Error retrieving customers: {str(e)}")
+        logger.error(f"Error retrieving customers: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve customers"
+            detail=f"Failed to retrieve customers: {str(e)[:100]}"  # Include partial error for debugging
         )
 
 @router.get("/search", response_model=CustomerSearchResponse)
@@ -106,7 +121,7 @@ async def search_customers(
         
         results = [
             {
-                "id": customer.id,
+                "id": str(customer.id),  # Ensure UUID is converted to string
                 "name": customer.name,
                 "phone": customer.phone,
                 "email": customer.email
@@ -121,10 +136,10 @@ async def search_customers(
         }
         
     except Exception as e:
-        logger.error(f"Error searching customers: {str(e)}")
+        logger.error(f"Error searching customers: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Search failed"
+            detail=f"Search failed: {str(e)[:100]}"
         )
 
 @router.post("/", response_model=CustomerResponse, status_code=status.HTTP_201_CREATED)
@@ -188,18 +203,30 @@ async def create_customer(
         db.commit()
         db.refresh(db_customer)
         
+        # Convert to response format manually to avoid Pydantic issues
+        customer_data = {
+            "id": str(db_customer.id),
+            "name": db_customer.name,
+            "phone": db_customer.phone,
+            "email": db_customer.email,
+            "address": db_customer.address,
+            "gst_number": db_customer.gst_number,
+            "created_at": db_customer.created_at,
+            "updated_at": db_customer.updated_at
+        }
+        
         logger.info(f"User {current_user.username} created customer {db_customer.id}: {db_customer.name}")
         
-        return db_customer
+        return customer_data
         
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        logger.error(f"Error creating customer: {str(e)}")
+        logger.error(f"Error creating customer: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to create customer"
+            detail=f"Failed to create customer: {str(e)[:100]}"
         )
 
 @router.get("/{customer_id}", response_model=CustomerResponse)
@@ -226,24 +253,42 @@ async def get_customer(
                 detail="Customer not found"
             )
         
+        # Convert to response format manually to avoid Pydantic issues
+        customer_data = {
+            "id": str(customer.id),
+            "name": customer.name,
+            "phone": customer.phone,
+            "email": customer.email,
+            "address": customer.address,
+            "gst_number": customer.gst_number,
+            "created_at": customer.created_at,
+            "updated_at": customer.updated_at
+        }
+        
         # Add statistics if requested
         if include_stats and hasattr(customer, 'orders'):
-            customer.order_count = len([o for o in customer.orders if not o.is_deleted])
-            customer.total_order_value = sum(
-                o.total_amount for o in customer.orders 
-                if not o.is_deleted and o.total_amount
-            )
+            try:
+                order_count = len([o for o in customer.orders if not o.is_deleted])
+                total_order_value = sum(
+                    o.total_amount for o in customer.orders 
+                    if not o.is_deleted and o.total_amount
+                )
+                customer_data["order_count"] = order_count
+                customer_data["total_order_value"] = float(total_order_value)
+            except Exception as stats_error:
+                logger.warning(f"Error calculating customer stats: {stats_error}")
+                # Continue without stats rather than failing
         
         logger.info(f"User {current_user.username} viewed customer {customer_id}")
-        return customer
+        return customer_data
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error retrieving customer {customer_id}: {str(e)}")
+        logger.error(f"Error retrieving customer {customer_id}: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve customer"
+            detail=f"Failed to retrieve customer: {str(e)[:100]}"
         )
 
 @router.put("/{customer_id}", response_model=CustomerResponse)
@@ -316,22 +361,34 @@ async def update_customer(
                 setattr(customer, field, value)
         
         customer.updated_by_user_id = current_user.id
-        customer.updated_at = datetime.utcnow()
+        # updated_at will be automatically updated by the database trigger
         
         db.commit()
         db.refresh(customer)
         
+        # Convert to response format manually to avoid Pydantic issues
+        customer_data = {
+            "id": str(customer.id),
+            "name": customer.name,
+            "phone": customer.phone,
+            "email": customer.email,
+            "address": customer.address,
+            "gst_number": customer.gst_number,
+            "created_at": customer.created_at,
+            "updated_at": customer.updated_at
+        }
+        
         logger.info(f"User {current_user.username} updated customer {customer_id}")
-        return customer
+        return customer_data
         
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        logger.error(f"Error updating customer {customer_id}: {str(e)}")
+        logger.error(f"Error updating customer {customer_id}: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to update customer"
+            detail=f"Failed to update customer: {str(e)[:100]}"
         )
 
 @router.delete("/{customer_id}")
@@ -370,7 +427,7 @@ async def delete_customer(
         # Soft delete
         customer.is_deleted = True
         customer.updated_by_user_id = current_user.id
-        customer.updated_at = datetime.utcnow()
+        # updated_at will be automatically updated by the database trigger
         
         db.commit()
         
@@ -385,10 +442,10 @@ async def delete_customer(
         raise
     except Exception as e:
         db.rollback()
-        logger.error(f"Error deleting customer {customer_id}: {str(e)}")
+        logger.error(f"Error deleting customer {customer_id}: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to delete customer"
+            detail=f"Failed to delete customer: {str(e)[:100]}"
         )
 
 @router.get("/{customer_id}/orders")
