@@ -28,6 +28,8 @@ async def list_orders(
 ):
     """List orders with filtering and search"""
     try:
+        logger.info(f"User {current_user.username} requesting orders list with skip={skip}, limit={limit}")
+        
         query = db.query(Order).filter(Order.is_deleted == False)
         
         if customer_id:
@@ -47,10 +49,84 @@ async def list_orders(
             )
         
         orders = query.order_by(Order.created_at.desc()).offset(skip).limit(limit).all()
-        return orders
+        
+        # Convert to response format manually to avoid Pydantic issues
+        response_data = []
+        for order in orders:
+            try:
+                # Get customer info safely
+                customer = db.query(Customer).filter(Customer.id == order.customer_id).first()
+                customer_data = {
+                    "id": str(customer.id),
+                    "name": customer.name,
+                    "phone": customer.phone,
+                    "email": customer.email,
+                    "address": customer.address,
+                    "gst_number": customer.gst_number,
+                    "created_at": customer.created_at,
+                    "updated_at": customer.updated_at
+                } if customer else None
+                
+                # Get order items safely
+                order_items = db.query(OrderItem).filter(OrderItem.order_id == order.id).all()
+                items_data = []
+                for item in order_items:
+                    item_dict = {
+                        "id": str(item.id),
+                        "order_id": str(item.order_id),
+                        "material_type": item.material_type,
+                        "quantity": item.quantity,
+                        "unit_price": float(item.unit_price),
+                        "customization_details": item.customization_details,
+                        "current_stage": item.current_stage,
+                        "pre_treatment_completed_at": item.pre_treatment_completed_at,
+                        "printing_completed_at": item.printing_completed_at,
+                        "post_process_completed_at": item.post_process_completed_at,
+                        "created_at": item.created_at
+                    }
+                    items_data.append(item_dict)
+                
+                order_dict = {
+                    "id": str(order.id),
+                    "order_number": order.order_number,
+                    "customer_id": str(order.customer_id),
+                    "order_date": order.order_date,
+                    "status": order.status,
+                    "total_amount": float(order.total_amount),
+                    "notes": order.notes,
+                    "created_at": order.created_at,
+                    "updated_at": order.updated_at,
+                    "customer": customer_data,
+                    "order_items": items_data
+                }
+                response_data.append(order_dict)
+            except Exception as item_error:
+                logger.warning(f"Error processing order {order.id}: {item_error}")
+                # Continue with basic order data if relationship loading fails
+                order_dict = {
+                    "id": str(order.id),
+                    "order_number": order.order_number,
+                    "customer_id": str(order.customer_id),
+                    "order_date": order.order_date,
+                    "status": order.status,
+                    "total_amount": float(order.total_amount),
+                    "notes": order.notes,
+                    "created_at": order.created_at,
+                    "updated_at": order.updated_at,
+                    "customer": None,
+                    "order_items": []
+                }
+                response_data.append(order_dict)
+        
+        logger.info(f"User {current_user.username} retrieved {len(response_data)} orders")
+        return response_data
+        
     except Exception as e:
-        logger.error(f"Error retrieving orders: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve orders")
+        logger.error(f"Error retrieving orders: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Failed to retrieve orders: {str(e)[:100]}"
+        )
 
 @router.post("/", response_model=OrderResponse, status_code=201)
 async def create_order(

@@ -23,6 +23,8 @@ async def list_inventory(
 ):
     """List inventory items"""
     try:
+        logger.info(f"User {current_user.username} requesting inventory list with skip={skip}, limit={limit}")
+        
         query = db.query(Inventory).filter(
             and_(Inventory.is_deleted == False, Inventory.is_active == True)
         )
@@ -34,10 +36,34 @@ async def list_inventory(
             query = query.filter(Inventory.current_stock <= Inventory.reorder_level)
         
         items = query.order_by(Inventory.item_name).offset(skip).limit(limit).all()
-        return items
+        
+        # Convert to response format manually to avoid Pydantic issues
+        response_data = []
+        for item in items:
+            item_dict = {
+                "id": str(item.id),
+                "item_name": item.item_name,
+                "category": item.category,
+                "current_stock": float(item.current_stock),
+                "unit": item.unit,
+                "reorder_level": float(item.reorder_level),
+                "cost_per_unit": float(item.cost_per_unit),
+                "supplier_info": item.supplier_info,
+                "is_active": item.is_active,
+                "updated_at": item.updated_at,
+                "created_at": item.created_at
+            }
+            response_data.append(item_dict)
+        
+        logger.info(f"User {current_user.username} retrieved {len(response_data)} inventory items")
+        return response_data
+        
     except Exception as e:
-        logger.error(f"Error retrieving inventory: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve inventory")
+        logger.error(f"Error retrieving inventory: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Failed to retrieve inventory: {str(e)[:100]}"
+        )
 
 @router.post("/", response_model=InventoryResponse, status_code=201)
 async def create_inventory_item(
@@ -131,7 +157,30 @@ async def get_low_stock_items(
             )
         ).order_by(Inventory.current_stock.asc()).all()
         
-        return items
+        # Convert to response format manually to avoid Pydantic issues
+        response_data = []
+        for item in items:
+            item_dict = {
+                "id": str(item.id),
+                "item_name": item.item_name,
+                "category": item.category,
+                "current_stock": float(item.current_stock),
+                "unit": item.unit,
+                "reorder_level": float(item.reorder_level),
+                "cost_per_unit": float(item.cost_per_unit),
+                "supplier_info": item.supplier_info,
+                "is_active": item.is_active,
+                "updated_at": item.updated_at,
+                "created_at": item.created_at
+            }
+            response_data.append(item_dict)
+        
+        logger.info(f"User {current_user.username} retrieved {len(response_data)} low stock items")
+        return response_data
+        
     except Exception as e:
-        logger.error(f"Error retrieving low stock items: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve low stock items")
+        logger.error(f"Error retrieving low stock items: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Failed to retrieve low stock items: {str(e)[:100]}"
+        )
