@@ -176,10 +176,20 @@ async def register_user(user_data: UserCreate, db: Session = Depends(get_db), cu
     
     return db_user
 
-@router.get("/me", response_model=UserResponse)
+@router.get("/me")  # Removed response_model=UserResponse temporarily
 async def read_users_me(current_user: User = Depends(get_current_active_user)):
     """Get current user information"""
-    return current_user
+    # Return raw data to avoid Pydantic serialization issues temporarily
+    return {
+        "id": str(current_user.id),
+        "username": current_user.username,
+        "email": current_user.email,
+        "full_name": current_user.full_name,
+        "role": current_user.role,  # Raw string value
+        "is_active": current_user.is_active,
+        "created_at": current_user.created_at.isoformat() if current_user.created_at else None,
+        "updated_at": current_user.updated_at.isoformat() if current_user.updated_at else None
+    }
 
 @router.get("/users", response_model=list[UserResponse])
 async def list_users(db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
