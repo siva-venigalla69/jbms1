@@ -26,19 +26,43 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
         headers={"WWW-Authenticate": "Bearer"},
     )
     
-    payload = verify_token(token)
-    if payload is None:
-        raise credentials_exception
-    
-    username: str = payload.get("sub")
-    if username is None:
-        raise credentials_exception
-    
-    user = db.query(User).filter(User.username == username).first()
-    if user is None:
-        raise credentials_exception
-    
-    return user
+    try:
+        logger.info(f"Getting current user from token: {token[:20]}...")
+        
+        payload = verify_token(token)
+        logger.info(f"Token payload: {payload}")
+        
+        if payload is None:
+            logger.warning("Token verification returned None")
+            raise credentials_exception
+        
+        username: str = payload.get("sub")
+        if username is None:
+            logger.warning("No username in token payload")
+            raise credentials_exception
+        
+        logger.info(f"Looking up user: {username}")
+        user = db.query(User).filter(User.username == username).first()
+        logger.info(f"User lookup result: {'Found' if user else 'Not found'}")
+        
+        if user is None:
+            logger.warning(f"User {username} not found in database")
+            raise credentials_exception
+        
+        logger.info(f"Successfully retrieved user: {user.username}, active: {user.is_active}")
+        return user
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error in get_current_user: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        # Return 500 error instead of 401 for debugging
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Authentication error: {str(e)}"
+        )
 
 async def get_current_active_user(current_user: User = Depends(get_current_user)):
     """Get current active user"""
@@ -168,3 +192,24 @@ async def list_users(db: Session = Depends(get_db), current_user: User = Depends
     
     users = db.query(User).all()
     return users 
+
+@router.get("/debug/token")
+async def debug_token(token: str = Depends(oauth2_scheme)):
+    """Debug endpoint to test token verification"""
+    try:
+        logger.info(f"Debug token endpoint called with token: {token[:20]}...")
+        
+        payload = verify_token(token)
+        logger.info(f"Token verification result: {payload}")
+        
+        return {
+            "token_valid": payload is not None,
+            "payload": payload,
+            "username": payload.get("sub") if payload else None
+        }
+    except Exception as e:
+        logger.error(f"Debug token error: {str(e)}")
+        return {
+            "error": str(e),
+            "token_valid": False
+        } 
