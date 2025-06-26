@@ -186,13 +186,21 @@ async def general_exception_handler(request: Request, exc: Exception):
     """Handle unexpected errors"""
     logger.error(f"Unexpected error on {request.url.path}: {str(exc)}", exc_info=True)
     
-    return JSONResponse(
+    response = JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={
             "detail": "An unexpected error occurred. Please contact support if the problem persists.",
             "request_id": id(request)
         }
     )
+    
+    # Ensure CORS headers are added even for 500 errors
+    origin = request.headers.get("origin")
+    if origin and origin in settings.ALLOWED_ORIGINS:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+    
+    return response
 
 # Health check endpoints
 @app.get("/health", tags=["Health"])
