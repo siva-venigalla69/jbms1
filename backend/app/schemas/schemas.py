@@ -2,7 +2,7 @@ from typing import Optional, List
 from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
-from pydantic import BaseModel, Field, EmailStr, field_validator
+from pydantic import BaseModel, Field, EmailStr
 from ..models.models import UserRole, OrderStatus, MaterialType, ProductionStage, PaymentMethod, ReturnReason
 
 # Base schemas
@@ -32,17 +32,6 @@ class UserResponse(UserBase):
     id: UUID
     created_at: datetime
     updated_at: datetime
-    
-    @field_validator('role', mode='before')
-    @classmethod
-    def validate_role(cls, v):
-        # Handle string values from database
-        if isinstance(v, str):
-            return v
-        # Handle enum values
-        if hasattr(v, 'value'):
-            return v.value
-        return v
     
     class Config:
         from_attributes = True
