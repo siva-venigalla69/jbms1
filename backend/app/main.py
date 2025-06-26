@@ -236,6 +236,20 @@ async def get_version():
         "timestamp": time.time()
     }
 
+# Add after the health endpoint
+@app.get("/debug/enum-check")
+async def debug_enum_check():
+    """Debug endpoint to check deployed enum values"""
+    from .models.models import UserRole
+    import time
+    return {
+        "app_version": "1.0.1",
+        "user_role_values": [role.value for role in UserRole],
+        "user_role_admin": UserRole.ADMIN.value,
+        "timestamp": time.time(),
+        "deployment_status": "enum_fix_applied"
+    }
+
 # Include routers
 app.include_router(auth.router, prefix="/api")
 app.include_router(customers.router, prefix="/api")

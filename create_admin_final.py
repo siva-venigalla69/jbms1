@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
 Final admin user creation script with correct lowercase enum values
+Updated for deployment v1.0.1
 """
 
 import uuid
@@ -24,50 +25,49 @@ def create_admin_sql():
     password_hash = pwd_context.hash(password)
     current_time = datetime.now().isoformat()
     
-    # Generate SQL with lowercase enum value
+    # Generate SQL with lowercase enum value 'admin'
     sql_commands = f"""
--- Create admin user with correct lowercase enum value
+-- Delete existing admin user if any
+DELETE FROM users WHERE username = 'admin' OR role = 'admin';
+
+-- Create admin user with LOWERCASE enum value
 INSERT INTO users (
-    id, 
-    username, 
-    email, 
-    full_name, 
-    password_hash, 
-    role, 
-    is_active, 
-    created_at, 
-    updated_at
+    id, username, email, full_name, password_hash, role, is_active, created_at, updated_at
 ) VALUES (
     '{user_id}',
     '{username}',
-    '{email}', 
+    '{email}',
     '{full_name}',
     '{password_hash}',
-    'admin',  -- LOWERCASE to match database enum
+    'admin',  -- LOWERCASE enum value matching database
     true,
     '{current_time}',
     '{current_time}'
-) ON CONFLICT (username) DO UPDATE SET
-    password_hash = '{password_hash}',
-    role = 'admin',
-    updated_at = '{current_time}';
+);
 
 -- Verify the user was created
-SELECT id, username, email, full_name, role, is_active, created_at 
-FROM users 
-WHERE username = 'admin';
+SELECT username, email, role, is_active FROM users WHERE username = 'admin';
 """
     
-    print("=== FINAL ADMIN CREATION SQL ===")
+    print("🔧 SQL Commands for Creating Admin User (v1.0.1)")
+    print("=" * 60)
     print(sql_commands)
-    print("\n=== INSTRUCTIONS ===")
+    print("=" * 60)
+    print(f"✅ Admin Username: {username}")
+    print(f"✅ Admin Password: {password}")
+    print(f"✅ Admin Role: admin (lowercase)")
+    print(f"✅ Password Hash: {password_hash[:50]}...")
+    print(f"✅ User ID: {user_id}")
+    print("\n📝 Instructions:")
     print("1. Copy the SQL commands above")
-    print("2. Connect to your Render PostgreSQL database")
-    print("3. Execute the SQL commands")
-    print("4. Test login with:")
-    print(f"   Username: {username}")
-    print(f"   Password: {password}")
-    print("5. The enum value 'admin' (lowercase) matches your database!")
+    print("2. Go to your Render PostgreSQL dashboard")
+    print("3. Open the Query tab and paste the SQL")
+    print("4. Execute the commands")
+    print("5. Test login with curl command")
+    print("\n🧪 Test Command:")
+    print(f'curl -X POST https://jbms1.onrender.com/api/auth/login \\')
+    print(f'  -H "Content-Type: application/x-www-form-urlencoded" \\')
+    print(f'  -d "username={username}&password={password}"')
 
 if __name__ == "__main__":
     create_admin_sql() 
