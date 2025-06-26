@@ -43,7 +43,7 @@ export const customerApi = {
         return response.data;
     },
 
-    getCustomer: async (id: number): Promise<Customer> => {
+    getCustomer: async (id: string): Promise<Customer> => {
         const response = await apiClient.get(API_ENDPOINTS.CUSTOMER_BY_ID(id));
         return response.data;
     },
@@ -53,12 +53,12 @@ export const customerApi = {
         return response.data;
     },
 
-    updateCustomer: async (id: number, customer: CustomerUpdate): Promise<Customer> => {
+    updateCustomer: async (id: string, customer: CustomerUpdate): Promise<Customer> => {
         const response = await apiClient.put(API_ENDPOINTS.CUSTOMER_BY_ID(id), customer);
         return response.data;
     },
 
-    deleteCustomer: async (id: number): Promise<void> => {
+    deleteCustomer: async (id: string): Promise<void> => {
         await apiClient.delete(API_ENDPOINTS.CUSTOMER_BY_ID(id));
     },
 };

@@ -61,11 +61,11 @@ export const API_ENDPOINTS = {
 
   // Customers
   CUSTOMERS: '/api/customers',
-  CUSTOMER_BY_ID: (id: number) => `/api/customers/${id}`,
+  CUSTOMER_BY_ID: (id: string) => `/api/customers/${id}`,
 
   // Orders (to be implemented in backend)
   ORDERS: '/api/orders',
-  ORDER_BY_ID: (id: number) => `/api/orders/${id}`,
+  ORDER_BY_ID: (id: string) => `/api/orders/${id}`,
 
   // Production (to be implemented in backend)
   PRODUCTION_STATUS: '/api/production/status',
