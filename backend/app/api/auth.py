@@ -212,4 +212,42 @@ async def debug_token(token: str = Depends(oauth2_scheme)):
         return {
             "error": str(e),
             "token_valid": False
+        }
+
+@router.get("/debug/user")
+async def debug_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    """Debug endpoint to test user lookup and serialization"""
+    try:
+        logger.info(f"Debug user endpoint called with token: {token[:20]}...")
+        
+        payload = verify_token(token)
+        if payload is None:
+            return {"error": "Invalid token"}
+        
+        username: str = payload.get("sub")
+        logger.info(f"Looking up user: {username}")
+        
+        user = db.query(User).filter(User.username == username).first()
+        if user is None:
+            return {"error": "User not found"}
+        
+        # Return raw user data without pydantic serialization
+        return {
+            "user_found": True,
+            "id": str(user.id),
+            "username": user.username,
+            "email": user.email,
+            "full_name": user.full_name,
+            "role": user.role,  # This might be causing the issue
+            "is_active": user.is_active,
+            "created_at": user.created_at.isoformat() if user.created_at else None,
+            "updated_at": user.updated_at.isoformat() if user.updated_at else None
+        }
+    except Exception as e:
+        logger.error(f"Debug user error: {str(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return {
+            "error": str(e),
+            "traceback": traceback.format_exc()
         } 

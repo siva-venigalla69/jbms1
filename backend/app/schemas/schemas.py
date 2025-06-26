@@ -32,6 +32,11 @@ class UserResponse(UserBase):
     id: UUID
     created_at: datetime
     updated_at: datetime
+    
+    class Config:
+        from_attributes = True
+        # Handle enum conversion from string values in database
+        use_enum_values = True
 
 # Authentication schemas
 class Token(BaseSchema):
