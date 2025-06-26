@@ -22,7 +22,7 @@ const Orders: React.FC = () => {
       </Box>
 
       <Grid container spacing={3}>
-        <Grid item xs={12}>
+        <Grid size={12}>
           <Card>
             <CardContent sx={{ textAlign: 'center', py: 8 }}>
               <ShoppingCart sx={{ fontSize: 80, color: 'primary.main', mb: 2 }} />
@@ -35,7 +35,7 @@ const Orders: React.FC = () => {
               <Typography variant="body2" color="text.secondary">
                 Features will include:
                 • Create new orders with multiple items
-                • Track order status and production stages  
+                • Track order status and production stages
                 • Manage order items and customizations
                 • Generate order reports
               </Typography>

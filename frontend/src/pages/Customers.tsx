@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     Box,
     Card,
@@ -20,12 +20,11 @@ import {
     Paper,
     Chip,
     InputAdornment,
-    Grid,
     Alert,
     CircularProgress,
-    Tooltip,
     Menu,
     MenuItem,
+    Grid,
 } from '@mui/material';
 import {
     Add,
@@ -42,15 +41,15 @@ import {
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
-import { Customer, CustomerCreate, CustomerUpdate } from '../types';
+import { Customer, CustomerCreate } from '../types';
 import { customerApi } from '../services/api';
 
-const customerSchema = yup.object({
+const customerSchema: yup.ObjectSchema<CustomerCreate> = yup.object({
     name: yup.string().required('Customer name is required'),
-    phone: yup.string().matches(/^[0-9]+$/, 'Phone number must contain only digits'),
-    email: yup.string().email('Invalid email format'),
-    address: yup.string(),
-    gst_number: yup.string(),
+    phone: yup.string().matches(/^[0-9]*$/, 'Phone number must contain only digits').optional(),
+    email: yup.string().email('Invalid email format').optional(),
+    address: yup.string().optional(),
+    gst_number: yup.string().optional(),
 });
 
 const Customers: React.FC = () => {
@@ -81,7 +80,7 @@ const Customers: React.FC = () => {
     });
 
     // Load customers
-    const loadCustomers = async () => {
+    const loadCustomers = useCallback(async () => {
         try {
             setLoading(true);
             const data = await customerApi.getCustomers({ search: searchTerm });
@@ -91,11 +90,11 @@ const Customers: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [searchTerm]);
 
     useEffect(() => {
         loadCustomers();
-    }, [searchTerm]);
+    }, [loadCustomers]);
 
     // Clear messages after 5 seconds
     useEffect(() => {
@@ -385,7 +384,7 @@ const Customers: React.FC = () => {
                 <form onSubmit={handleSubmit(onSubmit)}>
                     <DialogContent>
                         <Grid container spacing={2} sx={{ mt: 1 }}>
-                            <Grid item xs={12} md={6}>
+                            <Grid size={{ xs: 12, md: 6 }}>
                                 <Controller
                                     name="name"
                                     control={control}
@@ -400,7 +399,7 @@ const Customers: React.FC = () => {
                                     )}
                                 />
                             </Grid>
-                            <Grid item xs={12} md={6}>
+                            <Grid size={{ xs: 12, md: 6 }}>
                                 <Controller
                                     name="phone"
                                     control={control}
@@ -415,7 +414,7 @@ const Customers: React.FC = () => {
                                     )}
                                 />
                             </Grid>
-                            <Grid item xs={12} md={6}>
+                            <Grid size={{ xs: 12, md: 6 }}>
                                 <Controller
                                     name="email"
                                     control={control}
@@ -431,7 +430,7 @@ const Customers: React.FC = () => {
                                     )}
                                 />
                             </Grid>
-                            <Grid item xs={12} md={6}>
+                            <Grid size={{ xs: 12, md: 6 }}>
                                 <Controller
                                     name="gst_number"
                                     control={control}
@@ -446,7 +445,7 @@ const Customers: React.FC = () => {
                                     )}
                                 />
                             </Grid>
-                            <Grid item xs={12}>
+                            <Grid size={12}>
                                 <Controller
                                     name="address"
                                     control={control}

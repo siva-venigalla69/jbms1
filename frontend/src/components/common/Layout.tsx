@@ -16,7 +16,6 @@ import {
     MenuItem,
     useTheme,
     useMediaQuery,
-    Badge,
 } from '@mui/material';
 import {
     Menu as MenuIcon,
@@ -27,11 +26,10 @@ import {
     Receipt,
     Inventory,
     Assessment,
-    AccountCircle,
     Logout,
     Settings,
     Factory,
-    Assignment,
+    AccountCircle,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';

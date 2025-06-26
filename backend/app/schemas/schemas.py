@@ -1,6 +1,7 @@
 from typing import Optional, List
 from datetime import datetime
 from decimal import Decimal
+from uuid import UUID
 from pydantic import BaseModel, Field, EmailStr
 from ..models.models import UserRole, OrderStatus, MaterialType, ProductionStage, PaymentMethod, ReturnReason
 
@@ -28,7 +29,7 @@ class UserUpdate(BaseSchema):
     is_active: Optional[bool] = None
 
 class UserResponse(UserBase):
-    id: str  # UUID as string
+    id: UUID
     created_at: datetime
     updated_at: datetime
 

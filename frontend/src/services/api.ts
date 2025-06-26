@@ -83,8 +83,11 @@ export const apiUtils = {
     },
 };
 
-export default {
+// Named default export
+const apiService = {
     auth: authApi,
     customers: customerApi,
     utils: apiUtils,
-}; 
+};
+
+export default apiService; 

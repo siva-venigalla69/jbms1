@@ -1,12 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import {
     Box,
-    Grid,
     Card,
     CardContent,
     Typography,
     Button,
-    IconButton,
     Avatar,
     List,
     ListItem,
@@ -15,22 +13,16 @@ import {
     Divider,
     Chip,
     LinearProgress,
-    Paper,
+    Grid,
 } from '@mui/material';
 import {
-    Dashboard as DashboardIcon,
     People,
     ShoppingCart,
     Assignment,
-    TrendingUp,
     Factory,
     LocalShipping,
-    Receipt,
-    Add,
     ArrowForward,
-    Warning,
     CheckCircle,
-    AccessTime,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -222,7 +214,7 @@ const Dashboard: React.FC = () => {
             {/* Quick Actions */}
             <Grid container spacing={3} sx={{ mb: 4 }}>
                 {quickActions.map((action, index) => (
-                    <Grid item xs={12} sm={6} md={3} key={index}>
+                    <Grid size={{ xs: 12, sm: 6, md: 3 }} key={index}>
                         <Card
                             sx={{
                                 height: '100%',
@@ -259,7 +251,7 @@ const Dashboard: React.FC = () => {
             {/* Statistics Cards */}
             <Grid container spacing={3} sx={{ mb: 4 }}>
                 {statCards.map((stat, index) => (
-                    <Grid item xs={12} sm={6} md={3} key={index}>
+                    <Grid size={{ xs: 12, sm: 6, md: 3 }} key={index}>
                         <Card>
                             <CardContent>
                                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
@@ -303,7 +295,7 @@ const Dashboard: React.FC = () => {
 
             <Grid container spacing={3}>
                 {/* Recent Activity */}
-                <Grid item xs={12} md={8}>
+                <Grid size={{ xs: 12, md: 8 }}>
                     <Card>
                         <CardContent>
                             <Box
@@ -358,7 +350,7 @@ const Dashboard: React.FC = () => {
                 </Grid>
 
                 {/* Quick Stats */}
-                <Grid item xs={12} md={4}>
+                <Grid size={{ xs: 12, md: 4 }}>
                     <Card>
                         <CardContent>
                             <Typography variant="h6" fontWeight="600" gutterBottom>

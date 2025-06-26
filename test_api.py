@@ -10,9 +10,9 @@ import os
 from datetime import datetime
 
 # Configuration
-API_BASE_URL = os.getenv('API_URL', 'https://YOUR_API_URL_HERE')  # Replace with your Render URL
-ADMIN_USERNAME = 'admin'
-ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD', 'your_admin_password')  # Replace with your password
+API_BASE_URL = "https://jbms1.onrender.com"  # ✅ Update with your Render URL
+USERNAME = "admin"
+PASSWORD = "Siri@2299"  # ✅ Update with your admin password
 
 class APITester:
     def __init__(self, base_url, username, password):
@@ -222,13 +222,13 @@ def main():
         print("Edit the API_BASE_URL variable in this script with your Render URL")
         return
     
-    if ADMIN_PASSWORD == 'your_admin_password':
+    if PASSWORD == 'your_admin_password':
         print("❌ ERROR: Please set your admin password in the script or environment variable")
-        print("Edit the ADMIN_PASSWORD variable in this script")
+        print("Edit the PASSWORD variable in this script")
         return
     
     # Run tests
-    tester = APITester(API_BASE_URL, ADMIN_USERNAME, ADMIN_PASSWORD)
+    tester = APITester(API_BASE_URL, USERNAME, PASSWORD)
     tester.run_all_tests()
 
 if __name__ == "__main__":

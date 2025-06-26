@@ -18,7 +18,7 @@ const Production: React.FC = () => {
             </Box>
 
             <Grid container spacing={3}>
-                <Grid item xs={12}>
+                <Grid size={12}>
                     <Card>
                         <CardContent sx={{ textAlign: 'center', py: 8 }}>
                             <Factory sx={{ fontSize: 80, color: 'primary.main', mb: 2 }} />
