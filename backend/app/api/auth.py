@@ -255,9 +255,29 @@ async def debug_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
         }
     except Exception as e:
         logger.error(f"Debug user error: {str(e)}")
-        import traceback
         logger.error(f"Traceback: {traceback.format_exc()}")
         return {
             "error": str(e),
             "traceback": traceback.format_exc()
+        }
+
+@router.get("/debug/simple-test")
+async def simple_test():
+    """Simple test endpoint with no dependencies"""
+    return {"message": "Simple test works", "status": "ok"}
+
+@router.get("/debug/auth-test")
+async def auth_test(token: str = Depends(oauth2_scheme)):
+    """Test endpoint with only token dependency (no DB or User lookup)"""
+    try:
+        payload = verify_token(token)
+        return {
+            "message": "Token verification works",
+            "payload": payload,
+            "status": "ok"
+        }
+    except Exception as e:
+        return {
+            "error": str(e),
+            "status": "error"
         } 

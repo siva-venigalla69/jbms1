@@ -22,7 +22,7 @@ export interface AuthToken {
 
 // Customer types
 export interface Customer {
-    id: number;
+    id: string;
     name: string;
     phone?: string;
     email?: string;
@@ -48,8 +48,8 @@ export type OrderStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
 export type ProductionStage = 'pre_treatment' | 'printing' | 'post_process';
 
 export interface OrderItem {
-    id: number;
-    order_id: number;
+    id: string;
+    order_id: string;
     material_type: MaterialType;
     quantity: number;
     unit_price: number;
@@ -69,9 +69,9 @@ export interface OrderItemCreate {
 }
 
 export interface Order {
-    id: number;
+    id: string;
     order_number: string;
-    customer_id: number;
+    customer_id: string;
     order_date: string;
     status: OrderStatus;
     total_amount: number;
@@ -83,7 +83,7 @@ export interface Order {
 }
 
 export interface OrderCreate {
-    customer_id: number;
+    customer_id: string;
     order_date?: string;
     status?: OrderStatus;
     notes?: string;
