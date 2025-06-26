@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Login Test</title>
+</head>
+
+<body>
+    <h1>Login Test</h1>
+    <button onclick="testLogin()">Test Login</button>
+    <div id="result"></div>
+
+    <script>
+        async function testLogin() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Testing login...';
+
+            try {
+                // 1. Login
+                const formData = new FormData();
+                formData.append('username', 'admin');
+                formData.append('password', 'Siri@2299');
+
+                const loginResponse = await fetch('https://jbms1.onrender.com/api/auth/login', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const loginData = await loginResponse.json();
+                console.log('Login response:', loginData);
+
+                if (loginResponse.ok) {
+                    resultDiv.innerHTML += '<br>✅ Login successful!';
+
+                    // 2. Test /me endpoint
+                    const meResponse = await fetch('https://jbms1.onrender.com/api/auth/me', {
+                        headers: {
+                            'Authorization': `Bearer ${loginData.access_token}`
+                        }
+                    });
+
+                    const userData = await meResponse.json();
+                    console.log('User data:', userData);
+
+                    if (meResponse.ok) {
+                        resultDiv.innerHTML += '<br>✅ /me endpoint works!';
+                        resultDiv.innerHTML += `<br>User: ${userData.username} (${userData.role})`;
+                    } else {
+                        resultDiv.innerHTML += `<br>❌ /me failed: ${userData.detail}`;
+                    }
+                } else {
+                    resultDiv.innerHTML += `<br>❌ Login failed: ${loginData.detail}`;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                resultDiv.innerHTML += `<br>❌ Error: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+
+</html>

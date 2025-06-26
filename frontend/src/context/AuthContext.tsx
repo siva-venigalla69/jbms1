@@ -104,12 +104,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   useEffect(() => {
     const checkAuth = async () => {
       const token = localStorage.getItem('access_token');
-      if (token) {
+      const storedUser = localStorage.getItem('user');
+
+      if (token && storedUser) {
         try {
-          const response = await apiClient.get(API_ENDPOINTS.ME);
-          dispatch({ type: 'SET_USER', payload: response.data });
+          // First try to use stored user data
+          const userData = JSON.parse(storedUser);
+          dispatch({ type: 'SET_USER', payload: userData });
+
+          // Then verify with server (but don't fail if server is unreachable)
+          try {
+            const response = await apiClient.get(API_ENDPOINTS.ME);
+            dispatch({ type: 'SET_USER', payload: response.data });
+          } catch (verifyError) {
+            // If server verification fails, still use stored data
+            console.log('Server verification failed, using stored user data');
+          }
         } catch (error) {
-          // Token is invalid, remove it
+          // Token or stored data is invalid, remove it
           localStorage.removeItem('access_token');
           localStorage.removeItem('user');
         }
