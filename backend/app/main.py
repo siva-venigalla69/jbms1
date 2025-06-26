@@ -280,7 +280,7 @@ async def root():
         "health": "/health"
     }
 
-# Catch-all endpoint for unmatched routes
+# Catch-all endpoint for unmatched routes (MUST BE LAST)
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
 async def catch_all(request: Request, path: str):
     """Catch-all endpoint for undefined routes"""
