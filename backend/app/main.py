@@ -280,27 +280,5 @@ async def root():
         "health": "/health"
     }
 
-# Catch-all endpoint for unmatched routes (MUST BE LAST)
-@app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
-async def catch_all(request: Request, path: str):
-    """Catch-all endpoint for undefined routes"""
-    logger.warning(f"Undefined route accessed: {request.method} /{path}")
-    
-    return JSONResponse(
-        status_code=status.HTTP_404_NOT_FOUND,
-        content={
-            "detail": f"Endpoint not found: {request.method} /{path}",
-            "available_endpoints": [
-                "/docs",
-                "/health", 
-                "/api/auth/login",
-                "/api/customers",
-                "/api/orders",
-                "/api/challans",
-                "/api/invoices",
-                "/api/payments",
-                "/api/inventory",
-                "/api/materials"
-            ] if settings.DEBUG else "Contact support for available endpoints"
-        }
-    ) 
+# Temporary removal of catch-all route to debug routing issue
+# Will re-add once customer endpoints work properly 
