@@ -50,7 +50,7 @@ async def list_inventory(
                 "cost_per_unit": float(item.cost_per_unit),
                 "supplier_info": f"{item.supplier_name or ''} - {item.supplier_contact or ''}".strip(' -'),  # Combine supplier fields
                 "is_active": item.is_active,
-                "updated_at": item.updated_at,
+                "updated_at": item.last_updated,
                 "created_at": item.created_at
             }
             response_data.append(item_dict)
@@ -170,7 +170,7 @@ async def get_low_stock_items(
                 "cost_per_unit": float(item.cost_per_unit),
                 "supplier_info": f"{item.supplier_name or ''} - {item.supplier_contact or ''}".strip(' -'),  # Combine supplier fields
                 "is_active": item.is_active,
-                "updated_at": item.updated_at,
+                "updated_at": item.last_updated,
                 "created_at": item.created_at
             }
             response_data.append(item_dict)
