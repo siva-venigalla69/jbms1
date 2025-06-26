@@ -30,7 +30,7 @@ def create_admin_user():
     
     try:
         # Check if admin user already exists
-        existing_admin = db.query(User).filter(User.role == UserRole.ADMIN).first()
+        existing_admin = db.query(User).filter(User.role == "admin").first()
         if existing_admin:
             print(f"Admin user already exists: {existing_admin.username}")
             return
@@ -48,8 +48,8 @@ def create_admin_user():
             username=username,
             email=email,
             full_name=full_name,
-            hashed_password=hashed_password,
-            role=UserRole.ADMIN,
+            password_hash=hashed_password,
+            role="admin",  # Use lowercase enum value to match database
             is_active=True
         )
         
@@ -62,7 +62,7 @@ def create_admin_user():
     except Exception as e:
         print(f"❌ Error creating admin user: {e}")
         db.rollback()
-    finally:psql
+    finally:
         db.close()
 
 if __name__ == "__main__":
