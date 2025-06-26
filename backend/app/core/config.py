@@ -42,7 +42,7 @@ class Settings(BaseSettings):
         default_factory=lambda: os.getenv("DEBUG", "true").lower() == "true"
     )
     APP_NAME: str = "Digital Textile Printing System"
-    APP_VERSION: str = "1.0.2"
+    APP_VERSION: str = "1.0.3"
     
     # Security Headers
     ENABLE_SECURITY_HEADERS: bool = True
