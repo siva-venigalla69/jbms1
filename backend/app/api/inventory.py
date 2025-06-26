@@ -48,7 +48,7 @@ async def list_inventory(
                 "unit": item.unit,
                 "reorder_level": float(item.reorder_level),
                 "cost_per_unit": float(item.cost_per_unit),
-                "supplier_info": item.supplier_info,
+                "supplier_info": f"{item.supplier_name or ''} - {item.supplier_contact or ''}".strip(' -'),  # Combine supplier fields
                 "is_active": item.is_active,
                 "updated_at": item.updated_at,
                 "created_at": item.created_at
@@ -168,7 +168,7 @@ async def get_low_stock_items(
                 "unit": item.unit,
                 "reorder_level": float(item.reorder_level),
                 "cost_per_unit": float(item.cost_per_unit),
-                "supplier_info": item.supplier_info,
+                "supplier_info": f"{item.supplier_name or ''} - {item.supplier_contact or ''}".strip(' -'),  # Combine supplier fields
                 "is_active": item.is_active,
                 "updated_at": item.updated_at,
                 "created_at": item.created_at
