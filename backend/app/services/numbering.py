@@ -17,23 +17,28 @@ def generate_order_number(db: Session) -> str:
     current_year = datetime.now().year
     
     try:
-        # Get the highest order number for current year using safer SQL
+        # Simplified approach - get all order numbers for current year and find max
         result = db.execute(
             text("""
-            SELECT COALESCE(MAX(
-                CASE 
-                    WHEN order_number ~ '^ORD-[0-9]{4}-[0-9]+$' THEN
-                        CAST(SPLIT_PART(order_number, '-', 3) AS INTEGER)
-                    ELSE 0
-                END
-            ), 0) as max_num
+            SELECT order_number 
             FROM orders 
             WHERE order_number LIKE :pattern
+            ORDER BY order_number DESC
+            LIMIT 1
             """),
             {"pattern": f"ORD-{current_year}-%"}
         ).fetchone()
         
-        next_number = (result.max_num if result and result.max_num is not None else 0) + 1
+        if result and result.order_number:
+            # Extract the number part and increment
+            parts = result.order_number.split('-')
+            if len(parts) == 3 and parts[2].isdigit():
+                next_number = int(parts[2]) + 1
+            else:
+                next_number = 1
+        else:
+            next_number = 1
+            
         return f"ORD-{current_year}-{next_number:04d}"
         
     except Exception as e:

@@ -1,0 +1,219 @@
+{
+  "timestamp": "2025-06-27T22:34:18.392867",
+  "base_url": "http://localhost:8000",
+  "summary": {
+    "total_tests": 29,
+    "passed": 18,
+    "failed": 11,
+    "success_rate": 62.06896551724138
+  },
+  "test_data": {
+    "customer_id": "ca30092d-3ea3-42be-ad13-238ad0de6fbf",
+    "inventory_id": "76c14d99-1a94-4727-ad7f-7d12dbe3463c"
+  },
+  "results": [
+    {
+      "test": "Health Check",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2025-06-27T22:34:08.082876",
+      "response_data": null
+    },
+    {
+      "test": "Database Health",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2025-06-27T22:34:09.012408",
+      "response_data": null
+    },
+    {
+      "test": "Admin Login",
+      "success": true,
+      "details": "Token received: eyJhbGciOiJIUzI1NiIs...",
+      "timestamp": "2025-06-27T22:34:09.883317",
+      "response_data": null
+    },
+    {
+      "test": "List Users",
+      "success": false,
+      "details": "Status: 404, Count: 0",
+      "timestamp": "2025-06-27T22:34:09.893661",
+      "response_data": null
+    },
+    {
+      "test": "List Customers",
+      "success": true,
+      "details": "Status: 200, Count: 19",
+      "timestamp": "2025-06-27T22:34:10.237926",
+      "response_data": null
+    },
+    {
+      "test": "Create Customer",
+      "success": true,
+      "details": "Status: 201, ID: ca30092d-3ea3-42be-ad13-238ad0de6fbf",
+      "timestamp": "2025-06-27T22:34:11.055727",
+      "response_data": null
+    },
+    {
+      "test": "Search Customers",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2025-06-27T22:34:11.382302",
+      "response_data": null
+    },
+    {
+      "test": "List Orders",
+      "success": true,
+      "details": "Status: 200, Count: 0",
+      "timestamp": "2025-06-27T22:34:11.759120",
+      "response_data": null
+    },
+    {
+      "test": "Create Order",
+      "success": false,
+      "details": "Status: 422, ID: N/A",
+      "timestamp": "2025-06-27T22:34:12.011837",
+      "response_data": null
+    },
+    {
+      "test": "Order Items Tests",
+      "success": false,
+      "details": "No order ID available",
+      "timestamp": "2025-06-27T22:34:12.011927",
+      "response_data": null
+    },
+    {
+      "test": "List Material In",
+      "success": true,
+      "details": "Status: 200, Count: 0",
+      "timestamp": "2025-06-27T22:34:12.448863",
+      "response_data": null
+    },
+    {
+      "test": "Record Material In",
+      "success": false,
+      "details": "Status: 422, ID: N/A",
+      "timestamp": "2025-06-27T22:34:12.731895",
+      "response_data": null
+    },
+    {
+      "test": "List Material Out",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2025-06-27T22:34:13.118475",
+      "response_data": null
+    },
+    {
+      "test": "List Inventory",
+      "success": true,
+      "details": "Status: 200, Count: 18",
+      "timestamp": "2025-06-27T22:34:13.524832",
+      "response_data": null
+    },
+    {
+      "test": "Create Inventory Item",
+      "success": true,
+      "details": "Status: 201, ID: 76c14d99-1a94-4727-ad7f-7d12dbe3463c",
+      "timestamp": "2025-06-27T22:34:14.220854",
+      "response_data": null
+    },
+    {
+      "test": "Inventory Adjustment",
+      "success": false,
+      "details": "Status: 500",
+      "timestamp": "2025-06-27T22:34:14.552267",
+      "response_data": null
+    },
+    {
+      "test": "List Challans",
+      "success": true,
+      "details": "Status: 200, Count: 0",
+      "timestamp": "2025-06-27T22:34:14.927398",
+      "response_data": null
+    },
+    {
+      "test": "Create Challan",
+      "success": false,
+      "details": "Status: 422, ID: N/A",
+      "timestamp": "2025-06-27T22:34:15.262328",
+      "response_data": null
+    },
+    {
+      "test": "List Invoices",
+      "success": false,
+      "details": "Status: 500, Count: 0",
+      "timestamp": "2025-06-27T22:34:15.623528",
+      "response_data": null
+    },
+    {
+      "test": "List Payments",
+      "success": true,
+      "details": "Status: 200, Count: 0",
+      "timestamp": "2025-06-27T22:34:16.017274",
+      "response_data": null
+    },
+    {
+      "test": "List Returns",
+      "success": true,
+      "details": "Status: 200, Count: 0",
+      "timestamp": "2025-06-27T22:34:16.342771",
+      "response_data": null
+    },
+    {
+      "test": "List Expenses",
+      "success": false,
+      "details": "Status: 500, Count: 0",
+      "timestamp": "2025-06-27T22:34:16.749810",
+      "response_data": null
+    },
+    {
+      "test": "Record Expense",
+      "success": false,
+      "details": "Status: 422, ID: N/A",
+      "timestamp": "2025-06-27T22:34:17.032754",
+      "response_data": null
+    },
+    {
+      "test": "Report: Pending Orders",
+      "success": true,
+      "details": "Status: 200, Records: 0",
+      "timestamp": "2025-06-27T22:34:17.352517",
+      "response_data": null
+    },
+    {
+      "test": "Report: Production Status",
+      "success": true,
+      "details": "Status: 200, Records: 0",
+      "timestamp": "2025-06-27T22:34:17.683321",
+      "response_data": null
+    },
+    {
+      "test": "Report: Stock Holdings",
+      "success": true,
+      "details": "Status: 200, Records: 0",
+      "timestamp": "2025-06-27T22:34:18.008012",
+      "response_data": null
+    },
+    {
+      "test": "Report: Outstanding Receivables",
+      "success": true,
+      "details": "Status: 200, Records: 0",
+      "timestamp": "2025-06-27T22:34:18.336615",
+      "response_data": null
+    },
+    {
+      "test": "Report: Stock Items View",
+      "success": false,
+      "details": "Status: 404, Records: 0",
+      "timestamp": "2025-06-27T22:34:18.363762",
+      "response_data": null
+    },
+    {
+      "test": "Report: Audit Log",
+      "success": false,
+      "details": "Status: 404, Records: 0",
+      "timestamp": "2025-06-27T22:34:18.391063",
+      "response_data": null
+    }
+  ]
+}

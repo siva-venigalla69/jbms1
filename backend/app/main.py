@@ -11,7 +11,7 @@ from starlette.middleware.gzip import GZipMiddleware
 from sqlalchemy.exc import SQLAlchemyError
 from .core.config import settings, get_cors_config, get_security_headers
 from .core.database import engine, Base
-from .api import auth, customers, challans, invoices, inventory, payments, materials, orders, expenses, reports, returns
+from .api import auth, customers, challans, invoices, inventory, payments, materials, orders, expenses, reports, returns, users
 
 # Configure logging
 logging.basicConfig(
@@ -261,6 +261,7 @@ async def debug_enum_check():
 
 # Include routers
 app.include_router(auth.router, prefix="/api")
+app.include_router(users.router, prefix="/api")
 app.include_router(customers.router, prefix="/api")
 app.include_router(challans.router, prefix="/api")
 app.include_router(invoices.router, prefix="/api")

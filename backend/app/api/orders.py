@@ -11,6 +11,7 @@ from ..schemas.schemas import (
     OrderCreate, OrderUpdate, OrderResponse, OrderItemUpdate, 
     ProductionStageUpdate, ProductionStage
 )
+from ..models.models import OrderStatus
 from ..services.numbering import generate_order_number
 from datetime import datetime
 
@@ -153,12 +154,30 @@ async def create_order(
         # Generate order number
         order_number = generate_order_number(db)
         
-        # Create order
+        # Create order - use OrderStatus enum properly
+        status_value = order_data.status
+        if isinstance(status_value, OrderStatus):
+            # If it's already an enum, use its value
+            status_db_value = status_value.value
+        elif isinstance(status_value, str):
+            # If it's a string, try to match it to enum value
+            try:
+                # Try direct mapping first
+                if status_value.lower() in [s.value for s in OrderStatus]:
+                    status_db_value = status_value.lower()
+                else:
+                    # Try enum name mapping
+                    status_db_value = OrderStatus[status_value.upper()].value
+            except (ValueError, KeyError):
+                status_db_value = OrderStatus.PENDING.value
+        else:
+            status_db_value = OrderStatus.PENDING.value
+        
         db_order = Order(
             order_number=order_number,
             customer_id=order_data.customer_id,
             order_date=order_data.order_date or datetime.utcnow(),
-            status=order_data.status,
+            status=status_db_value,
             total_amount=total_amount,
             notes=order_data.notes,
             created_by_user_id=current_user.id,
@@ -182,14 +201,50 @@ async def create_order(
         db.refresh(db_order)
         
         logger.info(f"User {current_user.username} created order {db_order.order_number}")
-        return db_order
+        
+        # Return manual response to avoid schema issues
+        return {
+            "id": str(db_order.id),
+            "order_number": db_order.order_number,
+            "customer_id": str(db_order.customer_id),
+            "order_date": db_order.order_date,
+            "status": db_order.status,
+            "total_amount": float(db_order.total_amount),
+            "notes": db_order.notes,
+            "created_at": db_order.created_at,
+            "updated_at": db_order.updated_at,
+            "customer": {
+                "id": str(customer.id),
+                "name": customer.name,
+                "phone": customer.phone,
+                "email": customer.email,
+                "address": customer.address,
+                "gst_number": customer.gst_number,
+                "created_at": customer.created_at,
+                "updated_at": customer.updated_at
+            },
+            "order_items": [
+                {
+                    "id": str(item.id),
+                    "order_id": str(item.order_id),
+                    "material_type": item.material_type,
+                    "quantity": item.quantity,
+                    "unit_price": float(item.unit_price),
+                    "customization_details": item.customization_details,
+                    "production_stage": item.production_stage,
+                    "stage_completed_at": item.stage_completed_at,
+                    "created_at": item.created_at,
+                    "updated_at": item.updated_at
+                } for item in db.query(OrderItem).filter(OrderItem.order_id == db_order.id).all()
+            ]
+        }
     except HTTPException:
         db.rollback()
         raise
     except Exception as e:
         db.rollback()
-        logger.error(f"Error creating order: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to create order")
+        logger.error(f"Error creating order: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to create order: {str(e)[:100]}")
 
 @router.get("/{order_id}", response_model=OrderResponse)
 async def get_order(

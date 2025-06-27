@@ -1,0 +1,219 @@
+{
+  "timestamp": "2025-06-27T22:46:05.395101",
+  "base_url": "http://localhost:8000",
+  "summary": {
+    "total_tests": 29,
+    "passed": 18,
+    "failed": 11,
+    "success_rate": 62.06896551724138
+  },
+  "test_data": {
+    "customer_id": "a8a48f5e-5d8c-4c43-ab10-912b482850e2",
+    "inventory_id": "80d1edb7-ba25-40c7-a24e-a67e8bcf89c8"
+  },
+  "results": [
+    {
+      "test": "Health Check",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2025-06-27T22:45:55.168450",
+      "response_data": null
+    },
+    {
+      "test": "Database Health",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2025-06-27T22:45:55.373179",
+      "response_data": null
+    },
+    {
+      "test": "Admin Login",
+      "success": true,
+      "details": "Token received: eyJhbGciOiJIUzI1NiIs...",
+      "timestamp": "2025-06-27T22:45:56.697039",
+      "response_data": null
+    },
+    {
+      "test": "List Users",
+      "success": false,
+      "details": "Status: 500, Count: 0",
+      "timestamp": "2025-06-27T22:45:57.038933",
+      "response_data": null
+    },
+    {
+      "test": "List Customers",
+      "success": true,
+      "details": "Status: 200, Count: 20",
+      "timestamp": "2025-06-27T22:45:57.380735",
+      "response_data": null
+    },
+    {
+      "test": "Create Customer",
+      "success": true,
+      "details": "Status: 201, ID: a8a48f5e-5d8c-4c43-ab10-912b482850e2",
+      "timestamp": "2025-06-27T22:45:58.168824",
+      "response_data": null
+    },
+    {
+      "test": "Search Customers",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2025-06-27T22:45:58.502536",
+      "response_data": null
+    },
+    {
+      "test": "List Orders",
+      "success": true,
+      "details": "Status: 200, Count: 0",
+      "timestamp": "2025-06-27T22:45:58.870393",
+      "response_data": null
+    },
+    {
+      "test": "Create Order",
+      "success": false,
+      "details": "Status: 500, ID: N/A",
+      "timestamp": "2025-06-27T22:45:59.322125",
+      "response_data": null
+    },
+    {
+      "test": "Order Items Tests",
+      "success": false,
+      "details": "No order ID available",
+      "timestamp": "2025-06-27T22:45:59.322246",
+      "response_data": null
+    },
+    {
+      "test": "List Material In",
+      "success": true,
+      "details": "Status: 200, Count: 0",
+      "timestamp": "2025-06-27T22:45:59.633214",
+      "response_data": null
+    },
+    {
+      "test": "Record Material In",
+      "success": false,
+      "details": "Status: 500, ID: N/A",
+      "timestamp": "2025-06-27T22:45:59.988013",
+      "response_data": null
+    },
+    {
+      "test": "List Material Out",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2025-06-27T22:46:00.301921",
+      "response_data": null
+    },
+    {
+      "test": "List Inventory",
+      "success": true,
+      "details": "Status: 200, Count: 20",
+      "timestamp": "2025-06-27T22:46:00.675201",
+      "response_data": null
+    },
+    {
+      "test": "Create Inventory Item",
+      "success": true,
+      "details": "Status: 201, ID: 80d1edb7-ba25-40c7-a24e-a67e8bcf89c8",
+      "timestamp": "2025-06-27T22:46:01.386245",
+      "response_data": null
+    },
+    {
+      "test": "Inventory Adjustment",
+      "success": false,
+      "details": "Status: 500",
+      "timestamp": "2025-06-27T22:46:01.724284",
+      "response_data": null
+    },
+    {
+      "test": "List Challans",
+      "success": true,
+      "details": "Status: 200, Count: 0",
+      "timestamp": "2025-06-27T22:46:02.104492",
+      "response_data": null
+    },
+    {
+      "test": "Create Challan",
+      "success": false,
+      "details": "Missing dependencies: customer_id=a8a48f5e-5d8c-4c43-ab10-912b482850e2, order_item_id=None",
+      "timestamp": "2025-06-27T22:46:02.104747",
+      "response_data": null
+    },
+    {
+      "test": "List Invoices",
+      "success": false,
+      "details": "Status: 500, Count: 0",
+      "timestamp": "2025-06-27T22:46:02.453770",
+      "response_data": null
+    },
+    {
+      "test": "List Payments",
+      "success": true,
+      "details": "Status: 200, Count: 0",
+      "timestamp": "2025-06-27T22:46:02.839476",
+      "response_data": null
+    },
+    {
+      "test": "List Returns",
+      "success": true,
+      "details": "Status: 200, Count: 0",
+      "timestamp": "2025-06-27T22:46:03.192863",
+      "response_data": null
+    },
+    {
+      "test": "List Expenses",
+      "success": false,
+      "details": "Status: 500, Count: 0",
+      "timestamp": "2025-06-27T22:46:03.560898",
+      "response_data": null
+    },
+    {
+      "test": "Record Expense",
+      "success": false,
+      "details": "Status: 500, ID: N/A",
+      "timestamp": "2025-06-27T22:46:03.943353",
+      "response_data": null
+    },
+    {
+      "test": "Report: Pending Orders",
+      "success": true,
+      "details": "Status: 200, Records: 0",
+      "timestamp": "2025-06-27T22:46:04.283316",
+      "response_data": null
+    },
+    {
+      "test": "Report: Production Status",
+      "success": true,
+      "details": "Status: 200, Records: 0",
+      "timestamp": "2025-06-27T22:46:04.596463",
+      "response_data": null
+    },
+    {
+      "test": "Report: Stock Holdings",
+      "success": true,
+      "details": "Status: 200, Records: 0",
+      "timestamp": "2025-06-27T22:46:04.901544",
+      "response_data": null
+    },
+    {
+      "test": "Report: Outstanding Receivables",
+      "success": true,
+      "details": "Status: 200, Records: 0",
+      "timestamp": "2025-06-27T22:46:05.328641",
+      "response_data": null
+    },
+    {
+      "test": "Report: Stock Items View",
+      "success": false,
+      "details": "Status: 404, Records: 0",
+      "timestamp": "2025-06-27T22:46:05.359831",
+      "response_data": null
+    },
+    {
+      "test": "Report: Audit Log",
+      "success": false,
+      "details": "Status: 404, Records: 0",
+      "timestamp": "2025-06-27T22:46:05.393931",
+      "response_data": null
+    }
+  ]
+}
