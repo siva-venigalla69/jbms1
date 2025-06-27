@@ -1,5 +1,6 @@
 import logging
 from typing import List, Optional
+from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, func
@@ -51,7 +52,7 @@ async def list_inventory(
                 "supplier_name": item.supplier_name,
                 "supplier_contact": item.supplier_contact,
                 "is_active": item.is_active,
-                "updated_at": item.last_updated,
+                "updated_at": item.updated_at,
                 "created_at": item.created_at
             }
             response_data.append(item_dict)
@@ -114,7 +115,7 @@ async def create_inventory_item(
             "supplier_name": db_item.supplier_name,
             "supplier_contact": db_item.supplier_contact,
             "is_active": db_item.is_active,
-            "updated_at": db_item.last_updated,
+            "updated_at": db_item.updated_at,
             "created_at": db_item.created_at
         }
         
@@ -150,7 +151,7 @@ async def update_inventory_item(
             setattr(item, field, value)
         
         item.updated_by_user_id = current_user.id
-        item.last_updated = datetime.utcnow()
+        # Don't set last_updated manually - let database handle it
         
         db.commit()
         db.refresh(item)
@@ -167,7 +168,7 @@ async def update_inventory_item(
             "supplier_name": item.supplier_name,
             "supplier_contact": item.supplier_contact,
             "is_active": item.is_active,
-            "updated_at": item.last_updated,
+            "updated_at": item.updated_at,
             "created_at": item.created_at
         }
         
@@ -210,7 +211,7 @@ async def adjust_inventory(
         else:
             adjustment_type = str(adjustment_type_raw).lower()
         
-        quantity_change = float(adjustment_data.get("quantity_change", 0))
+        quantity_change = Decimal(str(adjustment_data.get("quantity_change", 0)))
         reason = adjustment_data.get("reason", "")
         notes = adjustment_data.get("notes", "")
         
@@ -234,8 +235,8 @@ async def adjust_inventory(
         
         # Update inventory stock
         item.current_stock = new_stock
-        item.last_updated = datetime.utcnow()
         item.updated_by_user_id = current_user.id
+        # Don't set last_updated manually - let database handle it
         
         db.add(db_adjustment)
         db.commit()
@@ -303,7 +304,7 @@ async def get_low_stock_items(
                 "supplier_name": item.supplier_name,
                 "supplier_contact": item.supplier_contact,
                 "is_active": item.is_active,
-                "updated_at": item.last_updated,
+                "updated_at": item.updated_at,
                 "created_at": item.created_at
             }
             response_data.append(item_dict)
