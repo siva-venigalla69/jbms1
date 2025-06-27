@@ -299,7 +299,6 @@ class Inventory(Base):
     is_active = Column(Boolean, default=True)
     is_deleted = Column(Boolean, default=False)
     last_updated = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     created_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
     updated_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
