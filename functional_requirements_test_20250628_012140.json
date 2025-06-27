@@ -1,0 +1,421 @@
+{
+  "summary": {
+    "total": 19,
+    "passed": 18,
+    "failed": 1,
+    "success_rate": 94.73684210526315,
+    "timestamp": "2025-06-28T01:21:40.518687"
+  },
+  "requirements_coverage": {
+    "REQ-001": {
+      "passed": 2,
+      "failed": 0,
+      "tests": [
+        {
+          "requirement": "REQ-001",
+          "test": "List Customers",
+          "status": "PASS",
+          "details": "Found 20 customers",
+          "data": null,
+          "timestamp": "2025-06-28T01:21:29.855018"
+        },
+        {
+          "requirement": "REQ-001",
+          "test": "Create Customer",
+          "status": "PASS",
+          "details": "Created customer ID: af111d72-e0f4-481f-8dbe-39405d0c3238",
+          "data": null,
+          "timestamp": "2025-06-28T01:21:30.624569"
+        }
+      ]
+    },
+    "REQ-002": {
+      "passed": 1,
+      "failed": 0,
+      "tests": [
+        {
+          "requirement": "REQ-002",
+          "test": "Duplicate Prevention",
+          "status": "PASS",
+          "details": "Properly rejected duplicate phone",
+          "data": null,
+          "timestamp": "2025-06-28T01:21:30.979947"
+        }
+      ]
+    },
+    "REQ-003": {
+      "passed": 1,
+      "failed": 0,
+      "tests": [
+        {
+          "requirement": "REQ-003",
+          "test": "Auto-generated Order Number",
+          "status": "PASS",
+          "details": "Order number: ORD-2025-0014",
+          "data": null,
+          "timestamp": "2025-06-28T01:21:32.028394"
+        }
+      ]
+    },
+    "REQ-009": {
+      "passed": 1,
+      "failed": 0,
+      "tests": [
+        {
+          "requirement": "REQ-009",
+          "test": "Order Total Calculation",
+          "status": "PASS",
+          "details": "Correct total: 2000.0",
+          "data": null,
+          "timestamp": "2025-06-28T01:21:32.028624"
+        }
+      ]
+    },
+    "REQ-007": {
+      "passed": 1,
+      "failed": 0,
+      "tests": [
+        {
+          "requirement": "REQ-007",
+          "test": "Order Items Creation",
+          "status": "PASS",
+          "details": "Created order with 2 items",
+          "data": null,
+          "timestamp": "2025-06-28T01:21:32.028677"
+        }
+      ]
+    },
+    "REQ-004": {
+      "passed": 1,
+      "failed": 0,
+      "tests": [
+        {
+          "requirement": "REQ-004",
+          "test": "Order Listing",
+          "status": "PASS",
+          "details": "Found 14 orders",
+          "data": null,
+          "timestamp": "2025-06-28T01:21:34.351899"
+        }
+      ]
+    },
+    "REQ-010": {
+      "passed": 2,
+      "failed": 0,
+      "tests": [
+        {
+          "requirement": "REQ-010",
+          "test": "Material In with Customer Link",
+          "status": "PASS",
+          "details": "Recorded material ID: 8f0dd319-2e11-4b82-8a3d-af62980f7b5a",
+          "data": null,
+          "timestamp": "2025-06-28T01:21:35.176329"
+        },
+        {
+          "requirement": "REQ-010",
+          "test": "Material In Listing",
+          "status": "PASS",
+          "details": "Found 20 material records",
+          "data": null,
+          "timestamp": "2025-06-28T01:21:36.229229"
+        }
+      ]
+    },
+    "REQ-011": {
+      "passed": 1,
+      "failed": 0,
+      "tests": [
+        {
+          "requirement": "REQ-011",
+          "test": "Material In without Order",
+          "status": "PASS",
+          "details": "Recorded general stock ID: fb1b2741-ab67-49b7-9deb-11a059efe8c9",
+          "data": null,
+          "timestamp": "2025-06-28T01:21:35.882995"
+        }
+      ]
+    },
+    "REQ-032": {
+      "passed": 1,
+      "failed": 0,
+      "tests": [
+        {
+          "requirement": "REQ-032",
+          "test": "Inventory Item Creation",
+          "status": "PASS",
+          "details": "Created item ID: af4b574c-14b8-4635-a7c1-cfc565809288",
+          "data": null,
+          "timestamp": "2025-06-28T01:21:36.970310"
+        }
+      ]
+    },
+    "REQ-033": {
+      "passed": 1,
+      "failed": 0,
+      "tests": [
+        {
+          "requirement": "REQ-033",
+          "test": "Inventory Listing",
+          "status": "PASS",
+          "details": "Found 38 items",
+          "data": null,
+          "timestamp": "2025-06-28T01:21:37.358270"
+        }
+      ]
+    },
+    "REQ-035": {
+      "passed": 0,
+      "failed": 1,
+      "tests": [
+        {
+          "requirement": "REQ-035",
+          "test": "Inventory Adjustment",
+          "status": "FAIL",
+          "details": "Status: 201 - {\"success\":true,\"message\":\"Inventory adjusted successfully\",\"adjustment\":{\"id\":\"e490c393-2feb-4d9b-8d18-923c39c54014\",\"inventory_id\":\"af4b574c-14b8-4635-a7c1-cfc565809288\",\"adjustment_type\":\"quantity_change\",\"quantity_change\":5.0,\"reason\":\"Test adjustment for functional requirements\",\"notes\":\"\",\"adjustment_date\":\"2025-06-27T19:51:37.700756+00:00\",\"created_at\":\"2025-06-27T19:51:37.700756+00:00\"},\"updated_inventory\":{\"id\":\"af4b574c-14b8-4635-a7c1-cfc565809288\",\"item_name\":\"Test Chemical 9e65fe\",\"old_stock\":100.0,\"new_stock\":105.0,\"change\":5.0}}",
+          "data": null,
+          "timestamp": "2025-06-28T01:21:38.190950"
+        }
+      ]
+    },
+    "REQ-036": {
+      "passed": 2,
+      "failed": 0,
+      "tests": [
+        {
+          "requirement": "REQ-036",
+          "test": "Expense Recording",
+          "status": "PASS",
+          "details": "Recorded expense ID: 5e69f8ef-97be-44cb-aded-dddb79ec2790",
+          "data": null,
+          "timestamp": "2025-06-28T01:21:38.836554"
+        },
+        {
+          "requirement": "REQ-036",
+          "test": "Expense Listing",
+          "status": "PASS",
+          "details": "Found 17 expenses",
+          "data": null,
+          "timestamp": "2025-06-28T01:21:39.195759"
+        }
+      ]
+    },
+    "REQ-037": {
+      "passed": 1,
+      "failed": 0,
+      "tests": [
+        {
+          "requirement": "REQ-037",
+          "test": "Pending Orders Report",
+          "status": "PASS",
+          "details": "Generated report with 3 orders",
+          "data": null,
+          "timestamp": "2025-06-28T01:21:39.512215"
+        }
+      ]
+    },
+    "REQ-038": {
+      "passed": 1,
+      "failed": 0,
+      "tests": [
+        {
+          "requirement": "REQ-038",
+          "test": "Production Status Report",
+          "status": "PASS",
+          "details": "Generated report with 4 items",
+          "data": null,
+          "timestamp": "2025-06-28T01:21:39.829291"
+        }
+      ]
+    },
+    "REQ-039": {
+      "passed": 1,
+      "failed": 0,
+      "tests": [
+        {
+          "requirement": "REQ-039",
+          "test": "Stock Holdings Report",
+          "status": "PASS",
+          "details": "Generated report with 4 items",
+          "data": null,
+          "timestamp": "2025-06-28T01:21:40.177086"
+        }
+      ]
+    },
+    "REQ-040": {
+      "passed": 1,
+      "failed": 0,
+      "tests": [
+        {
+          "requirement": "REQ-040",
+          "test": "Pending Receivables Report",
+          "status": "PASS",
+          "details": "Generated report with 4 items",
+          "data": null,
+          "timestamp": "2025-06-28T01:21:40.513139"
+        }
+      ]
+    }
+  },
+  "created_data": {
+    "existing_customer_id": "3cdb71e3-a335-4d22-98c7-bae81fa900e2",
+    "customer_id": "af111d72-e0f4-481f-8dbe-39405d0c3238",
+    "order_id": "ed3075af-09e6-4fb1-88d7-90959ef04473",
+    "material_in_id": "8f0dd319-2e11-4b82-8a3d-af62980f7b5a",
+    "inventory_id": "af4b574c-14b8-4635-a7c1-cfc565809288",
+    "expense_id": "5e69f8ef-97be-44cb-aded-dddb79ec2790"
+  },
+  "detailed_results": [
+    {
+      "requirement": "REQ-001",
+      "test": "List Customers",
+      "status": "PASS",
+      "details": "Found 20 customers",
+      "data": null,
+      "timestamp": "2025-06-28T01:21:29.855018"
+    },
+    {
+      "requirement": "REQ-001",
+      "test": "Create Customer",
+      "status": "PASS",
+      "details": "Created customer ID: af111d72-e0f4-481f-8dbe-39405d0c3238",
+      "data": null,
+      "timestamp": "2025-06-28T01:21:30.624569"
+    },
+    {
+      "requirement": "REQ-002",
+      "test": "Duplicate Prevention",
+      "status": "PASS",
+      "details": "Properly rejected duplicate phone",
+      "data": null,
+      "timestamp": "2025-06-28T01:21:30.979947"
+    },
+    {
+      "requirement": "REQ-003",
+      "test": "Auto-generated Order Number",
+      "status": "PASS",
+      "details": "Order number: ORD-2025-0014",
+      "data": null,
+      "timestamp": "2025-06-28T01:21:32.028394"
+    },
+    {
+      "requirement": "REQ-009",
+      "test": "Order Total Calculation",
+      "status": "PASS",
+      "details": "Correct total: 2000.0",
+      "data": null,
+      "timestamp": "2025-06-28T01:21:32.028624"
+    },
+    {
+      "requirement": "REQ-007",
+      "test": "Order Items Creation",
+      "status": "PASS",
+      "details": "Created order with 2 items",
+      "data": null,
+      "timestamp": "2025-06-28T01:21:32.028677"
+    },
+    {
+      "requirement": "REQ-004",
+      "test": "Order Listing",
+      "status": "PASS",
+      "details": "Found 14 orders",
+      "data": null,
+      "timestamp": "2025-06-28T01:21:34.351899"
+    },
+    {
+      "requirement": "REQ-010",
+      "test": "Material In with Customer Link",
+      "status": "PASS",
+      "details": "Recorded material ID: 8f0dd319-2e11-4b82-8a3d-af62980f7b5a",
+      "data": null,
+      "timestamp": "2025-06-28T01:21:35.176329"
+    },
+    {
+      "requirement": "REQ-011",
+      "test": "Material In without Order",
+      "status": "PASS",
+      "details": "Recorded general stock ID: fb1b2741-ab67-49b7-9deb-11a059efe8c9",
+      "data": null,
+      "timestamp": "2025-06-28T01:21:35.882995"
+    },
+    {
+      "requirement": "REQ-010",
+      "test": "Material In Listing",
+      "status": "PASS",
+      "details": "Found 20 material records",
+      "data": null,
+      "timestamp": "2025-06-28T01:21:36.229229"
+    },
+    {
+      "requirement": "REQ-032",
+      "test": "Inventory Item Creation",
+      "status": "PASS",
+      "details": "Created item ID: af4b574c-14b8-4635-a7c1-cfc565809288",
+      "data": null,
+      "timestamp": "2025-06-28T01:21:36.970310"
+    },
+    {
+      "requirement": "REQ-033",
+      "test": "Inventory Listing",
+      "status": "PASS",
+      "details": "Found 38 items",
+      "data": null,
+      "timestamp": "2025-06-28T01:21:37.358270"
+    },
+    {
+      "requirement": "REQ-035",
+      "test": "Inventory Adjustment",
+      "status": "FAIL",
+      "details": "Status: 201 - {\"success\":true,\"message\":\"Inventory adjusted successfully\",\"adjustment\":{\"id\":\"e490c393-2feb-4d9b-8d18-923c39c54014\",\"inventory_id\":\"af4b574c-14b8-4635-a7c1-cfc565809288\",\"adjustment_type\":\"quantity_change\",\"quantity_change\":5.0,\"reason\":\"Test adjustment for functional requirements\",\"notes\":\"\",\"adjustment_date\":\"2025-06-27T19:51:37.700756+00:00\",\"created_at\":\"2025-06-27T19:51:37.700756+00:00\"},\"updated_inventory\":{\"id\":\"af4b574c-14b8-4635-a7c1-cfc565809288\",\"item_name\":\"Test Chemical 9e65fe\",\"old_stock\":100.0,\"new_stock\":105.0,\"change\":5.0}}",
+      "data": null,
+      "timestamp": "2025-06-28T01:21:38.190950"
+    },
+    {
+      "requirement": "REQ-036",
+      "test": "Expense Recording",
+      "status": "PASS",
+      "details": "Recorded expense ID: 5e69f8ef-97be-44cb-aded-dddb79ec2790",
+      "data": null,
+      "timestamp": "2025-06-28T01:21:38.836554"
+    },
+    {
+      "requirement": "REQ-036",
+      "test": "Expense Listing",
+      "status": "PASS",
+      "details": "Found 17 expenses",
+      "data": null,
+      "timestamp": "2025-06-28T01:21:39.195759"
+    },
+    {
+      "requirement": "REQ-037",
+      "test": "Pending Orders Report",
+      "status": "PASS",
+      "details": "Generated report with 3 orders",
+      "data": null,
+      "timestamp": "2025-06-28T01:21:39.512215"
+    },
+    {
+      "requirement": "REQ-038",
+      "test": "Production Status Report",
+      "status": "PASS",
+      "details": "Generated report with 4 items",
+      "data": null,
+      "timestamp": "2025-06-28T01:21:39.829291"
+    },
+    {
+      "requirement": "REQ-039",
+      "test": "Stock Holdings Report",
+      "status": "PASS",
+      "details": "Generated report with 4 items",
+      "data": null,
+      "timestamp": "2025-06-28T01:21:40.177086"
+    },
+    {
+      "requirement": "REQ-040",
+      "test": "Pending Receivables Report",
+      "status": "PASS",
+      "details": "Generated report with 4 items",
+      "data": null,
+      "timestamp": "2025-06-28T01:21:40.513139"
+    }
+  ]
+}
