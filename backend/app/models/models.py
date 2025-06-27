@@ -43,6 +43,10 @@ class ReturnReason(str, enum.Enum):
     WRONG_DESIGN = "wrong_design"
     CUSTOMER_REQUEST = "customer_request"
 
+class AdjustmentType(str, enum.Enum):
+    QUANTITY_CHANGE = "quantity_change"
+    REASON = "reason"
+
 # Models
 class User(Base):
     __tablename__ = "users"
@@ -112,19 +116,16 @@ class OrderItem(Base):
     quantity = Column(Integer, nullable=False)
     unit_price = Column(Numeric(10, 2), nullable=False)
     customization_details = Column(Text)
-    current_stage = Column(Enum(ProductionStage, name='production_stage'), default=ProductionStage.PRE_TREATMENT)
-    pre_treatment_completed_at = Column(DateTime(timezone=True))
-    pre_treatment_completed_by = Column(UUID(as_uuid=True), ForeignKey("users.id"))
-    printing_completed_at = Column(DateTime(timezone=True))
-    printing_completed_by = Column(UUID(as_uuid=True), ForeignKey("users.id"))
-    post_process_completed_at = Column(DateTime(timezone=True))
-    post_process_completed_by = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    production_stage = Column(Enum(ProductionStage, name='production_stage'), default=ProductionStage.PRE_TREATMENT)
+    stage_completed_at = Column(DateTime(timezone=True))
     is_deleted = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
     
     # Relationships
     order = relationship("Order", back_populates="order_items")
+    updater = relationship("User", foreign_keys=[updated_by_user_id])
 
 class MaterialIn(Base):
     __tablename__ = "material_in"
@@ -137,6 +138,7 @@ class MaterialIn(Base):
     unit = Column(String(20), nullable=False)
     received_date = Column(DateTime(timezone=True), server_default=func.now())
     notes = Column(Text)
+    is_deleted = Column(Boolean, default=False)
     created_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
@@ -153,16 +155,20 @@ class DeliveryChallan(Base):
     customer_id = Column(UUID(as_uuid=True), ForeignKey("customers.id"), nullable=False)
     challan_date = Column(DateTime(timezone=True), server_default=func.now())
     total_quantity = Column(Integer, default=0)
-    delivery_status = Column(String(20), default="pending")
     notes = Column(Text)
+    is_delivered = Column(Boolean, default=False)
+    delivered_at = Column(DateTime(timezone=True))
     is_deleted = Column(Boolean, default=False)
     created_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    updated_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     
     # Relationships
     customer = relationship("Customer")
     challan_items = relationship("ChallanItem", back_populates="challan")
-    creator = relationship("User")
+    creator = relationship("User", foreign_keys=[created_by_user_id])
+    updater = relationship("User", foreign_keys=[updated_by_user_id])
 
 class ChallanItem(Base):
     __tablename__ = "challan_items"
@@ -185,7 +191,10 @@ class MaterialOut(Base):
     customer_id = Column(UUID(as_uuid=True), ForeignKey("customers.id"))
     material_type = Column(Enum(MaterialType, name='material_type'), nullable=False)
     quantity = Column(Integer, nullable=False)
+    unit = Column(String(20), nullable=False)
     dispatch_date = Column(DateTime(timezone=True), server_default=func.now())
+    notes = Column(Text)
+    is_deleted = Column(Boolean, default=False)
     created_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
@@ -213,13 +222,16 @@ class GSTInvoice(Base):
     notes = Column(Text)
     is_deleted = Column(Boolean, default=False)
     created_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    updated_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     
     # Relationships
     customer = relationship("Customer")
     invoice_challans = relationship("InvoiceChallan", back_populates="invoice")
     payments = relationship("Payment", back_populates="invoice")
-    creator = relationship("User")
+    creator = relationship("User", foreign_keys=[created_by_user_id])
+    updater = relationship("User", foreign_keys=[updated_by_user_id])
 
 class InvoiceChallan(Base):
     __tablename__ = "invoice_challans"
@@ -244,6 +256,7 @@ class Payment(Base):
     payment_method = Column(Enum(PaymentMethod, name='payment_method'), nullable=False)
     reference_number = Column(String(100))
     notes = Column(Text)
+    is_deleted = Column(Boolean, default=False)
     created_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
@@ -293,6 +306,24 @@ class Inventory(Base):
     # Relationships
     creator = relationship("User", foreign_keys=[created_by_user_id])
     updater = relationship("User", foreign_keys=[updated_by_user_id])
+    adjustments = relationship("InventoryAdjustment", back_populates="inventory")
+
+class InventoryAdjustment(Base):
+    __tablename__ = "inventory_adjustments"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    inventory_id = Column(UUID(as_uuid=True), ForeignKey("inventory.id"), nullable=False)
+    adjustment_type = Column(Enum(AdjustmentType, name='adjustment_type'), nullable=False)
+    quantity_change = Column(Numeric(10, 2), nullable=False)
+    reason = Column(Text)
+    notes = Column(Text)
+    adjustment_date = Column(DateTime(timezone=True), server_default=func.now())
+    created_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    inventory = relationship("Inventory", back_populates="adjustments")
+    creator = relationship("User")
 
 class Expense(Base):
     __tablename__ = "expenses"
@@ -312,17 +343,65 @@ class Expense(Base):
     # Relationships
     creator = relationship("User")
 
+# New view-like tables from schema diagram
+class VPendingOrders(Base):
+    __tablename__ = "v_pending_orders"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    order_number = Column(String(50))
+    customer_name = Column(String(255))
+    order_date = Column(DateTime(timezone=True))
+    status = Column(String(20))
+    total_quantity = Column(Integer)
+    total_items = Column(Integer)
+    post_process_items = Column(Integer)
+
+class VStockItems(Base):
+    __tablename__ = "v_stock_items"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    category = Column(String(100))
+    current_stock = Column(Numeric(10, 2))
+    reorder_level = Column(Numeric(10, 2))
+    supplier_name = Column(String(100))
+    supplier_contact = Column(String(100))
+
+class VOutstandingReceivables(Base):
+    __tablename__ = "v_outstanding_receivables"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    invoice_number = Column(String(50))
+    invoice_date = Column(DateTime(timezone=True))
+    final_amount = Column(Numeric(12, 2))
+    outstanding_amount = Column(Numeric(12, 2))
+    customer_name = Column(String(255))
+    customer_phone = Column(String(20))
+    customer_gst = Column(String(15))
+    days_outstanding = Column(Integer)
+
+class VMaterialFlowSummary(Base):
+    __tablename__ = "v_material_flow_summary"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    flow_date = Column(DateTime(timezone=True))
+    flow_type = Column(String(50))
+    material_type = Column(String(50))
+    total_quantity = Column(Integer)
+    new_values = Column(Text)
+    changed_at = Column(DateTime(timezone=True))
+    changed_by = Column(String(255))
+
 class AuditLog(Base):
     __tablename__ = "audit_log"
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    action = Column(String(100), nullable=False)
     table_name = Column(String(100), nullable=False)
     record_id = Column(String(255), nullable=False)
+    action = Column(String(50), nullable=False)
     old_values = Column(Text)
     new_values = Column(Text)
     changed_at = Column(DateTime(timezone=True), server_default=func.now())
+    changed_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
     
     # Relationships
     user = relationship("User") 

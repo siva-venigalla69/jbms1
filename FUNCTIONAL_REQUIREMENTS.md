@@ -62,19 +62,22 @@
 - Received Date (Default: Current Date)
 - Notes
 - Created by user tracking
--please link with materials with cusotmers 
-[
-  {
-    "order_id": "string",
-    "material_type": "saree",
-    "quantity": 1,
-    "unit": "string",
-    "received_date": "2025-06-27T03:36:54.375Z",
-    "notes": "string",
-    "id": "string",
-    "created_at": "2025-06-27T03:36:54.375Z"
-  }
-]
+**Customer Linkage**: Materials must be linked to customers for proper traceability
+- Add customer_id field to material_in table
+- Schema Example:
+```json
+{
+  "order_id": "string",
+  "customer_id": "string", 
+  "material_type": "saree",
+  "quantity": 1,
+  "unit": "string",
+  "received_date": "2025-06-27T03:36:54.375Z",
+  "notes": "string",
+  "id": "string",
+  "created_at": "2025-06-27T03:36:54.375Z"
+}
+```
 
 **REQ-011**: System shall allow material-in without linking to specific order (general stock)
 
@@ -108,10 +111,10 @@
 ### 3.7 MATERIAL OUT RECORDING
 **REQ-019**: System shall record material dispatch based on delivery challans:
 - Link to Delivery Challan (Required)
+- Customer ID (Required for direct traceability)
 - Material Type and Quantity confirmation
 - Actual Dispatch Date
-- Created by user tracking
--add custoemr field here as well 
+- Created by user tracking 
 
 **REQ-020**: System shall prevent material-out without valid challan
 
