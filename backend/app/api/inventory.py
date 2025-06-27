@@ -84,6 +84,11 @@ async def create_inventory_item(
         if existing:
             raise HTTPException(status_code=400, detail="Item name already exists")
         
+        # Parse supplier info into name and contact
+        supplier_parts = (item_data.supplier_info or "").split(" - ", 1) if item_data.supplier_info else ["", ""]
+        supplier_name = supplier_parts[0].strip() if supplier_parts[0] else None
+        supplier_contact = supplier_parts[1].strip() if len(supplier_parts) > 1 and supplier_parts[1] else None
+        
         db_item = Inventory(
             item_name=item_data.item_name,
             category=item_data.category,
@@ -91,7 +96,9 @@ async def create_inventory_item(
             unit=item_data.unit,
             reorder_level=item_data.reorder_level,
             cost_per_unit=item_data.cost_per_unit,
-            supplier_info=item_data.supplier_info,
+            supplier_name=supplier_name,
+            supplier_contact=supplier_contact,
+            created_by_user_id=current_user.id,
             updated_by_user_id=current_user.id
         )
         

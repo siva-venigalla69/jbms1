@@ -58,10 +58,23 @@ async def record_material_in(
             ).first()
             if not order:
                 raise HTTPException(status_code=404, detail="Order not found")
+            # If order is provided, use its customer_id if customer_id not explicitly provided
+            if not material_data.customer_id:
+                material_data.customer_id = str(order.customer_id)
+        
+        # Validate customer if provided
+        if material_data.customer_id:
+            from ..models.models import Customer
+            customer = db.query(Customer).filter(
+                and_(Customer.id == material_data.customer_id, Customer.is_deleted == False)
+            ).first()
+            if not customer:
+                raise HTTPException(status_code=404, detail="Customer not found")
         
         # Create material in record
         db_material = MaterialIn(
             order_id=material_data.order_id,
+            customer_id=material_data.customer_id,
             material_type=material_data.material_type,
             quantity=material_data.quantity,
             unit=material_data.unit,
@@ -130,9 +143,13 @@ async def record_material_out(
         if not challan:
             raise HTTPException(status_code=404, detail="Delivery challan not found")
         
+        # If customer_id not provided, use challan's customer_id
+        customer_id = material_data.customer_id or str(challan.customer_id)
+        
         # Create material out record
         db_material = MaterialOut(
             challan_id=material_data.challan_id,
+            customer_id=customer_id,
             material_type=material_data.material_type,
             quantity=material_data.quantity,
             dispatch_date=material_data.dispatch_date or datetime.utcnow(),

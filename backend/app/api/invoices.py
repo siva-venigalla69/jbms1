@@ -8,6 +8,7 @@ from ..core.database import get_db
 from ..core.security import get_current_active_user
 from ..models.models import User, GSTInvoice, InvoiceChallan, DeliveryChallan, Customer
 from ..schemas.schemas import GSTInvoiceCreate, GSTInvoiceResponse
+from ..services.numbering import generate_invoice_number
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
@@ -81,8 +82,12 @@ async def create_invoice(
         
         total_amount = subtotal + cgst_amount + sgst_amount + igst_amount
         
+        # Generate invoice number
+        invoice_number = generate_invoice_number(db)
+        
         # Create invoice
         db_invoice = GSTInvoice(
+            invoice_number=invoice_number,
             customer_id=invoice_data.customer_id,
             invoice_date=invoice_data.invoice_date or datetime.utcnow(),
             subtotal=subtotal,

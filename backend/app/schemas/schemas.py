@@ -134,6 +134,7 @@ class OrderResponse(OrderBase):
 # Material In schemas
 class MaterialInBase(BaseSchema):
     order_id: Optional[str] = None  # UUID as string
+    customer_id: Optional[str] = None  # UUID as string - Added per functional requirements
     material_type: MaterialType
     quantity: int = Field(..., gt=0)
     unit: str = Field(..., min_length=1, max_length=20)
@@ -191,6 +192,7 @@ class DeliveryChallanResponse(DeliveryChallanBase):
 # Material Out schemas
 class MaterialOutBase(BaseSchema):
     challan_id: str  # UUID as string
+    customer_id: Optional[str] = None  # UUID as string - Added per functional requirements
     material_type: MaterialType
     quantity: int = Field(..., gt=0)
     dispatch_date: Optional[datetime] = None

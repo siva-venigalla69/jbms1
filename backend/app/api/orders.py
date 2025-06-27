@@ -11,6 +11,7 @@ from ..schemas.schemas import (
     OrderCreate, OrderUpdate, OrderResponse, OrderItemUpdate, 
     ProductionStageUpdate, ProductionStage
 )
+from ..services.numbering import generate_order_number
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
@@ -150,8 +151,12 @@ async def create_order(
         # Calculate total amount
         total_amount = sum(item.quantity * item.unit_price for item in order_data.order_items)
         
+        # Generate order number
+        order_number = generate_order_number(db)
+        
         # Create order
         db_order = Order(
+            order_number=order_number,
             customer_id=order_data.customer_id,
             order_date=order_data.order_date or datetime.utcnow(),
             status=order_data.status,

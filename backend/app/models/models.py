@@ -131,6 +131,7 @@ class MaterialIn(Base):
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     order_id = Column(UUID(as_uuid=True), ForeignKey("orders.id"))
+    customer_id = Column(UUID(as_uuid=True), ForeignKey("customers.id"))
     material_type = Column(Enum(MaterialType, name='material_type'), nullable=False)
     quantity = Column(Integer, nullable=False)
     unit = Column(String(20), nullable=False)
@@ -141,6 +142,7 @@ class MaterialIn(Base):
     
     # Relationships
     order = relationship("Order")
+    customer = relationship("Customer")
     creator = relationship("User")
 
 class DeliveryChallan(Base):
@@ -180,6 +182,7 @@ class MaterialOut(Base):
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     challan_id = Column(UUID(as_uuid=True), ForeignKey("delivery_challans.id"), nullable=False)
+    customer_id = Column(UUID(as_uuid=True), ForeignKey("customers.id"))
     material_type = Column(Enum(MaterialType, name='material_type'), nullable=False)
     quantity = Column(Integer, nullable=False)
     dispatch_date = Column(DateTime(timezone=True), server_default=func.now())
@@ -188,6 +191,7 @@ class MaterialOut(Base):
     
     # Relationships
     challan = relationship("DeliveryChallan")
+    customer = relationship("Customer")
     creator = relationship("User")
 
 class GSTInvoice(Base):

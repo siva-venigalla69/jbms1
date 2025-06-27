@@ -7,6 +7,7 @@ from ..core.database import get_db
 from ..core.security import get_current_active_user
 from ..models.models import User, DeliveryChallan, ChallanItem, Customer, OrderItem
 from ..schemas.schemas import DeliveryChallanCreate, DeliveryChallanResponse, DeliveryChallanUpdate
+from ..services.numbering import generate_challan_number
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
@@ -58,8 +59,12 @@ async def create_challan(
         
         total_quantity = sum(item.quantity for item in challan_data.challan_items)
         
+        # Generate challan number
+        challan_number = generate_challan_number(db)
+        
         # Create challan
         db_challan = DeliveryChallan(
+            challan_number=challan_number,
             customer_id=challan_data.customer_id,
             challan_date=challan_data.challan_date or datetime.utcnow(),
             total_quantity=total_quantity,

@@ -32,6 +32,7 @@
 **REQ-003**: System shall allow order creation with following details:
 - Auto-generated Order Number (Format: ORD-YYYY-NNNN)
 - Customer Selection (Required)
+-
 - Order Date (Default: Current Date)
 - Order Status: Pending, In Progress, Completed, Cancelled
 - Total Amount
@@ -61,6 +62,19 @@
 - Received Date (Default: Current Date)
 - Notes
 - Created by user tracking
+-please link with materials with cusotmers 
+[
+  {
+    "order_id": "string",
+    "material_type": "saree",
+    "quantity": 1,
+    "unit": "string",
+    "received_date": "2025-06-27T03:36:54.375Z",
+    "notes": "string",
+    "id": "string",
+    "created_at": "2025-06-27T03:36:54.375Z"
+  }
+]
 
 **REQ-011**: System shall allow material-in without linking to specific order (general stock)
 
@@ -97,6 +111,7 @@
 - Material Type and Quantity confirmation
 - Actual Dispatch Date
 - Created by user tracking
+-add custoemr field here as well 
 
 **REQ-020**: System shall prevent material-out without valid challan
 
