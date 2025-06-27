@@ -30,6 +30,7 @@ import {
     Settings,
     Factory,
     AccountCircle,
+    Palette,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -45,9 +46,10 @@ const menuItems = [
     { text: 'Customers', icon: <People />, path: '/customers' },
     { text: 'Orders', icon: <ShoppingCart />, path: '/orders' },
     { text: 'Production', icon: <Factory />, path: '/production' },
+    { text: 'Materials', icon: <Palette />, path: '/materials' },
+    { text: 'Inventory', icon: <Inventory />, path: '/inventory' },
     { text: 'Delivery Challans', icon: <LocalShipping />, path: '/challans' },
     { text: 'Invoices', icon: <Receipt />, path: '/invoices' },
-    { text: 'Inventory', icon: <Inventory />, path: '/inventory' },
     { text: 'Reports', icon: <Assessment />, path: '/reports' },
 ];
 

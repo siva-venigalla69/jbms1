@@ -11,6 +11,9 @@ import Dashboard from './pages/Dashboard';
 import Customers from './pages/Customers';
 import Orders from './pages/Orders';
 import Production from './pages/Production';
+import Inventory from './pages/Inventory';
+import Reports from './pages/Reports';
+import Materials from './pages/Materials';
 
 function App() {
   return (
@@ -64,7 +67,39 @@ function App() {
               }
             />
 
-            {/* Placeholder routes for other pages */}
+            {/* Functional routes */}
+            <Route
+              path="/inventory"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Inventory />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/reports"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Reports />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/materials"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Materials />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Placeholder routes for remaining pages */}
             <Route
               path="/challans"
               element={
@@ -81,26 +116,6 @@ function App() {
                 <ProtectedRoute>
                   <Layout>
                     <div>Invoices - Coming Soon</div>
-                  </Layout>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/inventory"
-              element={
-                <ProtectedRoute>
-                  <Layout>
-                    <div>Inventory - Coming Soon</div>
-                  </Layout>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/reports"
-              element={
-                <ProtectedRoute>
-                  <Layout>
-                    <div>Reports - Coming Soon</div>
                   </Layout>
                 </ProtectedRoute>
               }
