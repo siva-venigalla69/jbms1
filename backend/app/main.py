@@ -186,10 +186,16 @@ async def general_exception_handler(request: Request, exc: Exception):
     """Handle unexpected errors"""
     logger.error(f"Unexpected error on {request.url.path}: {str(exc)}", exc_info=True)
     
+    # Show detailed error in debug mode
+    if settings.DEBUG:
+        detail = f"Error: {str(exc)} (Type: {type(exc).__name__})"
+    else:
+        detail = "An unexpected error occurred. Please contact support if the problem persists."
+    
     response = JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={
-            "detail": "An unexpected error occurred. Please contact support if the problem persists.",
+            "detail": detail,
             "request_id": id(request)
         }
     )

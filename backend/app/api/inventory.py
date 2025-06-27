@@ -12,7 +12,7 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/inventory", tags=["Inventory Management"])
 
-@router.get("/", response_model=List[InventoryResponse])
+@router.get("/")
 async def list_inventory(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
@@ -66,7 +66,7 @@ async def list_inventory(
             detail=f"Failed to retrieve inventory: {str(e)[:100]}"
         )
 
-@router.post("/", response_model=InventoryResponse, status_code=201)
+@router.post("/", status_code=201)
 async def create_inventory_item(
     item_data: InventoryCreate,
     db: Session = Depends(get_db),
@@ -128,7 +128,7 @@ async def create_inventory_item(
         logger.error(f"Error creating inventory item: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to create inventory item")
 
-@router.put("/{item_id}", response_model=InventoryResponse)
+@router.put("/{item_id}")
 async def update_inventory_item(
     item_id: str,
     item_update: InventoryUpdate,
@@ -199,7 +199,17 @@ async def adjust_inventory(
             raise HTTPException(status_code=404, detail="Inventory item not found")
         
         # Extract adjustment data
-        adjustment_type = adjustment_data.get("adjustment_type", "quantity_change")
+        adjustment_type_raw = adjustment_data.get("adjustment_type", "quantity_change")
+        # Handle adjustment_type enum properly
+        if hasattr(adjustment_type_raw, 'value'):
+            # If it's already an enum, use its value
+            adjustment_type = adjustment_type_raw.value
+        elif isinstance(adjustment_type_raw, str):
+            # If it's a string, use it directly
+            adjustment_type = adjustment_type_raw.lower()
+        else:
+            adjustment_type = str(adjustment_type_raw).lower()
+        
         quantity_change = float(adjustment_data.get("quantity_change", 0))
         reason = adjustment_data.get("reason", "")
         notes = adjustment_data.get("notes", "")
@@ -262,9 +272,9 @@ async def adjust_inventory(
     except Exception as e:
         db.rollback()
         logger.error(f"Error adjusting inventory: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to adjust inventory")
+        raise HTTPException(status_code=500, detail=f"Failed to adjust inventory: {str(e)}")
 
-@router.get("/low-stock", response_model=List[InventoryResponse])
+@router.get("/low-stock")
 async def get_low_stock_items(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)

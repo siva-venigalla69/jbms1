@@ -18,7 +18,7 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/orders", tags=["Order Management"])
 
-@router.get("/", response_model=List[OrderResponse])
+@router.get("/")
 async def list_orders(
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
@@ -58,16 +58,21 @@ async def list_orders(
             try:
                 # Get customer info safely
                 customer = db.query(Customer).filter(Customer.id == order.customer_id).first()
-                customer_data = {
-                    "id": str(customer.id),
-                    "name": customer.name,
-                    "phone": customer.phone,
-                    "email": customer.email,
-                    "address": customer.address,
-                    "gst_number": customer.gst_number,
-                    "created_at": customer.created_at,
-                    "updated_at": customer.updated_at
-                } if customer else None
+                if customer:
+                    customer_data = {
+                        "id": str(customer.id),
+                        "name": customer.name,
+                        "phone": customer.phone,
+                        "email": customer.email,
+                        "address": customer.address,
+                        "gst_number": customer.gst_number,
+                        "created_at": customer.created_at,
+                        "updated_at": customer.updated_at
+                    }
+                else:
+                    # Skip orders with missing customers to avoid validation errors
+                    logger.warning(f"Skipping order {order.id} - customer not found")
+                    continue
                 
                 # Get order items safely
                 order_items = db.query(OrderItem).filter(OrderItem.order_id == order.id).all()
@@ -129,7 +134,7 @@ async def list_orders(
             detail=f"Failed to retrieve orders: {str(e)[:100]}"
         )
 
-@router.post("/", response_model=OrderResponse, status_code=201)
+@router.post("/", status_code=201)
 async def create_order(
     order_data: OrderCreate,
     db: Session = Depends(get_db),
@@ -188,9 +193,20 @@ async def create_order(
         
         # Create order items
         for item_data in order_data.order_items:
+            # Handle material_type enum properly
+            material_type_value = item_data.material_type
+            if hasattr(material_type_value, 'value'):
+                # If it's already an enum, use its value
+                material_type_db_value = material_type_value.value
+            elif isinstance(material_type_value, str):
+                # If it's a string, use it directly
+                material_type_db_value = material_type_value.lower()
+            else:
+                material_type_db_value = str(material_type_value).lower()
+            
             db_item = OrderItem(
                 order_id=db_order.id,
-                material_type=item_data.material_type,
+                material_type=material_type_db_value,
                 quantity=item_data.quantity,
                 unit_price=item_data.unit_price,
                 customization_details=item_data.customization_details
@@ -246,7 +262,7 @@ async def create_order(
         logger.error(f"Error creating order: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to create order: {str(e)[:100]}")
 
-@router.get("/{order_id}", response_model=OrderResponse)
+@router.get("/{order_id}")
 async def get_order(
     order_id: str,
     db: Session = Depends(get_db),
@@ -262,7 +278,7 @@ async def get_order(
     
     return order
 
-@router.put("/{order_id}", response_model=OrderResponse)
+@router.put("/{order_id}")
 async def update_order(
     order_id: str,
     order_update: OrderUpdate,

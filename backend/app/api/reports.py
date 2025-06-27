@@ -230,7 +230,7 @@ async def get_pending_receivables_report(
                 c.gst_number as customer_gst,
                 CASE 
                     WHEN i.invoice_date IS NOT NULL THEN 
-                        EXTRACT(DAY FROM (CURRENT_DATE - i.invoice_date::date))
+                        (CURRENT_DATE - i.invoice_date::date)::integer
                     ELSE 0 
                 END as days_outstanding
             FROM gst_invoices i
@@ -240,7 +240,7 @@ async def get_pending_receivables_report(
             ORDER BY 
                 CASE 
                     WHEN i.invoice_date IS NOT NULL THEN 
-                        EXTRACT(DAY FROM (CURRENT_DATE - i.invoice_date::date))
+                        (CURRENT_DATE - i.invoice_date::date)::integer
                     ELSE 0 
                 END DESC, 
                 i.outstanding_amount DESC

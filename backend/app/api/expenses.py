@@ -12,7 +12,7 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/expenses", tags=["Expense Management"])
 
-@router.get("/", response_model=List[ExpenseResponse])
+@router.get("/")
 async def list_expenses(
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
@@ -41,7 +41,7 @@ async def list_expenses(
         logger.error(f"Error retrieving expenses: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to retrieve expenses")
 
-@router.post("/", response_model=ExpenseResponse, status_code=201)
+@router.post("/", status_code=201)
 async def create_expense(
     expense_data: ExpenseCreate,
     db: Session = Depends(get_db),
@@ -49,13 +49,24 @@ async def create_expense(
 ):
     """Record new expense"""
     try:
+        # Handle payment_method enum properly
+        payment_method_value = expense_data.payment_method
+        if hasattr(payment_method_value, 'value'):
+            # If it's already an enum, use its value
+            payment_method_db_value = payment_method_value.value
+        elif isinstance(payment_method_value, str):
+            # If it's a string, use it directly
+            payment_method_db_value = payment_method_value.lower()
+        else:
+            payment_method_db_value = str(payment_method_value).lower()
+
         # Create expense record
         db_expense = Expense(
             expense_date=expense_data.expense_date or datetime.utcnow(),
             category=expense_data.category,
             description=expense_data.description,
             amount=expense_data.amount,
-            payment_method=expense_data.payment_method,
+            payment_method=payment_method_db_value,
             reference_number=expense_data.reference_number,
             notes=expense_data.notes,
             created_by_user_id=current_user.id
@@ -72,7 +83,7 @@ async def create_expense(
         logger.error(f"Error creating expense: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to create expense")
 
-@router.get("/{expense_id}", response_model=ExpenseResponse)
+@router.get("/{expense_id}")
 async def get_expense(
     expense_id: str,
     db: Session = Depends(get_db),

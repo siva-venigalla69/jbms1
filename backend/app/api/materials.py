@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/materials", tags=["Material Tracking"])
 
 # Material In Endpoints
-@router.get("/in", response_model=List[MaterialInResponse])
+@router.get("/in")
 async def list_material_in(
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
@@ -43,7 +43,7 @@ async def list_material_in(
         logger.error(f"Error retrieving material in records: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to retrieve material in records")
 
-@router.post("/in", response_model=MaterialInResponse, status_code=201)
+@router.post("/in", status_code=201)
 async def record_material_in(
     material_data: MaterialInCreate,
     db: Session = Depends(get_db),
@@ -71,11 +71,22 @@ async def record_material_in(
             if not customer:
                 raise HTTPException(status_code=404, detail="Customer not found")
         
+        # Handle material_type enum properly
+        material_type_value = material_data.material_type
+        if hasattr(material_type_value, 'value'):
+            # If it's already an enum, use its value
+            material_type_db_value = material_type_value.value
+        elif isinstance(material_type_value, str):
+            # If it's a string, use it directly
+            material_type_db_value = material_type_value.lower()
+        else:
+            material_type_db_value = str(material_type_value).lower()
+
         # Create material in record
         db_material = MaterialIn(
             order_id=material_data.order_id,
             customer_id=material_data.customer_id,
-            material_type=material_data.material_type,
+            material_type=material_type_db_value,
             quantity=material_data.quantity,
             unit=material_data.unit,
             received_date=material_data.received_date or datetime.utcnow(),
@@ -98,7 +109,7 @@ async def record_material_in(
         raise HTTPException(status_code=500, detail="Failed to record material in")
 
 # Material Out Endpoints
-@router.get("/out", response_model=List[MaterialOutResponse])
+@router.get("/out")
 async def list_material_out(
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
@@ -128,7 +139,7 @@ async def list_material_out(
         logger.error(f"Error retrieving material out records: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to retrieve material out records")
 
-@router.post("/out", response_model=MaterialOutResponse, status_code=201)
+@router.post("/out", status_code=201)
 async def record_material_out(
     material_data: MaterialOutCreate,
     db: Session = Depends(get_db),
@@ -146,13 +157,26 @@ async def record_material_out(
         # If customer_id not provided, use challan's customer_id
         customer_id = material_data.customer_id or str(challan.customer_id)
         
+        # Handle material_type enum properly
+        material_type_value = material_data.material_type
+        if hasattr(material_type_value, 'value'):
+            # If it's already an enum, use its value
+            material_type_db_value = material_type_value.value
+        elif isinstance(material_type_value, str):
+            # If it's a string, use it directly
+            material_type_db_value = material_type_value.lower()
+        else:
+            material_type_db_value = str(material_type_value).lower()
+
         # Create material out record
         db_material = MaterialOut(
             challan_id=material_data.challan_id,
             customer_id=customer_id,
-            material_type=material_data.material_type,
+            material_type=material_type_db_value,
             quantity=material_data.quantity,
+            unit=material_data.unit,
             dispatch_date=material_data.dispatch_date or datetime.utcnow(),
+            notes=material_data.notes,
             created_by_user_id=current_user.id
         )
         

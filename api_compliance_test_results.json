@@ -1,146 +1,167 @@
 {
-  "passed": 7,
-  "failed": 13,
+  "passed": 11,
+  "failed": 12,
   "details": [
     {
       "test": "Health Check",
       "requirement": "SYSTEM",
       "status": "PASS",
       "details": "",
-      "timestamp": "2025-06-27T13:56:22.731256"
+      "timestamp": "2025-06-27T23:45:12.245166"
     },
     {
       "test": "Authentication",
       "requirement": "REQ-050,051",
       "status": "PASS",
       "details": "Admin login successful",
-      "timestamp": "2025-06-27T13:56:24.476261"
+      "timestamp": "2025-06-27T23:45:14.443164"
     },
     {
       "test": "Create Customer",
       "requirement": "REQ-001",
       "status": "PASS",
       "details": "",
-      "timestamp": "2025-06-27T13:56:24.663410"
+      "timestamp": "2025-06-27T23:45:15.259325"
     },
     {
       "test": "Get Customer",
       "requirement": "REQ-001",
       "status": "PASS",
       "details": "",
-      "timestamp": "2025-06-27T13:56:24.758373"
+      "timestamp": "2025-06-27T23:45:15.340047"
     },
     {
       "test": "Update Customer",
       "requirement": "REQ-001",
       "status": "PASS",
       "details": "",
-      "timestamp": "2025-06-27T13:56:25.104561"
+      "timestamp": "2025-06-27T23:45:15.451528"
     },
     {
       "test": "List Customers",
       "requirement": "REQ-001",
       "status": "PASS",
       "details": "",
-      "timestamp": "2025-06-27T13:56:25.193477"
+      "timestamp": "2025-06-27T23:45:15.550268"
     },
     {
       "test": "Prevent Duplicate Customer",
       "requirement": "REQ-002",
       "status": "PASS",
       "details": "",
-      "timestamp": "2025-06-27T13:56:25.290102"
+      "timestamp": "2025-06-27T23:45:15.634029"
     },
     {
       "test": "Create Order",
       "requirement": "REQ-003",
       "status": "FAIL",
-      "details": "Status: 500, Response: {\"detail\":\"Failed to create order\",\"status_code\":500,\"request_id\":128382221865872}",
-      "timestamp": "2025-06-27T13:56:25.398054"
+      "details": "Status: 500, Response: {\"detail\":\"An unexpected error occurred. Please contact support if the problem persists.\",\"request_id\":135640242220816}",
+      "timestamp": "2025-06-27T23:45:15.764222"
     },
     {
       "test": "Material In with Order",
       "requirement": "REQ-010",
       "status": "FAIL",
-      "details": "Status: 500, Response: {\"detail\":\"Failed to record material in\",\"status_code\":500,\"request_id\":128382286461520}",
-      "timestamp": "2025-06-27T13:56:25.494867"
+      "details": "Status: 500, Response: {\"detail\":\"An unexpected error occurred. Please contact support if the problem persists.\",\"request_id\":135640242438096}",
+      "timestamp": "2025-06-27T23:45:15.939859"
     },
     {
       "test": "Production Stage Tracking",
       "requirement": "REQ-012",
       "status": "FAIL",
       "details": "No order ID available",
-      "timestamp": "2025-06-27T13:56:25.495188"
+      "timestamp": "2025-06-27T23:45:15.940293"
     },
     {
       "test": "Challan Management",
       "requirement": "REQ-015",
       "status": "FAIL",
       "details": "No customer or order ID available",
-      "timestamp": "2025-06-27T13:56:25.495304"
+      "timestamp": "2025-06-27T23:45:15.940569"
     },
     {
       "test": "Material Out Tracking",
       "requirement": "REQ-019",
       "status": "FAIL",
       "details": "Missing challan or customer ID",
-      "timestamp": "2025-06-27T13:56:25.495415"
+      "timestamp": "2025-06-27T23:45:15.940782"
     },
     {
       "test": "Invoice Management",
       "requirement": "REQ-021",
       "status": "FAIL",
       "details": "Missing customer or challan ID",
-      "timestamp": "2025-06-27T13:56:25.495525"
+      "timestamp": "2025-06-27T23:45:15.940976"
     },
     {
       "test": "Payment Recording",
       "requirement": "REQ-025",
       "status": "FAIL",
       "details": "No invoice ID available",
-      "timestamp": "2025-06-27T13:56:25.495633"
+      "timestamp": "2025-06-27T23:45:15.941212"
     },
     {
       "test": "Create Inventory Item",
-      "requirement": "REQ-032",
+      "requirement": "REQ-032,033",
+      "status": "PASS",
+      "details": "",
+      "timestamp": "2025-06-27T23:45:16.047881"
+    },
+    {
+      "test": "Get Inventory Item",
+      "requirement": "REQ-033",
       "status": "FAIL",
-      "details": "Status: 500, Response: {\"detail\":\"An unexpected error occurred. Please contact support if the problem persists.\",\"request_id\":128382220091472}",
-      "timestamp": "2025-06-27T13:56:25.612588"
+      "details": "Status: 405",
+      "timestamp": "2025-06-27T23:45:16.124839"
+    },
+    {
+      "test": "List Inventory",
+      "requirement": "REQ-033",
+      "status": "PASS",
+      "details": "",
+      "timestamp": "2025-06-27T23:45:16.221828"
+    },
+    {
+      "test": "Inventory Adjustment",
+      "requirement": "REQ-035",
+      "status": "FAIL",
+      "details": "Status: 405",
+      "timestamp": "2025-06-27T23:45:16.308620"
     },
     {
       "test": "Create Expense",
       "requirement": "REQ-036",
       "status": "FAIL",
-      "details": "Status: 500, Response: {\"detail\":\"Failed to create expense\",\"status_code\":500,\"request_id\":128382291368656}",
-      "timestamp": "2025-06-27T13:56:25.710790"
+      "details": "Status: 500, Response: {\"detail\":\"An unexpected error occurred. Please contact support if the problem persists.\",\"request_id\":135640242575440}",
+      "timestamp": "2025-06-27T23:45:16.401434"
     },
     {
       "test": "Pending Orders Report",
       "requirement": "REQ-037",
-      "status": "FAIL",
-      "details": "Status: 404",
-      "timestamp": "2025-06-27T13:56:25.790839"
+      "status": "PASS",
+      "details": "",
+      "timestamp": "2025-06-27T23:45:16.488124"
     },
     {
       "test": "Dashboard Data Report",
       "requirement": "REQ-037+",
-      "status": "FAIL",
-      "details": "Status: 404",
-      "timestamp": "2025-06-27T13:56:25.871497"
+      "status": "PASS",
+      "details": "",
+      "timestamp": "2025-06-27T23:45:16.571849"
     },
     {
       "test": "Low Stock Report Report",
       "requirement": "REQ-037+",
       "status": "FAIL",
       "details": "Status: 404",
-      "timestamp": "2025-06-27T13:56:25.946572"
+      "timestamp": "2025-06-27T23:45:16.665187"
     },
     {
       "test": "Outstanding Receivables Report",
       "requirement": "REQ-037+",
       "status": "FAIL",
       "details": "Status: 404",
-      "timestamp": "2025-06-27T13:56:26.025303"
+      "timestamp": "2025-06-27T23:45:16.753953"
     }
   ]
 }

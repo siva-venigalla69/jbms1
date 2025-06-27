@@ -1,0 +1,374 @@
+{
+  "summary": {
+    "total": 17,
+    "passed": 9,
+    "failed": 8,
+    "success_rate": 52.94117647058824,
+    "timestamp": "2025-06-28T00:17:08.923069"
+  },
+  "requirements_coverage": {
+    "REQ-001": {
+      "passed": 2,
+      "failed": 0,
+      "tests": [
+        {
+          "requirement": "REQ-001",
+          "test": "List Customers",
+          "status": "PASS",
+          "details": "Found 20 customers",
+          "data": null,
+          "timestamp": "2025-06-28T00:17:01.017581"
+        },
+        {
+          "requirement": "REQ-001",
+          "test": "Create Customer",
+          "status": "PASS",
+          "details": "Created customer ID: db7a107d-e28e-4bcb-afd4-cca62e24c3a6",
+          "data": null,
+          "timestamp": "2025-06-28T00:17:01.734566"
+        }
+      ]
+    },
+    "REQ-002": {
+      "passed": 1,
+      "failed": 0,
+      "tests": [
+        {
+          "requirement": "REQ-002",
+          "test": "Duplicate Prevention",
+          "status": "PASS",
+          "details": "Properly rejected duplicate phone",
+          "data": null,
+          "timestamp": "2025-06-28T00:17:02.026058"
+        }
+      ]
+    },
+    "REQ-003": {
+      "passed": 0,
+      "failed": 1,
+      "tests": [
+        {
+          "requirement": "REQ-003",
+          "test": "Order Creation",
+          "status": "FAIL",
+          "details": "Status: 500 - {\"detail\":\"An unexpected error occurred. Please contact support if the problem persists.\",\"request_id\":140485541936864}",
+          "data": null,
+          "timestamp": "2025-06-28T00:17:02.884772"
+        }
+      ]
+    },
+    "REQ-004": {
+      "passed": 0,
+      "failed": 1,
+      "tests": [
+        {
+          "requirement": "REQ-004",
+          "test": "Order Listing",
+          "status": "FAIL",
+          "details": "Status: 500 - {\"detail\":\"An unexpected error occurred. Please contact support if the problem persists.\",\"request_id\":140485540611216}",
+          "data": null,
+          "timestamp": "2025-06-28T00:17:03.617308"
+        }
+      ]
+    },
+    "REQ-010": {
+      "passed": 0,
+      "failed": 2,
+      "tests": [
+        {
+          "requirement": "REQ-010",
+          "test": "Material In with Customer Link",
+          "status": "FAIL",
+          "details": "Status: 500 - {\"detail\":\"An unexpected error occurred. Please contact support if the problem persists.\",\"request_id\":140485542048576}",
+          "data": null,
+          "timestamp": "2025-06-28T00:17:04.236974"
+        },
+        {
+          "requirement": "REQ-010",
+          "test": "Material In Listing",
+          "status": "FAIL",
+          "details": "Status: 500 - {\"detail\":\"An unexpected error occurred. Please contact support if the problem persists.\",\"request_id\":140485541143280}",
+          "data": null,
+          "timestamp": "2025-06-28T00:17:05.276735"
+        }
+      ]
+    },
+    "REQ-011": {
+      "passed": 0,
+      "failed": 1,
+      "tests": [
+        {
+          "requirement": "REQ-011",
+          "test": "Material In without Order",
+          "status": "FAIL",
+          "details": "Status: 500 - {\"detail\":\"An unexpected error occurred. Please contact support if the problem persists.\",\"request_id\":140485541025328}",
+          "data": null,
+          "timestamp": "2025-06-28T00:17:04.980245"
+        }
+      ]
+    },
+    "REQ-032": {
+      "passed": 1,
+      "failed": 0,
+      "tests": [
+        {
+          "requirement": "REQ-032",
+          "test": "Inventory Item Creation",
+          "status": "PASS",
+          "details": "Created item ID: 9cba2d7e-7d4b-46ea-b270-0d47abf1472d",
+          "data": null,
+          "timestamp": "2025-06-28T00:17:05.888311"
+        }
+      ]
+    },
+    "REQ-033": {
+      "passed": 1,
+      "failed": 0,
+      "tests": [
+        {
+          "requirement": "REQ-033",
+          "test": "Inventory Listing",
+          "status": "PASS",
+          "details": "Found 27 items",
+          "data": null,
+          "timestamp": "2025-06-28T00:17:06.183605"
+        }
+      ]
+    },
+    "REQ-035": {
+      "passed": 0,
+      "failed": 1,
+      "tests": [
+        {
+          "requirement": "REQ-035",
+          "test": "Inventory Adjustment",
+          "status": "FAIL",
+          "details": "Status: 500 - {\"detail\":\"Failed to adjust inventory\",\"status_code\":500,\"request_id\":140485541257968}",
+          "data": null,
+          "timestamp": "2025-06-28T00:17:06.478032"
+        }
+      ]
+    },
+    "REQ-036": {
+      "passed": 0,
+      "failed": 2,
+      "tests": [
+        {
+          "requirement": "REQ-036",
+          "test": "Expense Recording",
+          "status": "FAIL",
+          "details": "Status: 500 - {\"detail\":\"An unexpected error occurred. Please contact support if the problem persists.\",\"request_id\":140485541148368}",
+          "data": null,
+          "timestamp": "2025-06-28T00:17:07.048583"
+        },
+        {
+          "requirement": "REQ-036",
+          "test": "Expense Listing",
+          "status": "FAIL",
+          "details": "Status: 500 - {\"detail\":\"An unexpected error occurred. Please contact support if the problem persists.\",\"request_id\":140485541260896}",
+          "data": null,
+          "timestamp": "2025-06-28T00:17:07.463235"
+        }
+      ]
+    },
+    "REQ-037": {
+      "passed": 1,
+      "failed": 0,
+      "tests": [
+        {
+          "requirement": "REQ-037",
+          "test": "Pending Orders Report",
+          "status": "PASS",
+          "details": "Generated report with 3 orders",
+          "data": null,
+          "timestamp": "2025-06-28T00:17:07.859565"
+        }
+      ]
+    },
+    "REQ-038": {
+      "passed": 1,
+      "failed": 0,
+      "tests": [
+        {
+          "requirement": "REQ-038",
+          "test": "Production Status Report",
+          "status": "PASS",
+          "details": "Generated report with 4 items",
+          "data": null,
+          "timestamp": "2025-06-28T00:17:08.216140"
+        }
+      ]
+    },
+    "REQ-039": {
+      "passed": 1,
+      "failed": 0,
+      "tests": [
+        {
+          "requirement": "REQ-039",
+          "test": "Stock Holdings Report",
+          "status": "PASS",
+          "details": "Generated report with 4 items",
+          "data": null,
+          "timestamp": "2025-06-28T00:17:08.585873"
+        }
+      ]
+    },
+    "REQ-040": {
+      "passed": 1,
+      "failed": 0,
+      "tests": [
+        {
+          "requirement": "REQ-040",
+          "test": "Pending Receivables Report",
+          "status": "PASS",
+          "details": "Generated report with 4 items",
+          "data": null,
+          "timestamp": "2025-06-28T00:17:08.920903"
+        }
+      ]
+    }
+  },
+  "created_data": {
+    "existing_customer_id": "c61aca5d-9891-4ac5-9056-9c0ec1a86168",
+    "customer_id": "db7a107d-e28e-4bcb-afd4-cca62e24c3a6",
+    "inventory_id": "9cba2d7e-7d4b-46ea-b270-0d47abf1472d"
+  },
+  "detailed_results": [
+    {
+      "requirement": "REQ-001",
+      "test": "List Customers",
+      "status": "PASS",
+      "details": "Found 20 customers",
+      "data": null,
+      "timestamp": "2025-06-28T00:17:01.017581"
+    },
+    {
+      "requirement": "REQ-001",
+      "test": "Create Customer",
+      "status": "PASS",
+      "details": "Created customer ID: db7a107d-e28e-4bcb-afd4-cca62e24c3a6",
+      "data": null,
+      "timestamp": "2025-06-28T00:17:01.734566"
+    },
+    {
+      "requirement": "REQ-002",
+      "test": "Duplicate Prevention",
+      "status": "PASS",
+      "details": "Properly rejected duplicate phone",
+      "data": null,
+      "timestamp": "2025-06-28T00:17:02.026058"
+    },
+    {
+      "requirement": "REQ-003",
+      "test": "Order Creation",
+      "status": "FAIL",
+      "details": "Status: 500 - {\"detail\":\"An unexpected error occurred. Please contact support if the problem persists.\",\"request_id\":140485541936864}",
+      "data": null,
+      "timestamp": "2025-06-28T00:17:02.884772"
+    },
+    {
+      "requirement": "REQ-004",
+      "test": "Order Listing",
+      "status": "FAIL",
+      "details": "Status: 500 - {\"detail\":\"An unexpected error occurred. Please contact support if the problem persists.\",\"request_id\":140485540611216}",
+      "data": null,
+      "timestamp": "2025-06-28T00:17:03.617308"
+    },
+    {
+      "requirement": "REQ-010",
+      "test": "Material In with Customer Link",
+      "status": "FAIL",
+      "details": "Status: 500 - {\"detail\":\"An unexpected error occurred. Please contact support if the problem persists.\",\"request_id\":140485542048576}",
+      "data": null,
+      "timestamp": "2025-06-28T00:17:04.236974"
+    },
+    {
+      "requirement": "REQ-011",
+      "test": "Material In without Order",
+      "status": "FAIL",
+      "details": "Status: 500 - {\"detail\":\"An unexpected error occurred. Please contact support if the problem persists.\",\"request_id\":140485541025328}",
+      "data": null,
+      "timestamp": "2025-06-28T00:17:04.980245"
+    },
+    {
+      "requirement": "REQ-010",
+      "test": "Material In Listing",
+      "status": "FAIL",
+      "details": "Status: 500 - {\"detail\":\"An unexpected error occurred. Please contact support if the problem persists.\",\"request_id\":140485541143280}",
+      "data": null,
+      "timestamp": "2025-06-28T00:17:05.276735"
+    },
+    {
+      "requirement": "REQ-032",
+      "test": "Inventory Item Creation",
+      "status": "PASS",
+      "details": "Created item ID: 9cba2d7e-7d4b-46ea-b270-0d47abf1472d",
+      "data": null,
+      "timestamp": "2025-06-28T00:17:05.888311"
+    },
+    {
+      "requirement": "REQ-033",
+      "test": "Inventory Listing",
+      "status": "PASS",
+      "details": "Found 27 items",
+      "data": null,
+      "timestamp": "2025-06-28T00:17:06.183605"
+    },
+    {
+      "requirement": "REQ-035",
+      "test": "Inventory Adjustment",
+      "status": "FAIL",
+      "details": "Status: 500 - {\"detail\":\"Failed to adjust inventory\",\"status_code\":500,\"request_id\":140485541257968}",
+      "data": null,
+      "timestamp": "2025-06-28T00:17:06.478032"
+    },
+    {
+      "requirement": "REQ-036",
+      "test": "Expense Recording",
+      "status": "FAIL",
+      "details": "Status: 500 - {\"detail\":\"An unexpected error occurred. Please contact support if the problem persists.\",\"request_id\":140485541148368}",
+      "data": null,
+      "timestamp": "2025-06-28T00:17:07.048583"
+    },
+    {
+      "requirement": "REQ-036",
+      "test": "Expense Listing",
+      "status": "FAIL",
+      "details": "Status: 500 - {\"detail\":\"An unexpected error occurred. Please contact support if the problem persists.\",\"request_id\":140485541260896}",
+      "data": null,
+      "timestamp": "2025-06-28T00:17:07.463235"
+    },
+    {
+      "requirement": "REQ-037",
+      "test": "Pending Orders Report",
+      "status": "PASS",
+      "details": "Generated report with 3 orders",
+      "data": null,
+      "timestamp": "2025-06-28T00:17:07.859565"
+    },
+    {
+      "requirement": "REQ-038",
+      "test": "Production Status Report",
+      "status": "PASS",
+      "details": "Generated report with 4 items",
+      "data": null,
+      "timestamp": "2025-06-28T00:17:08.216140"
+    },
+    {
+      "requirement": "REQ-039",
+      "test": "Stock Holdings Report",
+      "status": "PASS",
+      "details": "Generated report with 4 items",
+      "data": null,
+      "timestamp": "2025-06-28T00:17:08.585873"
+    },
+    {
+      "requirement": "REQ-040",
+      "test": "Pending Receivables Report",
+      "status": "PASS",
+      "details": "Generated report with 4 items",
+      "data": null,
+      "timestamp": "2025-06-28T00:17:08.920903"
+    }
+  ]
+}
