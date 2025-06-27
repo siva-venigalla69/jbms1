@@ -1,0 +1,421 @@
+{
+  "summary": {
+    "total": 19,
+    "passed": 18,
+    "failed": 1,
+    "success_rate": 94.73684210526315,
+    "timestamp": "2025-06-28T01:05:33.704516"
+  },
+  "requirements_coverage": {
+    "REQ-001": {
+      "passed": 2,
+      "failed": 0,
+      "tests": [
+        {
+          "requirement": "REQ-001",
+          "test": "List Customers",
+          "status": "PASS",
+          "details": "Found 20 customers",
+          "data": null,
+          "timestamp": "2025-06-28T01:05:25.283685"
+        },
+        {
+          "requirement": "REQ-001",
+          "test": "Create Customer",
+          "status": "PASS",
+          "details": "Created customer ID: 661e816c-23a1-41af-b10a-7c4b645a43bf",
+          "data": null,
+          "timestamp": "2025-06-28T01:05:25.958478"
+        }
+      ]
+    },
+    "REQ-002": {
+      "passed": 1,
+      "failed": 0,
+      "tests": [
+        {
+          "requirement": "REQ-002",
+          "test": "Duplicate Prevention",
+          "status": "PASS",
+          "details": "Properly rejected duplicate phone",
+          "data": null,
+          "timestamp": "2025-06-28T01:05:26.234848"
+        }
+      ]
+    },
+    "REQ-003": {
+      "passed": 1,
+      "failed": 0,
+      "tests": [
+        {
+          "requirement": "REQ-003",
+          "test": "Auto-generated Order Number",
+          "status": "PASS",
+          "details": "Order number: ORD-2025-0012",
+          "data": null,
+          "timestamp": "2025-06-28T01:05:27.168733"
+        }
+      ]
+    },
+    "REQ-009": {
+      "passed": 1,
+      "failed": 0,
+      "tests": [
+        {
+          "requirement": "REQ-009",
+          "test": "Order Total Calculation",
+          "status": "PASS",
+          "details": "Correct total: 2000.0",
+          "data": null,
+          "timestamp": "2025-06-28T01:05:27.168835"
+        }
+      ]
+    },
+    "REQ-007": {
+      "passed": 1,
+      "failed": 0,
+      "tests": [
+        {
+          "requirement": "REQ-007",
+          "test": "Order Items Creation",
+          "status": "PASS",
+          "details": "Created order with 2 items",
+          "data": null,
+          "timestamp": "2025-06-28T01:05:27.168855"
+        }
+      ]
+    },
+    "REQ-004": {
+      "passed": 1,
+      "failed": 0,
+      "tests": [
+        {
+          "requirement": "REQ-004",
+          "test": "Order Listing",
+          "status": "PASS",
+          "details": "Found 12 orders",
+          "data": null,
+          "timestamp": "2025-06-28T01:05:28.748771"
+        }
+      ]
+    },
+    "REQ-010": {
+      "passed": 2,
+      "failed": 0,
+      "tests": [
+        {
+          "requirement": "REQ-010",
+          "test": "Material In with Customer Link",
+          "status": "PASS",
+          "details": "Recorded material ID: 88beed37-b5f2-4d32-b855-909c463d8199",
+          "data": null,
+          "timestamp": "2025-06-28T01:05:29.456896"
+        },
+        {
+          "requirement": "REQ-010",
+          "test": "Material In Listing",
+          "status": "PASS",
+          "details": "Found 20 material records",
+          "data": null,
+          "timestamp": "2025-06-28T01:05:30.311844"
+        }
+      ]
+    },
+    "REQ-011": {
+      "passed": 1,
+      "failed": 0,
+      "tests": [
+        {
+          "requirement": "REQ-011",
+          "test": "Material In without Order",
+          "status": "PASS",
+          "details": "Recorded general stock ID: a00954af-bc4b-4131-96ab-da8939cd37d9",
+          "data": null,
+          "timestamp": "2025-06-28T01:05:30.035786"
+        }
+      ]
+    },
+    "REQ-032": {
+      "passed": 1,
+      "failed": 0,
+      "tests": [
+        {
+          "requirement": "REQ-032",
+          "test": "Inventory Item Creation",
+          "status": "PASS",
+          "details": "Created item ID: f62c4f7c-7219-49b8-a4b0-313154af1488",
+          "data": null,
+          "timestamp": "2025-06-28T01:05:30.920001"
+        }
+      ]
+    },
+    "REQ-033": {
+      "passed": 1,
+      "failed": 0,
+      "tests": [
+        {
+          "requirement": "REQ-033",
+          "test": "Inventory Listing",
+          "status": "PASS",
+          "details": "Found 35 items",
+          "data": null,
+          "timestamp": "2025-06-28T01:05:31.232191"
+        }
+      ]
+    },
+    "REQ-035": {
+      "passed": 0,
+      "failed": 1,
+      "tests": [
+        {
+          "requirement": "REQ-035",
+          "test": "Inventory Adjustment",
+          "status": "FAIL",
+          "details": "Status: 500 - {\"detail\":\"Failed to adjust inventory: (psycopg2.errors.InsufficientPrivilege) permission denied to set parameter \\\"session_replication_role\\\"\\n\\n[SQL: SET session_replication_role = replica;]\\n(Background on this error at: https://sqlalche.me/e/14/f405)\",\"status_code\":500,\"request_id\":140336690668080}",
+          "data": null,
+          "timestamp": "2025-06-28T01:05:31.742071"
+        }
+      ]
+    },
+    "REQ-036": {
+      "passed": 2,
+      "failed": 0,
+      "tests": [
+        {
+          "requirement": "REQ-036",
+          "test": "Expense Recording",
+          "status": "PASS",
+          "details": "Recorded expense ID: 4fbaf78e-ae68-43c4-879c-c169efcdea51",
+          "data": null,
+          "timestamp": "2025-06-28T01:05:32.299981"
+        },
+        {
+          "requirement": "REQ-036",
+          "test": "Expense Listing",
+          "status": "PASS",
+          "details": "Found 14 expenses",
+          "data": null,
+          "timestamp": "2025-06-28T01:05:32.588724"
+        }
+      ]
+    },
+    "REQ-037": {
+      "passed": 1,
+      "failed": 0,
+      "tests": [
+        {
+          "requirement": "REQ-037",
+          "test": "Pending Orders Report",
+          "status": "PASS",
+          "details": "Generated report with 3 orders",
+          "data": null,
+          "timestamp": "2025-06-28T01:05:32.870608"
+        }
+      ]
+    },
+    "REQ-038": {
+      "passed": 1,
+      "failed": 0,
+      "tests": [
+        {
+          "requirement": "REQ-038",
+          "test": "Production Status Report",
+          "status": "PASS",
+          "details": "Generated report with 4 items",
+          "data": null,
+          "timestamp": "2025-06-28T01:05:33.165904"
+        }
+      ]
+    },
+    "REQ-039": {
+      "passed": 1,
+      "failed": 0,
+      "tests": [
+        {
+          "requirement": "REQ-039",
+          "test": "Stock Holdings Report",
+          "status": "PASS",
+          "details": "Generated report with 4 items",
+          "data": null,
+          "timestamp": "2025-06-28T01:05:33.437114"
+        }
+      ]
+    },
+    "REQ-040": {
+      "passed": 1,
+      "failed": 0,
+      "tests": [
+        {
+          "requirement": "REQ-040",
+          "test": "Pending Receivables Report",
+          "status": "PASS",
+          "details": "Generated report with 4 items",
+          "data": null,
+          "timestamp": "2025-06-28T01:05:33.702921"
+        }
+      ]
+    }
+  },
+  "created_data": {
+    "existing_customer_id": "a46d3b34-6c2f-496d-8bab-7422fea8cba4",
+    "customer_id": "661e816c-23a1-41af-b10a-7c4b645a43bf",
+    "order_id": "0cb58680-55d3-4d2e-a5fb-8613a40e67de",
+    "material_in_id": "88beed37-b5f2-4d32-b855-909c463d8199",
+    "inventory_id": "f62c4f7c-7219-49b8-a4b0-313154af1488",
+    "expense_id": "4fbaf78e-ae68-43c4-879c-c169efcdea51"
+  },
+  "detailed_results": [
+    {
+      "requirement": "REQ-001",
+      "test": "List Customers",
+      "status": "PASS",
+      "details": "Found 20 customers",
+      "data": null,
+      "timestamp": "2025-06-28T01:05:25.283685"
+    },
+    {
+      "requirement": "REQ-001",
+      "test": "Create Customer",
+      "status": "PASS",
+      "details": "Created customer ID: 661e816c-23a1-41af-b10a-7c4b645a43bf",
+      "data": null,
+      "timestamp": "2025-06-28T01:05:25.958478"
+    },
+    {
+      "requirement": "REQ-002",
+      "test": "Duplicate Prevention",
+      "status": "PASS",
+      "details": "Properly rejected duplicate phone",
+      "data": null,
+      "timestamp": "2025-06-28T01:05:26.234848"
+    },
+    {
+      "requirement": "REQ-003",
+      "test": "Auto-generated Order Number",
+      "status": "PASS",
+      "details": "Order number: ORD-2025-0012",
+      "data": null,
+      "timestamp": "2025-06-28T01:05:27.168733"
+    },
+    {
+      "requirement": "REQ-009",
+      "test": "Order Total Calculation",
+      "status": "PASS",
+      "details": "Correct total: 2000.0",
+      "data": null,
+      "timestamp": "2025-06-28T01:05:27.168835"
+    },
+    {
+      "requirement": "REQ-007",
+      "test": "Order Items Creation",
+      "status": "PASS",
+      "details": "Created order with 2 items",
+      "data": null,
+      "timestamp": "2025-06-28T01:05:27.168855"
+    },
+    {
+      "requirement": "REQ-004",
+      "test": "Order Listing",
+      "status": "PASS",
+      "details": "Found 12 orders",
+      "data": null,
+      "timestamp": "2025-06-28T01:05:28.748771"
+    },
+    {
+      "requirement": "REQ-010",
+      "test": "Material In with Customer Link",
+      "status": "PASS",
+      "details": "Recorded material ID: 88beed37-b5f2-4d32-b855-909c463d8199",
+      "data": null,
+      "timestamp": "2025-06-28T01:05:29.456896"
+    },
+    {
+      "requirement": "REQ-011",
+      "test": "Material In without Order",
+      "status": "PASS",
+      "details": "Recorded general stock ID: a00954af-bc4b-4131-96ab-da8939cd37d9",
+      "data": null,
+      "timestamp": "2025-06-28T01:05:30.035786"
+    },
+    {
+      "requirement": "REQ-010",
+      "test": "Material In Listing",
+      "status": "PASS",
+      "details": "Found 20 material records",
+      "data": null,
+      "timestamp": "2025-06-28T01:05:30.311844"
+    },
+    {
+      "requirement": "REQ-032",
+      "test": "Inventory Item Creation",
+      "status": "PASS",
+      "details": "Created item ID: f62c4f7c-7219-49b8-a4b0-313154af1488",
+      "data": null,
+      "timestamp": "2025-06-28T01:05:30.920001"
+    },
+    {
+      "requirement": "REQ-033",
+      "test": "Inventory Listing",
+      "status": "PASS",
+      "details": "Found 35 items",
+      "data": null,
+      "timestamp": "2025-06-28T01:05:31.232191"
+    },
+    {
+      "requirement": "REQ-035",
+      "test": "Inventory Adjustment",
+      "status": "FAIL",
+      "details": "Status: 500 - {\"detail\":\"Failed to adjust inventory: (psycopg2.errors.InsufficientPrivilege) permission denied to set parameter \\\"session_replication_role\\\"\\n\\n[SQL: SET session_replication_role = replica;]\\n(Background on this error at: https://sqlalche.me/e/14/f405)\",\"status_code\":500,\"request_id\":140336690668080}",
+      "data": null,
+      "timestamp": "2025-06-28T01:05:31.742071"
+    },
+    {
+      "requirement": "REQ-036",
+      "test": "Expense Recording",
+      "status": "PASS",
+      "details": "Recorded expense ID: 4fbaf78e-ae68-43c4-879c-c169efcdea51",
+      "data": null,
+      "timestamp": "2025-06-28T01:05:32.299981"
+    },
+    {
+      "requirement": "REQ-036",
+      "test": "Expense Listing",
+      "status": "PASS",
+      "details": "Found 14 expenses",
+      "data": null,
+      "timestamp": "2025-06-28T01:05:32.588724"
+    },
+    {
+      "requirement": "REQ-037",
+      "test": "Pending Orders Report",
+      "status": "PASS",
+      "details": "Generated report with 3 orders",
+      "data": null,
+      "timestamp": "2025-06-28T01:05:32.870608"
+    },
+    {
+      "requirement": "REQ-038",
+      "test": "Production Status Report",
+      "status": "PASS",
+      "details": "Generated report with 4 items",
+      "data": null,
+      "timestamp": "2025-06-28T01:05:33.165904"
+    },
+    {
+      "requirement": "REQ-039",
+      "test": "Stock Holdings Report",
+      "status": "PASS",
+      "details": "Generated report with 4 items",
+      "data": null,
+      "timestamp": "2025-06-28T01:05:33.437114"
+    },
+    {
+      "requirement": "REQ-040",
+      "test": "Pending Receivables Report",
+      "status": "PASS",
+      "details": "Generated report with 4 items",
+      "data": null,
+      "timestamp": "2025-06-28T01:05:33.702921"
+    }
+  ]
+}

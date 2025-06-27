@@ -237,35 +237,15 @@ async def adjust_inventory(
         db.add(db_adjustment)
         db.flush()  # Get the adjustment ID without committing
         
-        # Try using PostgreSQL session to temporarily disable triggers
-        from sqlalchemy import text
-        try:
-            # Disable the trigger temporarily for this session
-            db.execute(text("SET session_replication_role = replica;"))
-            
-            # Now update the inventory
-            db.execute(
-                text("UPDATE inventory SET current_stock = :new_stock WHERE id = :item_id"),
-                {
-                    "new_stock": float(new_stock),
-                    "item_id": str(item.id)
-                }
-            )
-            
-            # Re-enable triggers
-            db.execute(text("SET session_replication_role = DEFAULT;"))
-        except Exception as e:
-            # Re-enable triggers even if update failed
-            try:
-                db.execute(text("SET session_replication_role = DEFAULT;"))
-            except:
-                pass
-            raise e
+        # Update the inventory directly without using privileged session settings
+        # This is safer and works on managed PostgreSQL instances
+        old_stock = item.current_stock
+        item.current_stock = new_stock
+        item.updated_by_user_id = current_user.id
+        # Let the database trigger handle last_updated/updated_at automatically
         
         db.commit()
         db.refresh(db_adjustment)
-        
-        # Refresh item to get updated values
         db.refresh(item)
         
         logger.info(f"User {current_user.username} adjusted inventory {item.item_name} by {quantity_change}")
@@ -286,7 +266,7 @@ async def adjust_inventory(
             "updated_inventory": {
                 "id": str(item.id),
                 "item_name": item.item_name,
-                "old_stock": float(item.current_stock - quantity_change),
+                "old_stock": float(old_stock),
                 "new_stock": float(item.current_stock),
                 "change": float(quantity_change)
             }

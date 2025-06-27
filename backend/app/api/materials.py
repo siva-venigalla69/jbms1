@@ -81,7 +81,7 @@ async def record_material_in(
             material_type_db_value = material_type_value.lower()
         else:
             material_type_db_value = str(material_type_value).lower()
-
+        
         # Create material in record
         db_material = MaterialIn(
             order_id=material_data.order_id,
@@ -167,7 +167,7 @@ async def record_material_out(
             material_type_db_value = material_type_value.lower()
         else:
             material_type_db_value = str(material_type_value).lower()
-
+        
         # Create material out record
         db_material = MaterialOut(
             challan_id=material_data.challan_id,
