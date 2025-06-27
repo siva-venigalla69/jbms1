@@ -228,12 +228,22 @@ async def get_pending_receivables_report(
                 c.name as customer_name,
                 c.phone as customer_phone,
                 c.gst_number as customer_gst,
-                EXTRACT(DAY FROM (CURRENT_DATE - i.invoice_date)) as days_outstanding
+                CASE 
+                    WHEN i.invoice_date IS NOT NULL THEN 
+                        EXTRACT(DAY FROM (CURRENT_DATE - i.invoice_date::date))
+                    ELSE 0 
+                END as days_outstanding
             FROM gst_invoices i
             JOIN customers c ON i.customer_id = c.id
             WHERE i.is_deleted = false 
             AND i.outstanding_amount > 0
-            ORDER BY days_outstanding DESC, i.outstanding_amount DESC
+            ORDER BY 
+                CASE 
+                    WHEN i.invoice_date IS NOT NULL THEN 
+                        EXTRACT(DAY FROM (CURRENT_DATE - i.invoice_date::date))
+                    ELSE 0 
+                END DESC, 
+                i.outstanding_amount DESC
         """))
         
         rows = result.fetchall()

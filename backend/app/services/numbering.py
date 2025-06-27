@@ -16,18 +16,31 @@ def generate_order_number(db: Session) -> str:
     """Generate next order number in format ORD-YYYY-NNNN"""
     current_year = datetime.now().year
     
-    # Get the highest order number for current year
-    result = db.execute(
-        text("""
-        SELECT COALESCE(MAX(CAST(SUBSTRING(order_number FROM 10) AS INTEGER)), 0) as max_num
-        FROM orders 
-        WHERE order_number LIKE :pattern
-        """),
-        {"pattern": f"ORD-{current_year}-%"}
-    ).fetchone()
-    
-    next_number = (result.max_num if result and result.max_num else 0) + 1
-    return f"ORD-{current_year}-{next_number:04d}"
+    try:
+        # Get the highest order number for current year using safer SQL
+        result = db.execute(
+            text("""
+            SELECT COALESCE(MAX(
+                CASE 
+                    WHEN order_number ~ '^ORD-[0-9]{4}-[0-9]+$' THEN
+                        CAST(SPLIT_PART(order_number, '-', 3) AS INTEGER)
+                    ELSE 0
+                END
+            ), 0) as max_num
+            FROM orders 
+            WHERE order_number LIKE :pattern
+            """),
+            {"pattern": f"ORD-{current_year}-%"}
+        ).fetchone()
+        
+        next_number = (result.max_num if result and result.max_num is not None else 0) + 1
+        return f"ORD-{current_year}-{next_number:04d}"
+        
+    except Exception as e:
+        # Fallback: use timestamp-based number if query fails
+        import time
+        fallback_number = int(time.time() % 10000)
+        return f"ORD-{current_year}-{fallback_number:04d}"
 
 
 def generate_challan_number(db: Session) -> str:
