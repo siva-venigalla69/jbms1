@@ -2,10 +2,10 @@ import logging
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
+from sqlalchemy import and_, func
 from ..core.database import get_db
 from ..core.security import get_current_active_user
-from ..models.models import User, Inventory
+from ..models.models import User, Inventory, InventoryAdjustment
 from ..schemas.schemas import InventoryCreate, InventoryUpdate, InventoryResponse
 from datetime import datetime
 
@@ -21,9 +21,9 @@ async def list_inventory(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """List inventory items"""
+    """List inventory items with filtering"""
     try:
-        logger.info(f"User {current_user.username} requesting inventory list with skip={skip}, limit={limit}")
+        logger.info(f"User {current_user.username} requesting inventory list")
         
         query = db.query(Inventory).filter(
             and_(Inventory.is_deleted == False, Inventory.is_active == True)
@@ -180,6 +180,89 @@ async def update_inventory_item(
         db.rollback()
         logger.error(f"Error updating inventory: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to update inventory")
+
+@router.post("/{item_id}/adjust", status_code=201)
+async def adjust_inventory(
+    item_id: str,
+    adjustment_data: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Adjust inventory levels"""
+    try:
+        # Validate inventory item
+        item = db.query(Inventory).filter(
+            and_(Inventory.id == item_id, Inventory.is_deleted == False)
+        ).first()
+        
+        if not item:
+            raise HTTPException(status_code=404, detail="Inventory item not found")
+        
+        # Extract adjustment data
+        adjustment_type = adjustment_data.get("adjustment_type", "quantity_change")
+        quantity_change = float(adjustment_data.get("quantity_change", 0))
+        reason = adjustment_data.get("reason", "")
+        notes = adjustment_data.get("notes", "")
+        
+        # Validate quantity change
+        new_stock = item.current_stock + quantity_change
+        if new_stock < 0:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Cannot reduce stock by {abs(quantity_change)}. Current stock is {item.current_stock}"
+            )
+        
+        # Create adjustment record
+        db_adjustment = InventoryAdjustment(
+            inventory_id=item_id,
+            adjustment_type=adjustment_type,
+            quantity_change=quantity_change,
+            reason=reason,
+            notes=notes,
+            created_by_user_id=current_user.id
+        )
+        
+        # Update inventory stock
+        item.current_stock = new_stock
+        item.last_updated = datetime.utcnow()
+        item.updated_by_user_id = current_user.id
+        
+        db.add(db_adjustment)
+        db.commit()
+        db.refresh(db_adjustment)
+        db.refresh(item)
+        
+        logger.info(f"User {current_user.username} adjusted inventory {item.item_name} by {quantity_change}")
+        
+        return {
+            "success": True,
+            "message": "Inventory adjusted successfully",
+            "adjustment": {
+                "id": str(db_adjustment.id),
+                "inventory_id": str(db_adjustment.inventory_id),
+                "adjustment_type": db_adjustment.adjustment_type,
+                "quantity_change": float(db_adjustment.quantity_change),
+                "reason": db_adjustment.reason,
+                "notes": db_adjustment.notes,
+                "adjustment_date": db_adjustment.adjustment_date,
+                "created_at": db_adjustment.created_at
+            },
+            "updated_inventory": {
+                "id": str(item.id),
+                "item_name": item.item_name,
+                "old_stock": float(item.current_stock - quantity_change),
+                "new_stock": float(item.current_stock),
+                "change": float(quantity_change)
+            }
+        }
+        
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error adjusting inventory: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to adjust inventory")
 
 @router.get("/low-stock", response_model=List[InventoryResponse])
 async def get_low_stock_items(

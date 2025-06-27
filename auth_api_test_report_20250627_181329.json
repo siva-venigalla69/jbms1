@@ -1,0 +1,173 @@
+[
+  {
+    "test_name": "Root Endpoint",
+    "endpoint": "/",
+    "method": "GET",
+    "status_code": 200,
+    "success": true,
+    "details": "API responding: Welcome to Digital Textile Printing System",
+    "timestamp": "2025-06-27T18:13:19.774223"
+  },
+  {
+    "test_name": "Health Check",
+    "endpoint": "/health",
+    "method": "GET",
+    "status_code": 200,
+    "success": true,
+    "details": "Status: healthy",
+    "timestamp": "2025-06-27T18:13:19.981067"
+  },
+  {
+    "test_name": "Version Info",
+    "endpoint": "/version",
+    "method": "GET",
+    "status_code": 200,
+    "success": true,
+    "details": "v1.0.3 (development)",
+    "timestamp": "2025-06-27T18:13:20.165617"
+  },
+  {
+    "test_name": "Admin Login (admin)",
+    "endpoint": "/api/auth/login",
+    "method": "POST",
+    "status_code": 401,
+    "success": false,
+    "details": "Failed: Incorrect username or password",
+    "timestamp": "2025-06-27T18:13:22.421012"
+  },
+  {
+    "test_name": "Admin Login (admin)",
+    "endpoint": "/api/auth/login",
+    "method": "POST",
+    "status_code": 401,
+    "success": false,
+    "details": "Failed: Incorrect username or password",
+    "timestamp": "2025-06-27T18:13:24.307797"
+  },
+  {
+    "test_name": "Admin Login (siva.data9@outlook.com)",
+    "endpoint": "/api/auth/login",
+    "method": "POST",
+    "status_code": 401,
+    "success": false,
+    "details": "Failed: Incorrect username or password",
+    "timestamp": "2025-06-27T18:13:24.485508"
+  },
+  {
+    "test_name": "Admin Login (admin)",
+    "endpoint": "/api/auth/login",
+    "method": "POST",
+    "status_code": 401,
+    "success": false,
+    "details": "Failed: Incorrect username or password",
+    "timestamp": "2025-06-27T18:13:26.215409"
+  },
+  {
+    "test_name": "Invalid Login (nonexistent)",
+    "endpoint": "/api/auth/login",
+    "method": "POST",
+    "status_code": 401,
+    "success": true,
+    "details": "Correctly rejected: Incorrect username or password",
+    "timestamp": "2025-06-27T18:13:26.382645"
+  },
+  {
+    "test_name": "Invalid Login (admin)",
+    "endpoint": "/api/auth/login",
+    "method": "POST",
+    "status_code": 401,
+    "success": true,
+    "details": "Correctly rejected: Incorrect username or password",
+    "timestamp": "2025-06-27T18:13:28.130144"
+  },
+  {
+    "test_name": "Invalid Login (empty)",
+    "endpoint": "/api/auth/login",
+    "method": "POST",
+    "status_code": 422,
+    "success": false,
+    "details": "Unexpected response: Validation failed",
+    "timestamp": "2025-06-27T18:13:28.290065"
+  },
+  {
+    "test_name": "Invalid Login (admin)",
+    "endpoint": "/api/auth/login",
+    "method": "POST",
+    "status_code": 422,
+    "success": false,
+    "details": "Unexpected response: Validation failed",
+    "timestamp": "2025-06-27T18:13:28.448603"
+  },
+  {
+    "test_name": "No Auth Access",
+    "endpoint": "/api/auth/me",
+    "method": "GET",
+    "status_code": 401,
+    "success": true,
+    "details": "Correctly protected",
+    "timestamp": "2025-06-27T18:13:28.643411"
+  },
+  {
+    "test_name": "No Auth Access",
+    "endpoint": "/api/auth/users",
+    "method": "GET",
+    "status_code": 401,
+    "success": true,
+    "details": "Correctly protected",
+    "timestamp": "2025-06-27T18:13:28.825914"
+  },
+  {
+    "test_name": "No Auth Access",
+    "endpoint": "/api/auth/register",
+    "method": "POST",
+    "status_code": 401,
+    "success": true,
+    "details": "Correctly protected",
+    "timestamp": "2025-06-27T18:13:28.985878"
+  },
+  {
+    "test_name": "Invalid Token (Invalid Token)",
+    "endpoint": "/api/auth/me",
+    "method": "GET",
+    "status_code": 500,
+    "success": false,
+    "details": "Security issue",
+    "timestamp": "2025-06-27T18:13:29.148830"
+  },
+  {
+    "test_name": "Invalid Token (Empty Token)",
+    "endpoint": "/api/auth/me",
+    "method": "GET",
+    "status_code": 401,
+    "success": true,
+    "details": "Correctly rejected",
+    "timestamp": "2025-06-27T18:13:29.337617"
+  },
+  {
+    "test_name": "Invalid Token (Invalid Format)",
+    "endpoint": "/api/auth/me",
+    "method": "GET",
+    "status_code": 401,
+    "success": true,
+    "details": "Correctly rejected",
+    "timestamp": "2025-06-27T18:13:29.505222"
+  },
+  {
+    "test_name": "Invalid Token (Oversized Token)",
+    "endpoint": "/api/auth/me",
+    "method": "GET",
+    "status_code": 500,
+    "success": false,
+    "details": "Security issue",
+    "timestamp": "2025-06-27T18:13:29.745049"
+  },
+  {
+    "test_name": "Schema Compliance",
+    "endpoint": "N/A",
+    "method": "VALIDATION",
+    "status_code": 0,
+    "success": false,
+    "details": "Schema validation completed",
+    "timestamp": "2025-06-27T18:13:29.745317"
+  }
+]

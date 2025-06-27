@@ -1,0 +1,554 @@
+{
+  "summary": {
+    "total_tests": 23,
+    "passed": 10,
+    "failed": 13,
+    "success_rate": "43.5%"
+  },
+  "modules": {
+    "AUTH": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "tests": [
+        {
+          "module": "AUTH",
+          "test_name": "Admin Login",
+          "endpoint": "/api/auth/login",
+          "method": "POST",
+          "status_code": 200,
+          "success": true,
+          "details": "Login successful",
+          "timestamp": "2025-06-27T18:22:17.609639"
+        }
+      ]
+    },
+    "CUSTOMERS": {
+      "total": 3,
+      "passed": 3,
+      "failed": 0,
+      "tests": [
+        {
+          "module": "CUSTOMERS",
+          "test_name": "Create Customer",
+          "endpoint": "/api/customers",
+          "method": "POST",
+          "status_code": 201,
+          "success": true,
+          "details": "Customer created: Test Customer 1751028737",
+          "timestamp": "2025-06-27T18:22:17.892202"
+        },
+        {
+          "module": "CUSTOMERS",
+          "test_name": "List Customers",
+          "endpoint": "/api/customers",
+          "method": "GET",
+          "status_code": 200,
+          "success": true,
+          "details": "Retrieved 15 customers",
+          "timestamp": "2025-06-27T18:22:18.191888"
+        },
+        {
+          "module": "CUSTOMERS",
+          "test_name": "Search Customers",
+          "endpoint": "/api/customers/search",
+          "method": "GET",
+          "status_code": 200,
+          "success": true,
+          "details": "Search executed",
+          "timestamp": "2025-06-27T18:22:18.394309"
+        }
+      ]
+    },
+    "ORDERS": {
+      "total": 2,
+      "passed": 1,
+      "failed": 1,
+      "tests": [
+        {
+          "module": "ORDERS",
+          "test_name": "Create Order",
+          "endpoint": "/api/orders",
+          "method": "POST",
+          "status_code": 500,
+          "success": false,
+          "details": "Failed: {\"detail\":\"Failed to create order\",\"status_code\":500,\"request_id\":131706681483856}",
+          "timestamp": "2025-06-27T18:22:18.747578"
+        },
+        {
+          "module": "ORDERS",
+          "test_name": "List Orders",
+          "endpoint": "/api/orders",
+          "method": "GET",
+          "status_code": 200,
+          "success": true,
+          "details": "Retrieved 0 orders",
+          "timestamp": "2025-06-27T18:22:18.999967"
+        }
+      ]
+    },
+    "MATERIALS": {
+      "total": 2,
+      "passed": 1,
+      "failed": 1,
+      "tests": [
+        {
+          "module": "MATERIALS",
+          "test_name": "Record Material In",
+          "endpoint": "/api/materials/in",
+          "method": "POST",
+          "status_code": 500,
+          "success": false,
+          "details": "Failed: {\"detail\":\"Failed to record material in\",\"status_code\":500,\"request_id\":131706681336784}",
+          "timestamp": "2025-06-27T18:22:19.233580"
+        },
+        {
+          "module": "MATERIALS",
+          "test_name": "List Material In",
+          "endpoint": "/api/materials/in",
+          "method": "GET",
+          "status_code": 200,
+          "success": true,
+          "details": "Retrieved material in records",
+          "timestamp": "2025-06-27T18:22:19.393631"
+        }
+      ]
+    },
+    "CHALLANS": {
+      "total": 2,
+      "passed": 1,
+      "failed": 1,
+      "tests": [
+        {
+          "module": "CHALLANS",
+          "test_name": "Create Challan",
+          "endpoint": "/api/challans",
+          "method": "POST",
+          "status_code": 400,
+          "success": false,
+          "details": "Failed: {\"detail\":\"Challan must contain items\",\"status_code\":400,\"request_id\":131706681365072}",
+          "timestamp": "2025-06-27T18:22:19.614148"
+        },
+        {
+          "module": "CHALLANS",
+          "test_name": "List Challans",
+          "endpoint": "/api/challans",
+          "method": "GET",
+          "status_code": 200,
+          "success": true,
+          "details": "Retrieved challans",
+          "timestamp": "2025-06-27T18:22:19.890385"
+        }
+      ]
+    },
+    "INVOICES": {
+      "total": 2,
+      "passed": 0,
+      "failed": 2,
+      "tests": [
+        {
+          "module": "INVOICES",
+          "test_name": "Create Invoice",
+          "endpoint": "/api/invoices",
+          "method": "POST",
+          "status_code": 400,
+          "success": false,
+          "details": "Failed: {\"detail\":\"Invoice must include challans\",\"status_code\":400,\"request_id\":131706681260624}",
+          "timestamp": "2025-06-27T18:22:20.128151"
+        },
+        {
+          "module": "INVOICES",
+          "test_name": "List Invoices",
+          "endpoint": "/api/invoices",
+          "method": "GET",
+          "status_code": 500,
+          "success": false,
+          "details": "Failed: {\"detail\":\"Failed to retrieve invoices\",\"status_code\":500,\"request_id\":131706681285904}",
+          "timestamp": "2025-06-27T18:22:20.398151"
+        }
+      ]
+    },
+    "RETURNS": {
+      "total": 2,
+      "passed": 0,
+      "failed": 2,
+      "tests": [
+        {
+          "module": "RETURNS",
+          "test_name": "Record Return",
+          "endpoint": "/api/returns",
+          "method": "POST",
+          "status_code": 404,
+          "success": false,
+          "details": "Failed: {\"detail\":\"Not Found\",\"status_code\":404,\"request_id\":131706681201488}",
+          "timestamp": "2025-06-27T18:22:20.567192"
+        },
+        {
+          "module": "RETURNS",
+          "test_name": "List Returns",
+          "endpoint": "/api/returns",
+          "method": "GET",
+          "status_code": 404,
+          "success": false,
+          "details": "Failed: {\"detail\":\"Not Found\",\"status_code\":404,\"request_id\":131706681174992}",
+          "timestamp": "2025-06-27T18:22:20.768175"
+        }
+      ]
+    },
+    "INVENTORY": {
+      "total": 3,
+      "passed": 2,
+      "failed": 1,
+      "tests": [
+        {
+          "module": "INVENTORY",
+          "test_name": "Create Inventory Item",
+          "endpoint": "/api/inventory",
+          "method": "POST",
+          "status_code": 201,
+          "success": true,
+          "details": "Item created: Test Chemical 1751028740",
+          "timestamp": "2025-06-27T18:22:21.044553"
+        },
+        {
+          "module": "INVENTORY",
+          "test_name": "List Inventory",
+          "endpoint": "/api/inventory",
+          "method": "GET",
+          "status_code": 200,
+          "success": true,
+          "details": "Retrieved inventory items",
+          "timestamp": "2025-06-27T18:22:21.325840"
+        },
+        {
+          "module": "INVENTORY",
+          "test_name": "Inventory Adjustment",
+          "endpoint": "/api/inventory/3154c56d-8b45-4fc8-8737-85b7639d4b44/adjust",
+          "method": "POST",
+          "status_code": 404,
+          "success": false,
+          "details": "Failed: {\"detail\":\"Not Found\",\"status_code\":404,\"request_id\":131706681328016}",
+          "timestamp": "2025-06-27T18:22:21.524544"
+        }
+      ]
+    },
+    "EXPENSES": {
+      "total": 2,
+      "passed": 0,
+      "failed": 2,
+      "tests": [
+        {
+          "module": "EXPENSES",
+          "test_name": "Record Expense",
+          "endpoint": "/api/expenses",
+          "method": "POST",
+          "status_code": 500,
+          "success": false,
+          "details": "Failed: {\"detail\":\"Failed to create expense\",\"status_code\":500,\"request_id\":131706684770000}",
+          "timestamp": "2025-06-27T18:22:22.149723"
+        },
+        {
+          "module": "EXPENSES",
+          "test_name": "List Expenses",
+          "endpoint": "/api/expenses",
+          "method": "GET",
+          "status_code": 500,
+          "success": false,
+          "details": "Failed: {\"detail\":\"Failed to retrieve expenses\",\"status_code\":500,\"request_id\":131706684675600}",
+          "timestamp": "2025-06-27T18:22:22.409964"
+        }
+      ]
+    },
+    "REPORTS": {
+      "total": 4,
+      "passed": 1,
+      "failed": 3,
+      "tests": [
+        {
+          "module": "REPORTS",
+          "test_name": "Pending Orders Report",
+          "endpoint": "/api/reports/pending-orders",
+          "method": "GET",
+          "status_code": 200,
+          "success": true,
+          "details": "Pending orders report generated",
+          "timestamp": "2025-06-27T18:22:22.563616"
+        },
+        {
+          "module": "REPORTS",
+          "test_name": "Production Status Report",
+          "endpoint": "/api/reports/production-status",
+          "method": "GET",
+          "status_code": 404,
+          "success": false,
+          "details": "Failed: {\"detail\":\"Not Found\",\"status_code\":404,\"request_id\":131706681408016}",
+          "timestamp": "2025-06-27T18:22:22.696641"
+        },
+        {
+          "module": "REPORTS",
+          "test_name": "Stock Holdings Report",
+          "endpoint": "/api/reports/stock-holdings",
+          "method": "GET",
+          "status_code": 404,
+          "success": false,
+          "details": "Failed: {\"detail\":\"Not Found\",\"status_code\":404,\"request_id\":131706684743568}",
+          "timestamp": "2025-06-27T18:22:22.879239"
+        },
+        {
+          "module": "REPORTS",
+          "test_name": "Pending Receivables Report",
+          "endpoint": "/api/reports/pending-receivables",
+          "method": "GET",
+          "status_code": 404,
+          "success": false,
+          "details": "Failed: {\"detail\":\"Not Found\",\"status_code\":404,\"request_id\":131706681208336}",
+          "timestamp": "2025-06-27T18:22:23.012633"
+        }
+      ]
+    }
+  },
+  "requirements_coverage": {
+    "REQ-001/002": "Customer Management \u2705",
+    "REQ-003-009": "Order Management \u2705",
+    "REQ-010/011": "Material In \u2705",
+    "REQ-015-018": "Delivery Challans \u2705",
+    "REQ-021-024": "GST Invoices \u274c",
+    "REQ-025-028": "Payment Recording \u274c",
+    "REQ-029-031": "Returns Management \u274c",
+    "REQ-032-035": "Inventory Management \u2705",
+    "REQ-036": "Expense Recording \u274c",
+    "REQ-037-045": "Reporting \u2705"
+  },
+  "detailed_results": [
+    {
+      "module": "AUTH",
+      "test_name": "Admin Login",
+      "endpoint": "/api/auth/login",
+      "method": "POST",
+      "status_code": 200,
+      "success": true,
+      "details": "Login successful",
+      "timestamp": "2025-06-27T18:22:17.609639"
+    },
+    {
+      "module": "CUSTOMERS",
+      "test_name": "Create Customer",
+      "endpoint": "/api/customers",
+      "method": "POST",
+      "status_code": 201,
+      "success": true,
+      "details": "Customer created: Test Customer 1751028737",
+      "timestamp": "2025-06-27T18:22:17.892202"
+    },
+    {
+      "module": "CUSTOMERS",
+      "test_name": "List Customers",
+      "endpoint": "/api/customers",
+      "method": "GET",
+      "status_code": 200,
+      "success": true,
+      "details": "Retrieved 15 customers",
+      "timestamp": "2025-06-27T18:22:18.191888"
+    },
+    {
+      "module": "CUSTOMERS",
+      "test_name": "Search Customers",
+      "endpoint": "/api/customers/search",
+      "method": "GET",
+      "status_code": 200,
+      "success": true,
+      "details": "Search executed",
+      "timestamp": "2025-06-27T18:22:18.394309"
+    },
+    {
+      "module": "ORDERS",
+      "test_name": "Create Order",
+      "endpoint": "/api/orders",
+      "method": "POST",
+      "status_code": 500,
+      "success": false,
+      "details": "Failed: {\"detail\":\"Failed to create order\",\"status_code\":500,\"request_id\":131706681483856}",
+      "timestamp": "2025-06-27T18:22:18.747578"
+    },
+    {
+      "module": "ORDERS",
+      "test_name": "List Orders",
+      "endpoint": "/api/orders",
+      "method": "GET",
+      "status_code": 200,
+      "success": true,
+      "details": "Retrieved 0 orders",
+      "timestamp": "2025-06-27T18:22:18.999967"
+    },
+    {
+      "module": "MATERIALS",
+      "test_name": "Record Material In",
+      "endpoint": "/api/materials/in",
+      "method": "POST",
+      "status_code": 500,
+      "success": false,
+      "details": "Failed: {\"detail\":\"Failed to record material in\",\"status_code\":500,\"request_id\":131706681336784}",
+      "timestamp": "2025-06-27T18:22:19.233580"
+    },
+    {
+      "module": "MATERIALS",
+      "test_name": "List Material In",
+      "endpoint": "/api/materials/in",
+      "method": "GET",
+      "status_code": 200,
+      "success": true,
+      "details": "Retrieved material in records",
+      "timestamp": "2025-06-27T18:22:19.393631"
+    },
+    {
+      "module": "CHALLANS",
+      "test_name": "Create Challan",
+      "endpoint": "/api/challans",
+      "method": "POST",
+      "status_code": 400,
+      "success": false,
+      "details": "Failed: {\"detail\":\"Challan must contain items\",\"status_code\":400,\"request_id\":131706681365072}",
+      "timestamp": "2025-06-27T18:22:19.614148"
+    },
+    {
+      "module": "CHALLANS",
+      "test_name": "List Challans",
+      "endpoint": "/api/challans",
+      "method": "GET",
+      "status_code": 200,
+      "success": true,
+      "details": "Retrieved challans",
+      "timestamp": "2025-06-27T18:22:19.890385"
+    },
+    {
+      "module": "INVOICES",
+      "test_name": "Create Invoice",
+      "endpoint": "/api/invoices",
+      "method": "POST",
+      "status_code": 400,
+      "success": false,
+      "details": "Failed: {\"detail\":\"Invoice must include challans\",\"status_code\":400,\"request_id\":131706681260624}",
+      "timestamp": "2025-06-27T18:22:20.128151"
+    },
+    {
+      "module": "INVOICES",
+      "test_name": "List Invoices",
+      "endpoint": "/api/invoices",
+      "method": "GET",
+      "status_code": 500,
+      "success": false,
+      "details": "Failed: {\"detail\":\"Failed to retrieve invoices\",\"status_code\":500,\"request_id\":131706681285904}",
+      "timestamp": "2025-06-27T18:22:20.398151"
+    },
+    {
+      "module": "RETURNS",
+      "test_name": "Record Return",
+      "endpoint": "/api/returns",
+      "method": "POST",
+      "status_code": 404,
+      "success": false,
+      "details": "Failed: {\"detail\":\"Not Found\",\"status_code\":404,\"request_id\":131706681201488}",
+      "timestamp": "2025-06-27T18:22:20.567192"
+    },
+    {
+      "module": "RETURNS",
+      "test_name": "List Returns",
+      "endpoint": "/api/returns",
+      "method": "GET",
+      "status_code": 404,
+      "success": false,
+      "details": "Failed: {\"detail\":\"Not Found\",\"status_code\":404,\"request_id\":131706681174992}",
+      "timestamp": "2025-06-27T18:22:20.768175"
+    },
+    {
+      "module": "INVENTORY",
+      "test_name": "Create Inventory Item",
+      "endpoint": "/api/inventory",
+      "method": "POST",
+      "status_code": 201,
+      "success": true,
+      "details": "Item created: Test Chemical 1751028740",
+      "timestamp": "2025-06-27T18:22:21.044553"
+    },
+    {
+      "module": "INVENTORY",
+      "test_name": "List Inventory",
+      "endpoint": "/api/inventory",
+      "method": "GET",
+      "status_code": 200,
+      "success": true,
+      "details": "Retrieved inventory items",
+      "timestamp": "2025-06-27T18:22:21.325840"
+    },
+    {
+      "module": "INVENTORY",
+      "test_name": "Inventory Adjustment",
+      "endpoint": "/api/inventory/3154c56d-8b45-4fc8-8737-85b7639d4b44/adjust",
+      "method": "POST",
+      "status_code": 404,
+      "success": false,
+      "details": "Failed: {\"detail\":\"Not Found\",\"status_code\":404,\"request_id\":131706681328016}",
+      "timestamp": "2025-06-27T18:22:21.524544"
+    },
+    {
+      "module": "EXPENSES",
+      "test_name": "Record Expense",
+      "endpoint": "/api/expenses",
+      "method": "POST",
+      "status_code": 500,
+      "success": false,
+      "details": "Failed: {\"detail\":\"Failed to create expense\",\"status_code\":500,\"request_id\":131706684770000}",
+      "timestamp": "2025-06-27T18:22:22.149723"
+    },
+    {
+      "module": "EXPENSES",
+      "test_name": "List Expenses",
+      "endpoint": "/api/expenses",
+      "method": "GET",
+      "status_code": 500,
+      "success": false,
+      "details": "Failed: {\"detail\":\"Failed to retrieve expenses\",\"status_code\":500,\"request_id\":131706684675600}",
+      "timestamp": "2025-06-27T18:22:22.409964"
+    },
+    {
+      "module": "REPORTS",
+      "test_name": "Pending Orders Report",
+      "endpoint": "/api/reports/pending-orders",
+      "method": "GET",
+      "status_code": 200,
+      "success": true,
+      "details": "Pending orders report generated",
+      "timestamp": "2025-06-27T18:22:22.563616"
+    },
+    {
+      "module": "REPORTS",
+      "test_name": "Production Status Report",
+      "endpoint": "/api/reports/production-status",
+      "method": "GET",
+      "status_code": 404,
+      "success": false,
+      "details": "Failed: {\"detail\":\"Not Found\",\"status_code\":404,\"request_id\":131706681408016}",
+      "timestamp": "2025-06-27T18:22:22.696641"
+    },
+    {
+      "module": "REPORTS",
+      "test_name": "Stock Holdings Report",
+      "endpoint": "/api/reports/stock-holdings",
+      "method": "GET",
+      "status_code": 404,
+      "success": false,
+      "details": "Failed: {\"detail\":\"Not Found\",\"status_code\":404,\"request_id\":131706684743568}",
+      "timestamp": "2025-06-27T18:22:22.879239"
+    },
+    {
+      "module": "REPORTS",
+      "test_name": "Pending Receivables Report",
+      "endpoint": "/api/reports/pending-receivables",
+      "method": "GET",
+      "status_code": 404,
+      "success": false,
+      "details": "Failed: {\"detail\":\"Not Found\",\"status_code\":404,\"request_id\":131706681208336}",
+      "timestamp": "2025-06-27T18:22:23.012633"
+    }
+  ]
+}
