@@ -79,11 +79,10 @@ async def list_orders(
                         "quantity": item.quantity,
                         "unit_price": float(item.unit_price),
                         "customization_details": item.customization_details,
-                        "current_stage": item.current_stage,
-                        "pre_treatment_completed_at": item.pre_treatment_completed_at,
-                        "printing_completed_at": item.printing_completed_at,
-                        "post_process_completed_at": item.post_process_completed_at,
-                        "created_at": item.created_at
+                        "production_stage": item.production_stage,
+                        "stage_completed_at": item.stage_completed_at,
+                        "created_at": item.created_at,
+                        "updated_at": item.updated_at
                     }
                     items_data.append(item_dict)
                 

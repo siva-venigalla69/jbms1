@@ -97,16 +97,15 @@ class OrderItemUpdate(BaseSchema):
     quantity: Optional[int] = Field(None, gt=0)
     unit_price: Optional[Decimal] = Field(None, gt=0)
     customization_details: Optional[str] = None
-    current_stage: Optional[ProductionStage] = None
+    production_stage: Optional[ProductionStage] = None
 
 class OrderItemResponse(OrderItemBase):
     id: str  # UUID as string
     order_id: str  # UUID as string
-    current_stage: ProductionStage
-    pre_treatment_completed_at: Optional[datetime] = None
-    printing_completed_at: Optional[datetime] = None
-    post_process_completed_at: Optional[datetime] = None
+    production_stage: ProductionStage
+    stage_completed_at: Optional[datetime] = None
     created_at: datetime
+    updated_at: datetime
 
 class OrderBase(BaseSchema):
     customer_id: str  # UUID as string
@@ -170,7 +169,8 @@ class ChallanItemResponse(ChallanItemBase):
 class DeliveryChallanBase(BaseSchema):
     customer_id: str  # UUID as string
     challan_date: Optional[datetime] = None
-    delivery_status: str = "pending"
+    is_delivered: bool = False
+    delivered_at: Optional[datetime] = None
     notes: Optional[str] = None
 
 class DeliveryChallanCreate(DeliveryChallanBase):
@@ -178,7 +178,8 @@ class DeliveryChallanCreate(DeliveryChallanBase):
 
 class DeliveryChallanUpdate(BaseSchema):
     customer_id: Optional[str] = None  # UUID as string
-    delivery_status: Optional[str] = None
+    is_delivered: Optional[bool] = None
+    delivered_at: Optional[datetime] = None
     notes: Optional[str] = None
 
 class DeliveryChallanResponse(DeliveryChallanBase):
@@ -195,7 +196,9 @@ class MaterialOutBase(BaseSchema):
     customer_id: Optional[str] = None  # UUID as string - Added per functional requirements
     material_type: MaterialType
     quantity: int = Field(..., gt=0)
+    unit: str = Field(..., min_length=1, max_length=20)
     dispatch_date: Optional[datetime] = None
+    notes: Optional[str] = None
 
 class MaterialOutCreate(MaterialOutBase):
     pass
@@ -289,7 +292,8 @@ class InventoryBase(BaseSchema):
     unit: str = Field(..., min_length=1, max_length=20)
     reorder_level: Decimal = Field(default=0, ge=0)
     cost_per_unit: Decimal = Field(default=0, ge=0)
-    supplier_info: Optional[str] = None
+    supplier_name: Optional[str] = Field(None, max_length=100)
+    supplier_contact: Optional[str] = Field(None, max_length=100)
 
 class InventoryCreate(InventoryBase):
     pass
@@ -301,7 +305,8 @@ class InventoryUpdate(BaseSchema):
     unit: Optional[str] = Field(None, min_length=1, max_length=20)
     reorder_level: Optional[Decimal] = Field(None, ge=0)
     cost_per_unit: Optional[Decimal] = Field(None, ge=0)
-    supplier_info: Optional[str] = None
+    supplier_name: Optional[str] = Field(None, max_length=100)
+    supplier_contact: Optional[str] = Field(None, max_length=100)
 
 class InventoryResponse(InventoryBase):
     id: str  # UUID as string
@@ -316,7 +321,7 @@ class ExpenseBase(BaseSchema):
     description: str = Field(..., min_length=1)
     amount: Decimal = Field(..., gt=0)
     payment_method: PaymentMethod
-    reference_number: Optional[str] = None  # Updated from receipt_number
+    reference_number: Optional[str] = Field(None, max_length=100)
     notes: Optional[str] = None
 
 class ExpenseCreate(ExpenseBase):
@@ -345,7 +350,7 @@ class ProductionStatusReport(BaseSchema):
     customer_name: str
     material_type: MaterialType
     quantity: int
-    current_stage: ProductionStage
+    production_stage: ProductionStage
     stage_completed_at: Optional[datetime]
 
 class PendingReceivablesReport(BaseSchema):

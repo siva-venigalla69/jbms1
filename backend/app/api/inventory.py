@@ -48,7 +48,8 @@ async def list_inventory(
                 "unit": item.unit,
                 "reorder_level": float(item.reorder_level),
                 "cost_per_unit": float(item.cost_per_unit),
-                "supplier_info": f"{item.supplier_name or ''} - {item.supplier_contact or ''}".strip(' -'),  # Combine supplier fields
+                "supplier_name": item.supplier_name,
+                "supplier_contact": item.supplier_contact,
                 "is_active": item.is_active,
                 "updated_at": item.last_updated,
                 "created_at": item.created_at
@@ -84,11 +85,6 @@ async def create_inventory_item(
         if existing:
             raise HTTPException(status_code=400, detail="Item name already exists")
         
-        # Parse supplier info into name and contact
-        supplier_parts = (item_data.supplier_info or "").split(" - ", 1) if item_data.supplier_info else ["", ""]
-        supplier_name = supplier_parts[0].strip() if supplier_parts[0] else None
-        supplier_contact = supplier_parts[1].strip() if len(supplier_parts) > 1 and supplier_parts[1] else None
-        
         db_item = Inventory(
             item_name=item_data.item_name,
             category=item_data.category,
@@ -96,8 +92,8 @@ async def create_inventory_item(
             unit=item_data.unit,
             reorder_level=item_data.reorder_level,
             cost_per_unit=item_data.cost_per_unit,
-            supplier_name=supplier_name,
-            supplier_contact=supplier_contact,
+            supplier_name=item_data.supplier_name,
+            supplier_contact=item_data.supplier_contact,
             created_by_user_id=current_user.id,
             updated_by_user_id=current_user.id
         )
@@ -105,13 +101,31 @@ async def create_inventory_item(
         db.add(db_item)
         db.commit()
         db.refresh(db_item)
-        return db_item
+        
+        # Return manual response to avoid schema issues
+        response_dict = {
+            "id": str(db_item.id),
+            "item_name": db_item.item_name,
+            "category": db_item.category,
+            "current_stock": float(db_item.current_stock),
+            "unit": db_item.unit,
+            "reorder_level": float(db_item.reorder_level),
+            "cost_per_unit": float(db_item.cost_per_unit),
+            "supplier_name": db_item.supplier_name,
+            "supplier_contact": db_item.supplier_contact,
+            "is_active": db_item.is_active,
+            "updated_at": db_item.last_updated,
+            "created_at": db_item.created_at
+        }
+        
+        logger.info(f"User {current_user.username} created inventory item {db_item.item_name}")
+        return response_dict
     except HTTPException:
         db.rollback()
         raise
     except Exception as e:
         db.rollback()
-        logger.error(f"Error creating inventory item: {str(e)}")
+        logger.error(f"Error creating inventory item: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to create inventory item")
 
 @router.put("/{item_id}", response_model=InventoryResponse)
@@ -136,17 +150,35 @@ async def update_inventory_item(
             setattr(item, field, value)
         
         item.updated_by_user_id = current_user.id
-        item.updated_at = datetime.utcnow()
+        item.last_updated = datetime.utcnow()
         
         db.commit()
         db.refresh(item)
-        return item
+        
+        # Return manual response to avoid schema issues
+        response_dict = {
+            "id": str(item.id),
+            "item_name": item.item_name,
+            "category": item.category,
+            "current_stock": float(item.current_stock),
+            "unit": item.unit,
+            "reorder_level": float(item.reorder_level),
+            "cost_per_unit": float(item.cost_per_unit),
+            "supplier_name": item.supplier_name,
+            "supplier_contact": item.supplier_contact,
+            "is_active": item.is_active,
+            "updated_at": item.last_updated,
+            "created_at": item.created_at
+        }
+        
+        logger.info(f"User {current_user.username} updated inventory item {item.item_name}")
+        return response_dict
     except HTTPException:
         db.rollback()
         raise
     except Exception as e:
         db.rollback()
-        logger.error(f"Error updating inventory: {str(e)}")
+        logger.error(f"Error updating inventory: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to update inventory")
 
 @router.get("/low-stock", response_model=List[InventoryResponse])
@@ -175,7 +207,8 @@ async def get_low_stock_items(
                 "unit": item.unit,
                 "reorder_level": float(item.reorder_level),
                 "cost_per_unit": float(item.cost_per_unit),
-                "supplier_info": f"{item.supplier_name or ''} - {item.supplier_contact or ''}".strip(' -'),  # Combine supplier fields
+                "supplier_name": item.supplier_name,
+                "supplier_contact": item.supplier_contact,
                 "is_active": item.is_active,
                 "updated_at": item.last_updated,
                 "created_at": item.created_at

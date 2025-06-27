@@ -11,7 +11,7 @@ from starlette.middleware.gzip import GZipMiddleware
 from sqlalchemy.exc import SQLAlchemyError
 from .core.config import settings, get_cors_config, get_security_headers
 from .core.database import engine, Base
-from .api import auth, customers, challans, invoices, inventory, payments, materials, orders, expenses
+from .api import auth, customers, challans, invoices, inventory, payments, materials, orders, expenses, reports
 
 # Configure logging
 logging.basicConfig(
@@ -269,6 +269,7 @@ app.include_router(payments.router, prefix="/api")
 app.include_router(materials.router, prefix="/api")
 app.include_router(orders.router, prefix="/api")
 app.include_router(expenses.router, prefix="/api")
+app.include_router(reports.router, prefix="/api")
 
 # Root endpoint
 @app.get("/", tags=["Root"])
