@@ -6,10 +6,9 @@ import time
 import statistics
 
 # Configuration
-import os
 API_BASE_URL = "https://jbms1.onrender.com"
 ADMIN_USERNAME = "admin" 
-ADMIN_PASSWORD = os.getenv("TEST_PASSWORD", "change-me")
+ADMIN_PASSWORD = "Siri@2299"
 
 class TestConfig:
     def __init__(self):

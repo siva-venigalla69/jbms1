@@ -7,7 +7,7 @@ import uuid
 # Configuration
 API_BASE_URL = os.getenv("RENDER_API_URL", "https://jbms1.onrender.com")
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
-ADMIN_PASSWORD = os.getenv("TEST_PASSWORD", "change-me")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "Siri@2299")
 
 class TestConfig:
     def __init__(self):
