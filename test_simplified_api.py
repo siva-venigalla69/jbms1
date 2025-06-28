@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 """
 Simplified API Testing Script to identify specific issues
 """
@@ -11,7 +12,7 @@ from datetime import datetime
 # Configuration
 BASE_URL = "https://jbms1.onrender.com"
 API_BASE = f"{BASE_URL}/api"
-PASSWORD = "Siri@2299"
+PASSWORD = os.getenv("TEST_PASSWORD", "change-me")
 
 def login():
     """Login and get token"""

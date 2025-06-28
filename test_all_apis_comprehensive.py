@@ -64,7 +64,7 @@ class ComprehensiveAPITester:
         print("=" * 60)
         
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
-        login_data = "username=admin&password=Siri@2299"
+        login_data = "username=admin&password = os.getenv("TEST_PASSWORD", "change-me")
         
         try:
             response = requests.post(

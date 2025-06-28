@@ -26,12 +26,12 @@ def main():
     print("=" * 50)
     
     # Get password
-    current_password = "Siri@2912"  # Your current password
+    current_password = os.getenv("TEST_PASSWORD", "change-me")
     print(f"Using password: {current_password}")
     
     # Generate hash
     print("\n📊 Generating password hash...")
-    password_hash = generate_password_hash(current_password)
+    password = os.getenv("TEST_PASSWORD", "change-me")
     print(f"Password hash: {password_hash}")
     
     # Create SQL commands
@@ -44,7 +44,7 @@ def main():
     print("\n-- Step 2: Update existing admin user (if exists)")
     print(f"""UPDATE users 
 SET role = 'admin', 
-    password_hash = '{password_hash}',
+    password = os.getenv("TEST_PASSWORD", "change-me"),
     updated_at = now() 
 WHERE username = 'admin';""")
     
@@ -77,7 +77,7 @@ curl https://jbms1.onrender.com/health
 # Test login
 curl -X POST https://jbms1.onrender.com/api/auth/login \\
   -H "Content-Type: application/x-www-form-urlencoded" \\
-  -d "username=admin&password={current_password}"
+  -d "username=admin&password = os.getenv("TEST_PASSWORD", "change-me")
 
 # Test with token (replace TOKEN with actual token from login)
 export TOKEN="your_token_here"

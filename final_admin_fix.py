@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 """
 Final admin user fix - comprehensive approach
 """
@@ -15,7 +16,7 @@ pwd_context = CryptContext(
 
 def test_hash_approaches():
     """Test different password hashing approaches"""
-    password = "Siri@2912"
+    password = os.getenv("TEST_PASSWORD", "change-me")
     
     print("=== TESTING MULTIPLE HASH APPROACHES ===")
     
@@ -55,7 +56,7 @@ def generate_comprehensive_fix():
 SET 
     email = 'siva.data9@outlook.com',
     full_name = 'Siva Venigalla',
-    password_hash = '{hash1}',
+    password = os.getenv("TEST_PASSWORD", "change-me"),
     role = 'admin',
     is_active = true,
     updated_at = '{current_time}'
@@ -82,15 +83,15 @@ INSERT INTO users (
     
     print(f"\n=== VERIFICATION QUERIES ===")
     print("-- Check current admin user:")
-    print("SELECT id, username, email, full_name, role, is_active, password_hash FROM users WHERE username = 'admin';")
+    print("SELECT id, username, email, full_name, role, is_active, password = os.getenv("TEST_PASSWORD", "change-me")
     print("\n-- Check all admin users:")
     print("SELECT id, username, email, full_name, role, is_active FROM users WHERE role = 'admin';")
     
     print(f"\n=== TEST COMMANDS ===")
     print("-- Test with admin:")
-    print('curl -X POST https://jbms1.onrender.com/api/auth/login -H "Content-Type: application/x-www-form-urlencoded" -d "username=admin&password=Siri@2912"')
+    print('curl -X POST https://jbms1.onrender.com/api/auth/login -H "Content-Type: application/x-www-form-urlencoded" -d "username=admin&password = os.getenv("TEST_PASSWORD", "change-me")
     print("\n-- Test with admin2 (if you create new user):")
-    print('curl -X POST https://jbms1.onrender.com/api/auth/login -H "Content-Type: application/x-www-form-urlencoded" -d "username=admin2&password=Siri@2912"')
+    print('curl -X POST https://jbms1.onrender.com/api/auth/login -H "Content-Type: application/x-www-form-urlencoded" -d "username=admin2&password = os.getenv("TEST_PASSWORD", "change-me")
     
     return hash1
 

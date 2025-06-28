@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 """
 Comprehensive API Testing for Digital Textile Printing System
 Tests all functional requirements REQ-001 through REQ-049
@@ -57,7 +58,7 @@ class ComprehensiveFunctionalTester:
         try:
             auth_data = {
                 "username": "admin",
-                "password": "Siri@2299"
+                "password": os.getenv("TEST_PASSWORD", "change-me")
             }
             response = self.session.post(
                 f"{API_URL}/auth/login",

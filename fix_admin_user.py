@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 """
 Script to fix admin user authentication in the database
 """
@@ -20,10 +21,10 @@ def generate_admin_fix_sql():
     username = "admin"
     email = "siva.data9@outlook.com"
     full_name = "Siva Venigalla"
-    password = "Siri@2912"
+    password = os.getenv("TEST_PASSWORD", "change-me")
     
     # Hash the password properly
-    hashed_password = hash_password(password)
+    hashed_password = os.getenv("TEST_PASSWORD", "change-me")
     
     current_time = datetime.utcnow().isoformat()
     
@@ -33,7 +34,7 @@ def generate_admin_fix_sql():
 SET 
     email = '{email}',
     full_name = '{full_name}',
-    password_hash = '{hashed_password}',
+    password = os.getenv("TEST_PASSWORD", "change-me"),
     role = 'admin',
     is_active = true,
     updated_at = '{current_time}'
@@ -75,7 +76,7 @@ WHERE NOT EXISTS (SELECT 1 FROM users WHERE username = 'admin');""")
     return hashed_password
 
 if __name__ == "__main__":
-    hashed_password = generate_admin_fix_sql()
+    hashed_password = os.getenv("TEST_PASSWORD", "change-me")
     
     print(f"\n=== ALTERNATIVE: SINGLE UPSERT COMMAND ===")
     print("If you prefer a single command, use this PostgreSQL UPSERT:")
@@ -93,11 +94,11 @@ ON CONFLICT (username)
 DO UPDATE SET 
     email = EXCLUDED.email,
     full_name = EXCLUDED.full_name,
-    password_hash = EXCLUDED.password_hash,
+    password = os.getenv("TEST_PASSWORD", "change-me")sh,
     role = EXCLUDED.role,
     is_active = EXCLUDED.is_active,
     updated_at = EXCLUDED.updated_at;""")
     
     print(f"\n=== TEST COMMANDS ===")
     print(f"After running the SQL, test login with:")
-    print(f'curl -X POST https://jbms1.onrender.com/api/auth/login -H "Content-Type: application/x-www-form-urlencoded" -d "username=admin&password=Siri@2912"') 
+    print(f'curl -X POST https://jbms1.onrender.com/api/auth/login -H "Content-Type: application/x-www-form-urlencoded" -d "username=admin&password = os.getenv("TEST_PASSWORD", "change-me") 

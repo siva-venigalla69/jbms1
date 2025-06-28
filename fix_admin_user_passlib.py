@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 """
 Script to fix admin user authentication using passlib (same as backend)
 """
@@ -28,10 +29,10 @@ def generate_admin_fix_sql():
     username = "admin"
     email = "siva.data9@outlook.com"
     full_name = "Siva Venigalla"
-    password = "Siri@2912"
+    password = os.getenv("TEST_PASSWORD", "change-me")
     
     # Hash the password using passlib (same as backend)
-    hashed_password = hash_password(password)
+    hashed_password = os.getenv("TEST_PASSWORD", "change-me")
     
     # Test the hash
     verify_result = verify_password_test(password, hashed_password)
@@ -54,24 +55,24 @@ def generate_admin_fix_sql():
 SET 
     email = '{email}',
     full_name = '{full_name}',
-    password_hash = '{hashed_password}',
+    password = os.getenv("TEST_PASSWORD", "change-me"),
     role = 'admin',
     is_active = true,
     updated_at = '{current_time}'
 WHERE username = 'admin';""")
     
     print(f"\n=== VERIFICATION SQL ===")
-    print("SELECT id, username, email, full_name, role, is_active, password_hash FROM users WHERE username = 'admin';")
+    print("SELECT id, username, email, full_name, role, is_active, password = os.getenv("TEST_PASSWORD", "change-me")
     
     return hashed_password
 
 if __name__ == "__main__":
     print("🔐 Generating admin user fix with PASSLIB (backend-compatible)")
-    hashed_password = generate_admin_fix_sql()
+    hashed_password = os.getenv("TEST_PASSWORD", "change-me")
     
     if hashed_password:
         print(f"\n=== TEST COMMAND ===")
-        print(f'curl -X POST https://jbms1.onrender.com/api/auth/login -H "Content-Type: application/x-www-form-urlencoded" -d "username=admin&password=Siri@2912"')
+        print(f'curl -X POST https://jbms1.onrender.com/api/auth/login -H "Content-Type: application/x-www-form-urlencoded" -d "username=admin&password = os.getenv("TEST_PASSWORD", "change-me")
         
         print(f"\n=== DEBUGGING ===")
         print("If login still fails, check:")

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 """
 Comprehensive API Testing - Functional Requirements Compliance
 Tests all APIs against the updated database schema and functional requirements
@@ -18,7 +19,7 @@ API_URL = f"{BASE_URL}/api"
 # Test credentials
 ADMIN_CREDENTIALS = {
     "username": "admin",
-    "password": "Siri@2299"
+    "password": os.getenv("TEST_PASSWORD", "change-me")
 }
 
 class APITester:

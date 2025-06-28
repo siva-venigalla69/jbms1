@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 """
 System Health Monitoring Script
 Run this periodically to monitor your Render deployment
@@ -12,7 +13,7 @@ from datetime import datetime
 # Configuration
 API_BASE_URL = "https://jbms1.onrender.com"
 ADMIN_USERNAME = "admin"
-ADMIN_PASSWORD = "Siri@2299"
+ADMIN_PASSWORD = os.getenv("TEST_PASSWORD", "change-me")
 
 def health_check():
     """Monitor system health"""

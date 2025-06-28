@@ -1,0 +1,263 @@
+#!/usr/bin/env python3
+"""
+Complete Setup and Test Script
+Handles backend startup, environment setup, and comprehensive testing
+"""
+import os
+import sys
+import time
+import subprocess
+import signal
+import psutil
+from pathlib import Path
+
+def check_backend_running(port=8000):
+    """Check if backend is running on specified port"""
+    for conn in psutil.net_connections():
+        if conn.laddr.port == port and conn.status == 'LISTEN':
+            return True
+    return False
+
+def start_backend():
+    """Start the backend server"""
+    if check_backend_running():
+        print("✅ Backend already running on port 8000")
+        return None
+    
+    print("🚀 Starting backend server...")
+    backend_dir = Path("backend")
+    if not backend_dir.exists():
+        print("❌ Backend directory not found!")
+        return None
+    
+    # Start backend in background
+    cmd = [sys.executable, "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    process = subprocess.Popen(cmd, cwd=backend_dir, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    
+    # Wait for server to start
+    print("⏳ Waiting for backend to start...")
+    for i in range(30):  # Wait up to 30 seconds
+        if check_backend_running():
+            print("✅ Backend started successfully!")
+            return process
+        time.sleep(1)
+        print(f"   Waiting... ({i+1}/30)")
+    
+    print("❌ Backend failed to start within 30 seconds")
+    process.terminate()
+    return None
+
+def setup_environment():
+    """Setup secure environment variables"""
+    print("🔧 Setting up secure environment...")
+    
+    # Set test credentials
+    os.environ["TEST_USERNAME"] = "admin"
+    os.environ["TEST_PASSWORD = os.getenv("TEST_PASSWORD", "change-me")
+    os.environ["TEST_BASE_URL"] = "http://localhost:8000"
+    os.environ["PRODUCTION_BASE_URL"] = "https://jbms1.onrender.com"
+    
+    print("✅ Environment variables set")
+
+def run_secure_tests():
+    """Run the secure API tests"""
+    print("🧪 Running comprehensive API tests...")
+    
+    try:
+        # Import and run the secure test
+        sys.path.append('.')
+        from secure_api_test import SecureAPITester
+        
+        tester = SecureAPITester(use_production=False)
+        
+        if tester.authenticate():
+            tester.run_comprehensive_tests()
+            tester.save_results()
+            tester.print_summary()
+            return True
+        else:
+            print("❌ Authentication failed")
+            return False
+            
+    except Exception as e:
+        print(f"❌ Test execution failed: {e}")
+        return False
+
+def test_production_apis():
+    """Test production APIs"""
+    print("\n🌐 Testing Production APIs...")
+    print("⚠️  Make sure PRODUCTION_PASSWORD is set!")
+    
+    production_password = os.getenv("TEST_PASSWORD", "change-me")
+    if not production_password:
+        print("⏭️  Skipping production tests")
+        return
+    
+    os.environ["PRODUCTION_PASSWORD = os.getenv("TEST_PASSWORD", "change-me")
+    
+    try:
+        from secure_api_test import SecureAPITester
+        
+        tester = SecureAPITester(use_production=True)
+        
+        if tester.authenticate():
+            tester.run_comprehensive_tests()
+            tester.save_results(f"production_api_test_results_{time.strftime('%Y%m%d_%H%M%S')}.json")
+            tester.print_summary()
+        else:
+            print("❌ Production authentication failed")
+            
+    except Exception as e:
+        print(f"❌ Production test failed: {e}")
+
+def check_hardcoded_passwords():
+    """Check for hardcoded passwords in test files"""
+    print("\n🔍 Checking for hardcoded passwords...")
+    
+    try:
+        result = subprocess.run([sys.executable, "remove_hardcoded_passwords.py"], 
+                              capture_output=True, text=True, timeout=30)
+        print(result.stdout)
+        if result.stderr:
+            print("Warnings:", result.stderr)
+    except subprocess.TimeoutExpired:
+        print("❌ Password check script timed out")
+    except Exception as e:
+        print(f"❌ Error running password check: {e}")
+
+def frontend_testing_instructions():
+    """Provide frontend testing instructions"""
+    print("\n🌐 FRONTEND TESTING INSTRUCTIONS")
+    print("=" * 50)
+    print("1. Open a new terminal")
+    print("2. Navigate to frontend directory:")
+    print("   cd frontend")
+    print("3. Install dependencies (if not done):")
+    print("   npm install")
+    print("4. Start frontend server:")
+    print("   npm start")
+    print("5. Open browser: http://localhost:3000")
+    print("6. Test login with credentials:")
+    print("   Username: admin")
+    print("   Password: Siri@2299")
+    print("\n📋 Frontend Testing Checklist:")
+    print("   ✓ Login/logout functionality")
+    print("   ✓ Dashboard loads correctly")
+    print("   ✓ Customer management")
+    print("   ✓ Order management")
+    print("   ✓ Inventory management")
+    print("   ✓ Reports generation")
+
+def production_deployment_steps():
+    """Show production deployment steps"""
+    print("\n🚀 PRODUCTION DEPLOYMENT STEPS")
+    print("=" * 50)
+    print("1. 🔒 Security Setup:")
+    print("   - Remove hardcoded passwords from all files")
+    print("   - Generate secure admin password")
+    print("   - Set environment variables in Render")
+    print()
+    print("2. 🛠️ Render Configuration:")
+    print("   - Update render.yaml with secure settings")
+    print("   - Set CORS_ORIGINS to actual frontend domain")
+    print("   - Enable rate limiting and security headers")
+    print()
+    print("3. 📊 Database Migration:")
+    print("   - Apply FIXED_ENUM_MIGRATION.sql")
+    print("   - Verify schema compliance")
+    print()
+    print("4. 🚀 Deployment:")
+    print("   git add .")
+    print("   git commit -m 'Security fixes and production deployment'")
+    print("   git push origin main")
+    print()
+    print("5. ✅ Post-Deployment:")
+    print("   - Change admin password immediately")
+    print("   - Test all APIs in production")
+    print("   - Monitor logs for errors")
+
+def password_change_instructions():
+    """Show password change instructions"""
+    print("\n🔐 PASSWORD CHANGE INSTRUCTIONS")
+    print("=" * 50)
+    print("1. 🏠 Local Environment:")
+    print("   python change_admin_password.py")
+    print()
+    print("2. 🌐 Production Environment:")
+    print("   - SSH into production server OR")
+    print("   - Use database admin panel")
+    print("   - Run: python change_admin_password.py --production")
+    print()
+    print("3. 🔄 Update Environment Variables:")
+    print("   - Update TEST_PASSWORD in local .env")
+    print("   - Update PRODUCTION_PASSWORD in Render")
+    print()
+    print("4. ✅ Verify Changes:")
+    print("   - Test login with new password")
+    print("   - Run API tests with new credentials")
+
+def cleanup_backend(process):
+    """Cleanup backend process"""
+    if process:
+        print("\n🧹 Cleaning up backend process...")
+        process.terminate()
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            process.kill()
+        print("✅ Backend process cleaned up")
+
+def main():
+    """Main function"""
+    print("🎯 Complete Setup and Test Suite")
+    print("=" * 60)
+    
+    backend_process = None
+    
+    try:
+        # Setup environment
+        setup_environment()
+        
+        # Check for hardcoded passwords
+        check_hardcoded_passwords()
+        
+        # Start backend
+        backend_process = start_backend()
+        if not backend_process and not check_backend_running():
+            print("❌ Cannot proceed without backend server")
+            print("💡 Please start backend manually:")
+            print("   cd backend")
+            print("   python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload")
+            return
+        
+        # Run local API tests
+        run_secure_tests()
+        
+        # Ask about production testing
+        print("\n" + "=" * 60)
+        test_prod = input("🌐 Test production APIs? (y/N): ").strip().lower()
+        if test_prod in ['y', 'yes']:
+            test_production_apis()
+        
+        # Show instructions
+        print("\n" + "=" * 60)
+        frontend_testing_instructions()
+        production_deployment_steps()
+        password_change_instructions()
+        
+        print("\n🎉 SETUP AND TESTING COMPLETE!")
+        print("📋 Next Steps:")
+        print("1. Test frontend locally")
+        print("2. Remove hardcoded passwords from test files")
+        print("3. Deploy to production with secure credentials")
+        print("4. Change admin password immediately after deployment")
+        
+    except KeyboardInterrupt:
+        print("\n⏹️  Operation cancelled by user")
+    except Exception as e:
+        print(f"\n❌ Unexpected error: {e}")
+    finally:
+        cleanup_backend(backend_process)
+
+if __name__ == "__main__":
+    main() 

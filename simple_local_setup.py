@@ -77,7 +77,7 @@ def test_local_apis():
     
     # Test authentication
     try:
-        login_data = "username=admin&password=Siri@2299"
+        login_data = "username=admin&password = os.getenv("TEST_PASSWORD", "change-me")
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
         
         response = requests.post(

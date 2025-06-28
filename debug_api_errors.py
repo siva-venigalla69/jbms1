@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 """
 Debug script to test individual API calls and get detailed error messages
 """
@@ -14,7 +15,7 @@ def authenticate():
     """Get auth token"""
     response = requests.post(
         f"{API_URL}/auth/login",
-        data={"username": "admin", "password": "Siri@2299"},
+        data={"username": "admin", "password": os.getenv("TEST_PASSWORD", "change-me")},
         headers={"Content-Type": "application/x-www-form-urlencoded"}
     )
     if response.status_code == 200:

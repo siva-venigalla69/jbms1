@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 """
 Focused Admin Login Test with Provided Password
 """
@@ -14,7 +15,7 @@ BASE_URL = "https://jbms1.onrender.com"
 def test_admin_login():
     """Test admin login with provided password and various usernames"""
     
-    password = "Siri@2299"  # Provided password
+    password = os.getenv("TEST_PASSWORD", "change-me")
     
     # Usernames to try
     usernames = [
@@ -35,7 +36,7 @@ def test_admin_login():
     for username in usernames:
         print(f"\n🔑 Trying username: {username}")
         
-        login_data = f"username={username}&password={password}"
+        login_data = f"username={username}&password = os.getenv("TEST_PASSWORD", "change-me")
         
         try:
             response = requests.post(
@@ -96,7 +97,7 @@ def test_token(token):
         print(f"   ❌ Token test error: {str(e)}")
 
 if __name__ == "__main__":
-    username, password, token = test_admin_login()
+    username, password = os.getenv("TEST_PASSWORD", "change-me")
     
     if username and token:
         print(f"\n🎉 SUCCESSFUL CREDENTIALS FOUND:")

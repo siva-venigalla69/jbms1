@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 """
 Fix Admin User Role Enum Issue
 This script creates SQL commands to fix the admin user role enum problem.
@@ -17,12 +18,12 @@ def create_admin_fix_sql():
     
     # User details
     username = "admin"
-    password = "Siri@2912"
+    password = os.getenv("TEST_PASSWORD", "change-me")
     email = "siva.data9@outlook.com"
     full_name = "Siva Venigalla"
     
     # Hash password using the same method as backend
-    password_hash = pwd_context.hash(password)
+    password = os.getenv("TEST_PASSWORD", "change-me")
     
     # Generate UUID for new user (if needed)
     new_user_id = str(uuid.uuid4())
@@ -37,7 +38,7 @@ def create_admin_fix_sql():
     print(f"""
 UPDATE users 
 SET 
-    password_hash = '{password_hash}',
+    password = os.getenv("TEST_PASSWORD", "change-me"),
     email = '{email}',
     full_name = '{full_name}',
     role = 'admin',
@@ -90,7 +91,7 @@ VALUES (
     print(f"\n=== VERIFICATION ===")
     print(f"Password hash: {password_hash}")
     print(f"Hash length: {len(password_hash)}")
-    print(f"Hash format: {'✅ Valid bcrypt' if password_hash.startswith('$2b$') and len(password_hash) == 60 else '❌ Invalid'}")
+    print(f"Hash format: {'✅ Valid bcrypt' if password = os.getenv("TEST_PASSWORD", "change-me")
 
 if __name__ == "__main__":
     create_admin_fix_sql() 

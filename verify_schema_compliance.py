@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 """
 Schema verification script to check if database matches Python models
 """
@@ -38,7 +39,7 @@ def test_minimal_database_operations():
         # Authenticate first
         auth_response = requests.post(
             f"{BASE_URL}/api/auth/login",
-            data={"username": "admin", "password": "Siri@2299"},
+            data={"username": "admin", "password": os.getenv("TEST_PASSWORD", "change-me")},
             headers={"Content-Type": "application/x-www-form-urlencoded"}
         )
         

@@ -140,14 +140,14 @@ class AuthAPITester:
         # Test with form data (OAuth2PasswordRequestForm)
         login_data = {
             "username": "admin",
-            "password": "admin123"
+            "password": os.getenv("TEST_PASSWORD", "change-me")
         }
         
         # OAuth2PasswordRequestForm expects form data, not JSON
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
         
         # Convert to form data
-        form_data = f"username={login_data['username']}&password={login_data['password']}"
+        form_data = f"username={login_data['username']}&password = os.getenv("TEST_PASSWORD", "change-me")
         
         start_time = time.time()
         url = f"{self.base_url}/auth/login"
@@ -266,7 +266,7 @@ class AuthAPITester:
         logger.info(f"=== Testing Login with New User: {username} ===")
         
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
-        form_data = f"username={username}&password={password}"
+        form_data = f"username={username}&password = os.getenv("TEST_PASSWORD", "change-me")
         
         start_time = time.time()
         url = f"{self.base_url}/auth/login"
@@ -347,7 +347,7 @@ class AuthAPITester:
         
         # Test with invalid username
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
-        form_data = "username=nonexistent&password=wrongpassword"
+        form_data = "username=nonexistent&password = os.getenv("TEST_PASSWORD", "change-me")
         
         start_time = time.time()
         url = f"{self.base_url}/auth/login"

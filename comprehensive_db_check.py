@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 """
 Comprehensive Remote Database Schema Checker
 Analyzes the production database schema by examining API responses
@@ -14,7 +15,7 @@ def get_auth_token():
     """Get authentication token"""
     response = requests.post(f"{BASE_URL}/auth/login", data={
         "username": "admin", 
-        "password": "Siri@2299"
+        "password": os.getenv("TEST_PASSWORD", "change-me")
     })
     if response.status_code == 200:
         return response.json()["access_token"]

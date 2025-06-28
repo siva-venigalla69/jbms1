@@ -98,10 +98,10 @@ class AuthAPITester:
         
         # Credentials to try (based on database schema and previous setup)
         credentials = [
-            ("admin", "Siri@2299"),  # Correct password
-            ("admin", "admin123"),
-            ("admin", "Siri@2912"),
-            ("siva.data9@outlook.com", "Siri@2299"),
+            ("admin", os.getenv("TEST_PASSWORD", "change-me")),  # Correct password
+            ("admin", os.getenv("TEST_PASSWORD", "change-me")),
+            ("admin", os.getenv("TEST_PASSWORD", "change-me")),
+            ("siva.data9@outlook.com", os.getenv("TEST_PASSWORD", "change-me")),
             ("admin", "admin"),
         ]
         
@@ -109,7 +109,7 @@ class AuthAPITester:
         
         for username, password in credentials:
             try:
-                login_data = f"username={username}&password={password}"
+                login_data = f"username={username}&password = os.getenv("TEST_PASSWORD", "change-me")
                 response = requests.post(
                     f"{self.base_url}/api/auth/login",
                     data=login_data,
@@ -159,7 +159,7 @@ class AuthAPITester:
         
         for username, password in invalid_credentials:
             try:
-                login_data = f"username={username}&password={password}"
+                login_data = f"username={username}&password = os.getenv("TEST_PASSWORD", "change-me")
                 response = requests.post(
                     f"{self.base_url}/api/auth/login",
                     data=login_data,
@@ -362,7 +362,7 @@ class AuthAPITester:
         print("=" * 60)
         
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
-        login_data = f"username={username}&password={password}"
+        login_data = f"username={username}&password = os.getenv("TEST_PASSWORD", "change-me")
         
         try:
             response = requests.post(

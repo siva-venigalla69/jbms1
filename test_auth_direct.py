@@ -25,7 +25,7 @@ def test_auth_endpoints():
     
     # 1. Test Login Endpoint (OAuth2PasswordRequestForm)
     print("\n1. Testing Admin Login...")
-    login_data = "username=admin&password=admin123"
+    login_data = "username=admin&password = os.getenv("TEST_PASSWORD", "change-me")
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
     
     try:
@@ -56,14 +56,14 @@ def test_auth_endpoints():
     # 2. Test Alternative Login Credentials
     print("\n2. Testing Alternative Admin Credentials...")
     alt_credentials = [
-        ("admin", "Siri@2912"),
-        ("siva.data9@outlook.com", "Siri@2912"),
+        ("admin", os.getenv("TEST_PASSWORD", "change-me")),
+        ("siva.data9@outlook.com", os.getenv("TEST_PASSWORD", "change-me")),
         ("admin", "admin"),
     ]
     
     for username, password in alt_credentials:
         print(f"   Trying: {username}")
-        login_data = f"username={username}&password={password}"
+        login_data = f"username={username}&password = os.getenv("TEST_PASSWORD", "change-me")
         
         try:
             response = requests.post(
@@ -89,7 +89,7 @@ def test_auth_endpoints():
     
     # 3. Test Invalid Login
     print("\n3. Testing Invalid Credentials...")
-    invalid_data = "username=invalid&password=wrong"
+    invalid_data = "username=invalid&password = os.getenv("TEST_PASSWORD", "change-me")
     
     try:
         response = requests.post(
@@ -216,7 +216,7 @@ def test_new_user_login(username, password):
     """Test login with newly created user"""
     
     print(f"\n7. Testing New User Login...")
-    login_data = f"username={username}&password={password}"
+    login_data = f"username={username}&password = os.getenv("TEST_PASSWORD", "change-me")
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
     
     try:

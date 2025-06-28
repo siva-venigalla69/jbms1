@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 """
 Functional API Testing Script for JBMS Digital Textile Printing System
 Tests APIs with correct schema requirements
@@ -13,7 +14,7 @@ from typing import Dict, Any, Optional
 # Configuration
 BASE_URL = "https://jbms1.onrender.com"
 API_BASE = f"{BASE_URL}/api"
-PASSWORD = "Siri@2299"
+PASSWORD = os.getenv("TEST_PASSWORD", "change-me")
 
 class FunctionalAPITester:
     def __init__(self):
@@ -21,7 +22,7 @@ class FunctionalAPITester:
         self.token = None
         self.test_data = {}
         
-    def login(self, username: str = "admin", password: str = PASSWORD) -> bool:
+    def login(self, username: str = "admin", password = os.getenv("TEST_PASSWORD", "change-me") -> bool:
         """Login and get access token"""
         print(f"\n🔐 Testing Login...")
         

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 """
 Debug specific API endpoints to understand 500 errors
 """
@@ -12,7 +13,7 @@ BASE_URL = "https://jbms1.onrender.com/api"
 def get_token():
     response = requests.post(f"{BASE_URL}/auth/login", data={
         "username": "admin",
-        "password": "Siri@2299"
+        "password": os.getenv("TEST_PASSWORD", "change-me")
     })
     if response.status_code == 200:
         return response.json()["access_token"]

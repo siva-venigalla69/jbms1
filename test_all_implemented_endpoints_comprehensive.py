@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 """
 Comprehensive Test for ALL Implemented API Endpoints
 Tests every endpoint found in the backend/app/api/ directory
@@ -57,7 +58,7 @@ class AllEndpointsComprehensiveTester:
         try:
             auth_data = {
                 "username": "admin",
-                "password": "Siri@2299"
+                "password": os.getenv("TEST_PASSWORD", "change-me")
             }
             response = self.session.post(
                 f"{API_URL}/auth/login",

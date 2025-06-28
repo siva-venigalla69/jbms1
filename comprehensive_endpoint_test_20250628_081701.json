@@ -1,0 +1,255 @@
+{
+  "passed": 23,
+  "failed": 7,
+  "total": 30,
+  "details": [
+    {
+      "module": "HEALTH",
+      "test": "Health Check",
+      "status": "PASS",
+      "details": "Status: healthy",
+      "data": null,
+      "timestamp": "2025-06-28T08:16:41.196712"
+    },
+    {
+      "module": "HEALTH",
+      "test": "Database Health",
+      "status": "PASS",
+      "details": "DB: connected",
+      "data": null,
+      "timestamp": "2025-06-28T08:16:41.426287"
+    },
+    {
+      "module": "INFO",
+      "test": "Version Info",
+      "status": "PASS",
+      "details": "Version: 1.0.3",
+      "data": null,
+      "timestamp": "2025-06-28T08:16:41.439174"
+    },
+    {
+      "module": "DEBUG",
+      "test": "Enum Check",
+      "status": "PASS",
+      "details": "App Version: 1.0.2",
+      "data": null,
+      "timestamp": "2025-06-28T08:16:41.451014"
+    },
+    {
+      "module": "AUTH",
+      "test": "Login",
+      "status": "PASS",
+      "details": "JWT token received",
+      "data": null,
+      "timestamp": "2025-06-28T08:16:41.451511"
+    },
+    {
+      "module": "AUTH",
+      "test": "Token Validation",
+      "status": "FAIL",
+      "details": "Status: 500",
+      "data": null,
+      "timestamp": "2025-06-28T08:16:42.816480"
+    },
+    {
+      "module": "USERS",
+      "test": "List Users",
+      "status": "FAIL",
+      "details": "Status: 500",
+      "data": null,
+      "timestamp": "2025-06-28T08:16:43.881492"
+    },
+    {
+      "module": "USERS",
+      "test": "Get Current User",
+      "status": "FAIL",
+      "details": "Status: 500",
+      "data": null,
+      "timestamp": "2025-06-28T08:16:44.262540"
+    },
+    {
+      "module": "CUSTOMERS",
+      "test": "List Customers",
+      "status": "PASS",
+      "details": "Found 20 customers",
+      "data": null,
+      "timestamp": "2025-06-28T08:16:44.779776"
+    },
+    {
+      "module": "CUSTOMERS",
+      "test": "Create Customer",
+      "status": "PASS",
+      "details": "Created: bd5f2717-47d5-4ee6-b60f-775ff51556ab",
+      "data": null,
+      "timestamp": "2025-06-28T08:16:46.249519"
+    },
+    {
+      "module": "CUSTOMERS",
+      "test": "Search Customers",
+      "status": "FAIL",
+      "details": "Status: 422",
+      "data": null,
+      "timestamp": "2025-06-28T08:16:46.611427"
+    },
+    {
+      "module": "ORDERS",
+      "test": "List Orders",
+      "status": "PASS",
+      "details": "Found 14 orders",
+      "data": null,
+      "timestamp": "2025-06-28T08:16:49.868604"
+    },
+    {
+      "module": "ORDERS",
+      "test": "Create Order",
+      "status": "PASS",
+      "details": "Created: ORD-2025-0015",
+      "data": null,
+      "timestamp": "2025-06-28T08:16:51.544226"
+    },
+    {
+      "module": "INVENTORY",
+      "test": "List Items",
+      "status": "PASS",
+      "details": "Found 39 items",
+      "data": null,
+      "timestamp": "2025-06-28T08:16:52.095709"
+    },
+    {
+      "module": "INVENTORY",
+      "test": "Create Item",
+      "status": "PASS",
+      "details": "Created: Test Item 407d3fb5",
+      "data": null,
+      "timestamp": "2025-06-28T08:16:52.967864"
+    },
+    {
+      "module": "INVENTORY",
+      "test": "Adjust Stock",
+      "status": "PASS",
+      "details": "Adjusted by 5.0",
+      "data": null,
+      "timestamp": "2025-06-28T08:16:54.138853"
+    },
+    {
+      "module": "INVENTORY",
+      "test": "Low Stock Items",
+      "status": "PASS",
+      "details": "Found 0 low stock items",
+      "data": null,
+      "timestamp": "2025-06-28T08:16:54.657034"
+    },
+    {
+      "module": "MATERIALS",
+      "test": "List Material In",
+      "status": "PASS",
+      "details": "Found 20 records",
+      "data": null,
+      "timestamp": "2025-06-28T08:16:55.302954"
+    },
+    {
+      "module": "MATERIALS",
+      "test": "Record Material In",
+      "status": "FAIL",
+      "details": "Status: 422 - {\"detail\":\"Validation failed\",\"errors\":[\"body -> unit: field required\"],\"request_id\":140097515259552}",
+      "data": null,
+      "timestamp": "2025-06-28T08:16:55.719412"
+    },
+    {
+      "module": "MATERIALS",
+      "test": "List Material Out",
+      "status": "PASS",
+      "details": "Found 0 records",
+      "data": null,
+      "timestamp": "2025-06-28T08:16:56.087737"
+    },
+    {
+      "module": "EXPENSES",
+      "test": "List Expenses",
+      "status": "PASS",
+      "details": "Found 18 expenses",
+      "data": null,
+      "timestamp": "2025-06-28T08:16:56.542120"
+    },
+    {
+      "module": "EXPENSES",
+      "test": "Record Expense",
+      "status": "FAIL",
+      "details": "Status: 422 - {\"detail\":\"Validation failed\",\"errors\":[\"body -> category: field required\",\"body -> payment_method: field required\"],\"request_id\":140097503748464}",
+      "data": null,
+      "timestamp": "2025-06-28T08:16:56.994294"
+    },
+    {
+      "module": "PAYMENTS",
+      "test": "List Payments",
+      "status": "PASS",
+      "details": "Found 0 payments",
+      "data": null,
+      "timestamp": "2025-06-28T08:16:57.533000"
+    },
+    {
+      "module": "INVOICES",
+      "test": "List Invoices",
+      "status": "FAIL",
+      "details": "Status: 500",
+      "data": null,
+      "timestamp": "2025-06-28T08:16:57.970801"
+    },
+    {
+      "module": "CHALLANS",
+      "test": "List Challans",
+      "status": "PASS",
+      "details": "Found 0 challans",
+      "data": null,
+      "timestamp": "2025-06-28T08:16:58.577570"
+    },
+    {
+      "module": "RETURNS",
+      "test": "List Returns",
+      "status": "PASS",
+      "details": "Found 0 returns",
+      "data": null,
+      "timestamp": "2025-06-28T08:16:59.323086"
+    },
+    {
+      "module": "REPORTS",
+      "test": "Pending Orders",
+      "status": "PASS",
+      "details": "Found 3 pending orders",
+      "data": null,
+      "timestamp": "2025-06-28T08:16:59.703296"
+    },
+    {
+      "module": "REPORTS",
+      "test": "Production Status",
+      "status": "PASS",
+      "details": "Found 4 production items",
+      "data": null,
+      "timestamp": "2025-06-28T08:17:00.217399"
+    },
+    {
+      "module": "REPORTS",
+      "test": "Stock Holdings",
+      "status": "PASS",
+      "details": "Found 4 stock items",
+      "data": null,
+      "timestamp": "2025-06-28T08:17:00.833132"
+    },
+    {
+      "module": "REPORTS",
+      "test": "Outstanding Receivables",
+      "status": "PASS",
+      "details": "Found 3 receivables",
+      "data": null,
+      "timestamp": "2025-06-28T08:17:01.302523"
+    }
+  ],
+  "created_data": {
+    "existing_customer_id": "af111d72-e0f4-481f-8dbe-39405d0c3238",
+    "customer_id": "bd5f2717-47d5-4ee6-b60f-775ff51556ab",
+    "existing_order_id": "ed3075af-09e6-4fb1-88d7-90959ef04473",
+    "order_id": "e4bf57ee-1a6a-447d-97f4-549790b63f9a",
+    "existing_inventory_id": "cb3fe6a9-efa5-4b47-9ebf-8ca77dc53dfb",
+    "inventory_id": "894e6eeb-5ad7-48bd-90b7-0b6b68b3d665"
+  }
+}

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 """
 Comprehensive API testing script for JBMS Digital Textile Printing Workflow System
 Tests each functional requirement systematically
@@ -15,7 +16,7 @@ BASE_URL = "https://jbms1.onrender.com/api"
 TEST_DATA = {
     "admin_user": {
         "username": "admin",
-        "password": "Siri@2299"
+        "password": os.getenv("TEST_PASSWORD", "change-me")
     }
 }
 

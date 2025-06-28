@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 """
 Comprehensive Local API Testing Suite
 Tests all APIs against current database schema in local environment
@@ -99,7 +100,7 @@ class LocalAPITester:
         print("\n🔐 TESTING AUTHENTICATION")
         
         # Test admin login
-        login_data = "username=admin&password=Siri@2299"
+        login_data = "username=admin&password = os.getenv("TEST_PASSWORD", "change-me")
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
         
         try:

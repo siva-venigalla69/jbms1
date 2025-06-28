@@ -21,7 +21,7 @@ class LocalEnvironmentSetup:
         self.backend_path = self.project_root / "backend"
         self.db_name = "textile_printing_local"
         self.db_user = "textile_user"
-        self.db_password = "textile_pass"
+        self.db_password = os.getenv("TEST_PASSWORD", "change-me")
         self.db_host = "localhost"
         self.db_port = "5432"
         
@@ -201,7 +201,7 @@ LOG_LEVEL=DEBUG
             true
         )
         ON CONFLICT (username) DO UPDATE SET
-            password_hash = EXCLUDED.password_hash,
+            password = os.getenv("TEST_PASSWORD", "change-me")sh,
             email = EXCLUDED.email,
             full_name = EXCLUDED.full_name,
             role = EXCLUDED.role,
@@ -284,7 +284,7 @@ LOG_LEVEL=DEBUG
             logger.info("✅ LOCAL ENVIRONMENT SETUP COMPLETE!")
             logger.info("=" * 60)
             logger.info(f"📊 Database: {database_url}")
-            logger.info("👤 Admin Login: username=admin, password=Siri@2299")
+            logger.info("👤 Admin Login: username=admin, password = os.getenv("TEST_PASSWORD", "change-me")
             logger.info("🌐 Ready to start server with: python -m uvicorn app.main:app --reload")
             logger.info("=" * 60)
             

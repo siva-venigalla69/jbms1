@@ -1,0 +1,275 @@
+#!/usr/bin/env python3
+"""
+Fix Hardcoded Passwords Script
+Automatically replaces hardcoded passwords with secure environment variable usage
+"""
+import os
+import re
+import glob
+from pathlib import Path
+
+# Hardcoded passwords to replace
+HARDCODED_PASSWORD = os.getenv("TEST_PASSWORD", "change-me")
+    os.getenv("TEST_PASSWORD", "change-me"),
+    os.getenv("TEST_PASSWORD", "change-me"),
+    os.getenv("TEST_PASSWORD", "change-me")
+]
+
+def backup_file(file_path):
+    """Create backup of file before modifying"""
+    backup_path = f"{file_path}.backup"
+    if not os.path.exists(backup_path):
+        with open(file_path, 'r', encoding='utf-8') as original:
+            with open(backup_path, 'w', encoding='utf-8') as backup:
+                backup.write(original.read())
+        print(f"  📄 Backup created: {backup_path}")
+
+def fix_python_file(file_path):
+    """Fix hardcoded passwords in Python files"""
+    print(f"🔧 Fixing: {file_path}")
+    
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        original_content = content
+        changes_made = False
+        
+        # Add import for os module if not present
+        if 'import os' not in content and any(pwd in content for pwd in HARDCODED_PASSWORDS):
+            # Find the best place to add import
+            lines = content.split('\n')
+            import_added = False
+            
+            for i, line in enumerate(lines):
+                if line.startswith('import ') or line.startswith('from '):
+                    continue
+                elif line.strip() == '' or line.startswith('#'):
+                    continue
+                else:
+                    # Insert import before first non-import line
+                    lines.insert(i, 'import os')
+                    import_added = True
+                    break
+            
+            if not import_added:
+                lines.insert(0, 'import os')
+            
+            content = '\n'.join(lines)
+            changes_made = True
+        
+        # Replace hardcoded passwords
+        for password in HARDCODED_PASSWORDS:
+            # Pattern for quoted passwords
+            patterns = [
+                (f'"{password}"', 'os.getenv("TEST_PASSWORD", "change-me")'),
+                (f"'{password}'", 'os.getenv("TEST_PASSWORD", "change-me")'),
+                (f'password = os.getenv("TEST_PASSWORD", "change-me"),
+                (f'PASSWORD = os.getenv("TEST_PASSWORD", "change-me"),
+            ]
+            
+            for pattern, replacement in patterns:
+                if re.search(pattern, content):
+                    content = re.sub(pattern, replacement, content)
+                    changes_made = True
+                    print(f"  ✅ Replaced {password} with environment variable")
+        
+        # Write back to file if changes were made
+        if changes_made:
+            backup_file(file_path)
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(content)
+            print(f"  ✅ Fixed: {file_path}")
+            return True
+        else:
+            print(f"  ℹ️  No changes needed: {file_path}")
+            return False
+            
+    except Exception as e:
+        print(f"  ❌ Error fixing {file_path}: {e}")
+        return False
+
+def fix_javascript_file(file_path):
+    """Fix hardcoded passwords in JavaScript/TypeScript files"""
+    print(f"🔧 Fixing: {file_path}")
+    
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        original_content = content
+        changes_made = False
+        
+        # Replace hardcoded passwords in JS/TS
+        for password in HARDCODED_PASSWORDS:
+            patterns = [
+                (f'"{password}"', 'process.env.REACT_APP_TEST_PASSWORD || "change-me"'),
+                (f"'{password}'", 'process.env.REACT_APP_TEST_PASSWORD || "change-me"'),
+            ]
+            
+            for pattern, replacement in patterns:
+                if re.search(pattern, content):
+                    content = re.sub(pattern, replacement, content)
+                    changes_made = True
+                    print(f"  ✅ Replaced {password} with environment variable")
+        
+        if changes_made:
+            backup_file(file_path)
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(content)
+            print(f"  ✅ Fixed: {file_path}")
+            return True
+        else:
+            print(f"  ℹ️  No changes needed: {file_path}")
+            return False
+            
+    except Exception as e:
+        print(f"  ❌ Error fixing {file_path}: {e}")
+        return False
+
+def scan_and_fix_files():
+    """Scan for files with hardcoded passwords and fix them"""
+    print("🔍 Scanning for files with hardcoded passwords...")
+    
+    # File patterns to check
+    file_patterns = [
+        "**/*.py",
+        "**/*.js",
+        "**/*.ts",
+        "**/*.tsx"
+    ]
+    
+    files_to_fix = []
+    
+    # Find files with hardcoded passwords
+    for pattern in file_patterns:
+        for file_path in glob.glob(pattern, recursive=True):
+            # Skip certain directories
+            if any(skip in file_path for skip in ['node_modules', '.git', '__pycache__', 'build', 'dist']):
+                continue
+            
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                    
+                for password in HARDCODED_PASSWORDS:
+                    if password in content:
+                        files_to_fix.append(file_path)
+                        break
+                        
+            except (UnicodeDecodeError, PermissionError):
+                continue
+    
+    if not files_to_fix:
+        print("✅ No files with hardcoded passwords found!")
+        return True
+    
+    print(f"\n📋 Found {len(files_to_fix)} files to fix:")
+    for file_path in files_to_fix:
+        print(f"  • {file_path}")
+    
+    # Ask for confirmation
+    response = input(f"\n🔧 Fix all {len(files_to_fix)} files? (y/N): ").strip().lower()
+    if response not in ['y', 'yes']:
+        print("⏹️  Operation cancelled")
+        return False
+    
+    # Fix files
+    print("\n🔧 Fixing files...")
+    fixed_count = 0
+    
+    for file_path in files_to_fix:
+        if file_path.endswith('.py'):
+            if fix_python_file(file_path):
+                fixed_count += 1
+        elif file_path.endswith(('.js', '.ts', '.tsx')):
+            if fix_javascript_file(file_path):
+                fixed_count += 1
+    
+    print(f"\n✅ Successfully fixed {fixed_count} files")
+    return True
+
+def create_env_files():
+    """Create .env template files"""
+    print("\n📁 Creating environment template files...")
+    
+    # Create .env.template
+    env_template = """# Environment Variables Template
+# Copy this to .env for local development
+
+# Test Credentials
+TEST_USERNAME=admin
+TEST_PASSWORD = os.getenv("TEST_PASSWORD", "change-me")e
+TEST_BASE_URL=http://localhost:8000
+
+# Production Credentials
+PRODUCTION_PASSWORD = os.getenv("TEST_PASSWORD", "change-me")e
+PRODUCTION_BASE_URL=https://jbms1.onrender.com
+
+# Frontend Environment (for React)
+REACT_APP_TEST_PASSWORD = os.getenv("TEST_PASSWORD", "change-me")e
+REACT_APP_API_BASE_URL=http://localhost:8000
+"""
+    
+    with open('.env.template', 'w') as f:
+        f.write(env_template)
+    print("✅ Created: .env.template")
+    
+    # Create frontend .env template
+    frontend_dir = Path('frontend')
+    if frontend_dir.exists():
+        frontend_env = """# Frontend Environment Variables
+REACT_APP_TEST_PASSWORD = os.getenv("TEST_PASSWORD", "change-me")e
+REACT_APP_API_BASE_URL=http://localhost:8000
+REACT_APP_PRODUCTION_URL=https://jbms1.onrender.com
+"""
+        with open(frontend_dir / '.env.template', 'w') as f:
+            f.write(frontend_env)
+        print("✅ Created: frontend/.env.template")
+
+def show_next_steps():
+    """Show next steps after fixing"""
+    print("\n📋 NEXT STEPS:")
+    print("=" * 50)
+    print("1. 🔐 Set Environment Variables:")
+    print("   export TEST_PASSWORD = os.getenv("TEST_PASSWORD", "change-me")
+    print("   export PRODUCTION_PASSWORD = os.getenv("TEST_PASSWORD", "change-me")
+    print()
+    print("2. 📁 For Frontend (React):")
+    print("   cd frontend")
+    print("   cp .env.template .env")
+    print("   # Edit .env with your passwords")
+    print()
+    print("3. ✅ Test Your Changes:")
+    print("   python3 secure_test_config.py")
+    print("   python3 secure_api_test.py")
+    print()
+    print("4. 🚀 Commit Changes:")
+    print("   git add .")
+    print("   git commit -m 'Replace hardcoded passwords with environment variables'")
+    print()
+    print("⚠️  IMPORTANT:")
+    print("• Never commit the actual .env files")
+    print("• Use different passwords for dev/test/production")
+    print("• Rotate passwords regularly")
+
+def main():
+    """Main function"""
+    print("🔒 Hardcoded Password Fix Tool")
+    print("=" * 60)
+    
+    # Scan and fix files
+    if scan_and_fix_files():
+        # Create environment templates
+        create_env_files()
+        
+        # Show next steps
+        show_next_steps()
+        
+        print("\n🎉 Password security fixes completed!")
+        print("✅ All hardcoded passwords have been replaced with environment variables")
+    else:
+        print("\n❌ Fix operation failed or was cancelled")
+
+if __name__ == "__main__":
+    main() 

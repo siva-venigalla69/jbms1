@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 """
 Debug script to test authentication step by step
 """
@@ -40,7 +41,7 @@ def test_auth_endpoint():
     
     login_data = {
         "username": "admin",
-        "password": "Siri@2912"
+        "password": os.getenv("TEST_PASSWORD", "change-me")
     }
     
     headers = {

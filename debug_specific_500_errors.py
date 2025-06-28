@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 """
 Focused Debugging Script for 500 Errors
 Systematically test and fix each 500 error with detailed logging
@@ -21,7 +22,7 @@ class FocusedDebugger:
         """Authenticate and get admin token"""
         print("🔐 Authenticating...")
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
-        login_data = "username=admin&password=Siri@2299"
+        login_data = "username=admin&password = os.getenv("TEST_PASSWORD", "change-me")
         
         try:
             response = requests.post(
