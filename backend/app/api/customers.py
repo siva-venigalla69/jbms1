@@ -4,10 +4,13 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_
+from uuid import UUID
+
 from ..core.database import get_db
 from ..core.security import get_current_active_user
 from ..models.models import User, Customer
 from ..schemas.schemas import CustomerCreate, CustomerUpdate, CustomerResponse, CustomerSearchResponse
+from ..services.customer_service import customer_service
 from datetime import datetime
 
 # Configure logging
@@ -20,62 +23,23 @@ async def list_customers(
     skip: int = Query(0, ge=0, description="Number of records to skip"),
     limit: int = Query(20, ge=1, le=100, description="Number of records to return"),
     search: Optional[str] = Query(None, description="Search by name, phone, or email"),
-    is_active: Optional[bool] = Query(None, description="Filter by active status"),
-    sort_by: Optional[str] = Query("created_at", description="Sort field"),
-    sort_order: Optional[str] = Query("desc", regex="^(asc|desc)$", description="Sort order"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """
-    Retrieve customers with pagination, search, and filtering
-    
-    - **skip**: Number of records to skip for pagination
-    - **limit**: Maximum number of records to return (1-100)
-    - **search**: Search term for name, phone, or email
-    - **is_active**: Filter by active/inactive status
-    - **sort_by**: Field to sort by (name, created_at, etc.)
-    - **sort_order**: Sort direction (asc/desc)
+    Retrieve customers with pagination and search
     """
     try:
-        logger.info(f"User {current_user.username} requesting customers list with skip={skip}, limit={limit}, search='{search}'")
-        
-        # Build base query
-        query = db.query(Customer).filter(Customer.is_deleted == False)
-        
-        # Apply search filter
         if search:
-            search_term = f"%{search.strip()}%"
-            query = query.filter(
-                or_(
-                    Customer.name.ilike(search_term),
-                    Customer.phone.ilike(search_term),
-                    Customer.email.ilike(search_term)
-                )
-            )
-        
-        # Note: Customer model doesn't have is_active field, skipping that filter
-        # The is_active parameter is accepted but ignored for now
-        
-        # Apply sorting - be more defensive about field existence
-        if sort_by and hasattr(Customer, sort_by):
-            if sort_order == "desc":
-                query = query.order_by(getattr(Customer, sort_by).desc())
-            else:
-                query = query.order_by(getattr(Customer, sort_by).asc())
+            customers = customer_service.search_customers(db, search, skip, limit)
         else:
-            # Default sorting
-            query = query.order_by(Customer.created_at.desc())
+            customers = customer_service.get_multi(db, skip=skip, limit=limit)
         
-        # Apply pagination
-        customers = query.offset(skip).limit(limit).all()
-        
-        logger.info(f"User {current_user.username} retrieved {len(customers)} customers")
-        
-        # Convert to response format manually to avoid Pydantic issues
+        # Convert to response format
         response_data = []
         for customer in customers:
             customer_dict = {
-                "id": str(customer.id),  # Ensure UUID is converted to string
+                "id": str(customer.id),
                 "name": customer.name,
                 "phone": customer.phone,
                 "email": customer.email,
@@ -86,13 +50,16 @@ async def list_customers(
             }
             response_data.append(customer_dict)
         
+        logger.info(f"User {current_user.username} retrieved {len(customers)} customers")
         return response_data
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error retrieving customers: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to retrieve customers: {str(e)[:100]}"  # Include partial error for debugging
+            detail="Failed to retrieve customers"
         )
 
 @router.get("/search", response_model=CustomerSearchResponse)
@@ -150,83 +117,31 @@ async def create_customer(
 ):
     """
     Create a new customer with validation
-    
-    - **name**: Customer name (required, 2-255 characters)
-    - **phone**: Phone number (unique, validated format)
-    - **email**: Email address (optional, validated format)
-    - **address**: Customer address (optional)
-    - **gst_number**: GST number (optional, validated format)
     """
     try:
-        # Check for duplicate phone number
-        if customer_data.phone:
-            existing_phone = db.query(Customer).filter(
-                and_(
-                    Customer.phone == customer_data.phone,
-                    Customer.is_deleted == False
-                )
-            ).first()
-            
-            if existing_phone:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Customer with phone number {customer_data.phone} already exists"
-                )
+        customer = customer_service.create_customer(db, customer_data, current_user)
         
-        # Check for duplicate email
-        if customer_data.email:
-            existing_email = db.query(Customer).filter(
-                and_(
-                    Customer.email == customer_data.email,
-                    Customer.is_deleted == False
-                )
-            ).first()
-            
-            if existing_email:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Customer with email {customer_data.email} already exists"
-                )
-        
-        # Create customer
-        db_customer = Customer(
-            name=customer_data.name.strip(),
-            phone=customer_data.phone,
-            email=customer_data.email.strip().lower() if customer_data.email else None,
-            address=customer_data.address.strip() if customer_data.address else None,
-            gst_number=customer_data.gst_number.strip().upper() if customer_data.gst_number else None,
-            created_by_user_id=current_user.id,
-            updated_by_user_id=current_user.id
-        )
-        
-        db.add(db_customer)
-        db.commit()
-        db.refresh(db_customer)
-        
-        # Convert to response format manually to avoid Pydantic issues
-        customer_data = {
-            "id": str(db_customer.id),
-            "name": db_customer.name,
-            "phone": db_customer.phone,
-            "email": db_customer.email,
-            "address": db_customer.address,
-            "gst_number": db_customer.gst_number,
-            "created_at": db_customer.created_at,
-            "updated_at": db_customer.updated_at
+        # Convert to response format
+        customer_response = {
+            "id": str(customer.id),
+            "name": customer.name,
+            "phone": customer.phone,
+            "email": customer.email,
+            "address": customer.address,
+            "gst_number": customer.gst_number,
+            "created_at": customer.created_at,
+            "updated_at": customer.updated_at
         }
         
-        logger.info(f"User {current_user.username} created customer {db_customer.id}: {db_customer.name}")
-        
-        return customer_data
+        return customer_response
         
     except HTTPException:
         raise
     except Exception as e:
-        db.rollback()
         logger.error(f"Error creating customer: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create customer: {str(e)[:100]}"
+            detail="Failed to create customer"
         )
 
 @router.get("/{customer_id}", response_model=CustomerResponse)

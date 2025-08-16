@@ -17,7 +17,7 @@ def get_test_credentials() -> Dict[str, Any]:
     if not TEST_PASSWORD:
         raise ValueError(
             "❌ TEST_PASSWORD environment variable not set!\n"
-            "Run: export TEST_PASSWORD='your-secure-password'"
+            "Run: export TEST_password=os.getenv("ADMIN_PASSWORD", "change_me")"
         )
     
     return {
@@ -32,7 +32,7 @@ def get_production_credentials() -> Dict[str, Any]:
     if not prod_password:
         raise ValueError(
             "❌ PRODUCTION_PASSWORD environment variable not set!\n"
-            "Run: export PRODUCTION_PASSWORD='your-production-password'"
+            "Run: export PRODUCTION_password=os.getenv("ADMIN_PASSWORD", "change_me")"
         )
     
     return {

@@ -1,570 +1,591 @@
-# Deployment Guide - Digital Textile Printing System
+# 🚀 Production Deployment Guide
 
-This guide provides step-by-step instructions for deploying the complete system to production using free tier services.
+Complete step-by-step guide for deploying the Digital Textile Printing Management System to production with enhanced security and monitoring.
 
-## 📋 Deployment Overview
+## 📋 Table of Contents
 
-### Deployment Architecture
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                      PRODUCTION DEPLOYMENT                      │
-├─────────────────────────────────────────────────────────────────┤
-│  Frontend (React)     Backend (FastAPI)     Database (PostgreSQL) │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐   │
-│  │   Netlify.com   │  │  Render.com     │  │  Render.com     │   │
-│  │   - Free Tier   │  │  - Free Tier    │  │  - Free Tier    │   │
-│  │   - CDN         │  │  - 750hrs/month │  │  - 1GB Storage  │   │
-│  │   - 100GB/month │  │  - Auto-scale   │  │  - 90day retention  │
-│  └─────────────────┘  └─────────────────┘  └─────────────────┘   │
-└─────────────────────────────────────────────────────────────────┘
-```
+1. [Prerequisites](#prerequisites)
+2. [Pre-Deployment Security](#pre-deployment-security)
+3. [Environment Setup](#environment-setup)
+4. [Database Deployment](#database-deployment)
+5. [Backend Deployment](#backend-deployment)
+6. [Frontend Deployment](#frontend-deployment)
+7. [Post-Deployment Verification](#post-deployment-verification)
+8. [Monitoring & Maintenance](#monitoring--maintenance)
+9. [Troubleshooting](#troubleshooting)
 
-### Deployment Order
-1. **Database** (PostgreSQL on Render.com) - Foundation
-2. **Backend** (FastAPI on Render.com) - API Services
-3. **Frontend** (React on Netlify) - User Interface
+## 🔧 Prerequisites
 
-### Prerequisites
-- GitHub account (for source code)
-- Render.com account (for backend and database)
-- Netlify account (for frontend)
-- Domain name (optional)
+### Required Accounts
+- [Render.com](https://render.com) account (for backend and database)
+- [Netlify](https://netlify.com) account (for frontend)
+- [GitHub](https://github.com) repository access
 
----
+### Required Tools
+- Git
+- Python 3.9+
+- Node.js 16+
+- PostgreSQL client (psql)
 
-## 🗄️ PHASE 1: Database Deployment (Render.com PostgreSQL)
+### System Requirements
+- **Backend**: Render Starter Plan (minimum for production)
+- **Database**: Render PostgreSQL Starter Plan
+- **Frontend**: Netlify Pro (for custom domains and enhanced features)
 
-### Step 1.1: Create Render Account
-1. Go to [render.com](https://render.com)
-2. Sign up with GitHub account
-3. Verify email address
+## 🔒 Pre-Deployment Security
 
-### Step 1.2: Create PostgreSQL Database
-1. **Login to Render Dashboard**
-2. **Click "New +" → "PostgreSQL"**
-3. **Configure Database Settings:**
-   ```
-   Name: textile-printing-db
-   Database: textile_printing_db
-   User: textile_user
-   Region: Oregon (US West) or closest region
-   PostgreSQL Version: 14
-   Plan: Free
-   ```
-4. **Click "Create Database"**
-5. **Wait for deployment** (2-3 minutes)
-
-### Step 1.3: Note Database Connection Details
+### Step 1: Security Cleanup
 ```bash
-# Save these details - you'll need them later
-External Database URL: postgresql://textile_user:password@hostname:port/textile_printing_db
-Internal Database URL: postgresql://textile_user:password@hostname:port/textile_printing_db
-Host: dpg-xxxxx-a.oregon-postgres.render.com
-Port: 5432
-Database: textile_printing_db
-Username: textile_user
-Password: [generated-password]
+# Clone and navigate to project
+git clone <your-repository-url>
+cd textile-printing-system
+
+# Remove any hardcoded credentials
+python3 remove_hardcoded_credentials.py
+
+# Verify no sensitive data remains
+grep -r "Siri@2299" . || echo "✅ No hardcoded passwords found"
+grep -r "password.*=" --include="*.py" . | grep -v "test" | grep -v ".env" || echo "✅ No hardcoded passwords in code"
 ```
 
-### Step 1.4: Initialize Database Schema
-1. **Connect to database using psql or any PostgreSQL client:**
-   ```bash
-   psql "postgresql://textile_user:password@hostname:port/textile_printing_db"
+### Step 2: Secure Environment Setup
+```bash
+# Run interactive environment setup
+python3 setup_secure_environment.py
+
+# Choose "2" for production environment
+# Provide:
+# - Production database URL (will get from Render)
+# - Production frontend URL (will get from Netlify)
+# - Admin email address
+# - Admin full name
+```
+
+### Step 3: Validate Security Configuration
+```bash
+# Ensure .env file is not in version control
+echo ".env" >> .gitignore
+echo ".env.*" >> .gitignore
+echo "secure_setup_summary_*.json" >> .gitignore
+
+# Verify security improvements
+cd backend
+python -m pytest tests/test_api_security.py -v
+```
+
+## 🌍 Environment Setup
+
+### Production Environment Variables
+
+Create these environment variables in your deployment platforms:
+
+#### Database Configuration
+```env
+DATABASE_URL=<from-render-database>
+DB_POOL_SIZE=5
+DB_POOL_OVERFLOW=10
+DB_POOL_TIMEOUT=30
+```
+
+#### Security Configuration
+```env
+SECRET_KEY=<generate-secure-64-char-key>
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+```
+
+#### Application Configuration
+```env
+APP_NAME=Digital Textile Printing Management System
+APP_VERSION=2.0.0
+ENVIRONMENT=production
+DEBUG=false
+```
+
+#### CORS and Frontend
+```env
+CORS_ORIGINS=https://your-domain.netlify.app
+FRONTEND_URL=https://your-domain.netlify.app
+```
+
+#### Security Features
+```env
+RATE_LIMIT_ENABLED=true
+RATE_LIMIT_REQUESTS=100
+RATE_LIMIT_WINDOW=3600
+```
+
+#### Admin Configuration
+```env
+ADMIN_USERNAME=admin
+ADMIN_EMAIL=admin@yourdomain.com
+ADMIN_PASSWORD=<secure-generated-password>
+ADMIN_FULL_NAME=System Administrator
+```
+
+## 🗄️ Database Deployment
+
+### Step 1: Create Database on Render
+
+1. **Log into Render Dashboard**
+   - Go to [render.com](https://render.com)
+   - Navigate to Dashboard
+
+2. **Create PostgreSQL Database**
+   ```
+   - Click "New +" → "PostgreSQL"
+   - Name: textile-printing-db
+   - Database Name: textile_printing_db
+   - User: textile_user
+   - Region: Oregon (US West)
+   - Plan: Starter ($7/month minimum for production)
    ```
 
-2. **Execute schema creation script:**
-   ```sql
-   -- Copy and paste the complete schema from database/schema.sql
-   -- This includes all tables, indexes, triggers, and initial data
+3. **Note Database Connection Details**
+   - Save the `Internal Database URL` for backend configuration
+   - Save the `External Database URL` for local management
+
+### Step 2: Apply Database Migration
+
+```bash
+# Connect to production database
+export DATABASE_URL="<your-render-database-external-url>"
+
+# Apply schema migration with improvements
+psql $DATABASE_URL -f backend/app/migrations/schema_fix_v2.sql
+
+# Verify migration success
+psql $DATABASE_URL -c "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';"
+```
+
+### Step 3: Create Initial Admin User
+
+```bash
+# Create admin user with secure password
+psql $DATABASE_URL -c "
+INSERT INTO users (id, username, email, full_name, password_hash, role, is_active, created_at, updated_at)
+VALUES (
+    gen_random_uuid(),
+    'admin',
+    '$ADMIN_EMAIL',
+    '$ADMIN_FULL_NAME',
+    '<bcrypt-hash-of-secure-password>',
+    'admin',
+    true,
+    NOW(),
+    NOW()
+) ON CONFLICT (username) DO NOTHING;
+"
+```
+
+## 🔧 Backend Deployment
+
+### Step 1: Prepare Backend for Deployment
+
+```bash
+# Ensure render.yaml is properly configured
+cat backend/render.yaml
+
+# Update requirements if needed
+cd backend
+pip freeze > requirements.txt
+```
+
+### Step 2: Deploy to Render
+
+1. **Create Web Service**
    ```
-
-3. **Verify tables creation:**
-   ```sql
-   \dt
-   -- Should show all tables: users, customers, orders, etc.
-   ```
-
----
-
-## 🐍 PHASE 2: Backend Deployment (Render.com Web Service)
-
-### Step 2.1: Prepare Backend for Deployment
-
-1. **Create `render.yaml` in backend root:**
-   ```yaml
-   services:
-     - type: web
-       name: textile-printing-api
-       env: python
-       region: oregon
-       plan: free
-       buildCommand: pip install -r requirements.txt
-       startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
-       envVars:
-         - key: DATABASE_URL
-           fromDatabase:
-             name: textile-printing-db
-             property: connectionString
-         - key: SECRET_KEY
-           generateValue: true
-         - key: ALGORITHM
-           value: HS256
-         - key: ACCESS_TOKEN_EXPIRE_MINUTES
-           value: 30
-         - key: ENVIRONMENT
-           value: production
-   ```
-
-2. **Update `requirements.txt`:**
-   ```txt
-   fastapi==0.104.1
-   uvicorn[standard]==0.24.0
-   sqlalchemy==2.0.23
-   psycopg2-binary==2.9.9
-   python-jose[cryptography]==3.3.0
-   python-multipart==0.0.6
-   passlib[bcrypt]==1.7.4
-   python-dotenv==1.0.0
-   alembic==1.12.1
-   reportlab==4.0.4
-   pandas==2.1.3
-   openpyxl==3.1.2
-   ```
-
-3. **Create `app/core/config.py`:**
-   ```python
-   import os
-   from pydantic_settings import BaseSettings
-
-   class Settings(BaseSettings):
-       DATABASE_URL: str = os.getenv("DATABASE_URL", "")
-       SECRET_KEY: str = os.getenv("SECRET_KEY", "")
-       ALGORITHM: str = "HS256"
-       ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-       ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
-       
-       class Config:
-           env_file = ".env"
-
-   settings = Settings()
-   ```
-
-### Step 2.2: Deploy Backend to Render
-
-1. **Push code to GitHub:**
-   ```bash
-   git add .
-   git commit -m "Prepare for Render deployment"
-   git push origin main
-   ```
-
-2. **Create Web Service on Render:**
    - Go to Render Dashboard
    - Click "New +" → "Web Service"
    - Connect your GitHub repository
-   - Select the backend directory (if monorepo)
-
-3. **Configure Web Service:**
-   ```
-   Name: textile-printing-api
-   Region: Oregon (same as database)
-   Branch: main
-   Root Directory: backend (if applicable)
-   Runtime: Python 3
-   Build Command: pip install -r requirements.txt
-   Start Command: uvicorn app.main:app --host 0.0.0.0 --port $PORT
-   Plan: Free
+   - Configure:
+     - Name: textile-printing-api
+     - Environment: Python
+     - Region: Oregon (US West)
+     - Branch: main
+     - Root Directory: backend
+     - Build Command: pip install -r requirements.txt
+     - Start Command: uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 2
    ```
 
-4. **Set Environment Variables:**
+2. **Configure Environment Variables**
+   Add all environment variables from the [Environment Setup](#environment-setup) section.
+
+3. **Set Advanced Settings**
    ```
-   DATABASE_URL: [Auto-linked from database]
-   SECRET_KEY: [Generate random 32-character string]
-   ALGORITHM: HS256
-   ACCESS_TOKEN_EXPIRE_MINUTES: 30
-   ENVIRONMENT: production
-   ```
-
-5. **Deploy and Monitor:**
-   - Click "Create Web Service"
-   - Monitor build logs
-   - Wait for "Deploy successful" message
-   - Note the service URL: `https://textile-printing-api.onrender.com`
-
-### Step 2.3: Verify Backend Deployment
-
-1. **Test API Health:**
-   ```bash
-   curl https://textile-printing-api.onrender.com/health
-   # Should return: {"status": "healthy"}
+   - Plan: Starter ($7/month minimum)
+   - Health Check Path: /health
+   - Auto-Deploy: Yes
    ```
 
-2. **Test Database Connection:**
-   ```bash
-   curl https://textile-printing-api.onrender.com/api/v1/users/
-   # Should return empty array or user list
-   ```
+### Step 3: Verify Backend Deployment
 
-3. **Access API Documentation:**
-   - Open: `https://textile-printing-api.onrender.com/docs`
-   - Verify all endpoints are listed
+```bash
+# Wait for deployment to complete, then test
+export BACKEND_URL="https://your-service.onrender.com"
 
----
+# Test health endpoint
+curl $BACKEND_URL/health
 
-## ⚛️ PHASE 3: Frontend Deployment (Netlify)
+# Test API documentation
+curl $BACKEND_URL/docs
 
-### Step 3.1: Prepare Frontend for Deployment
+# Test authentication
+curl -X POST "$BACKEND_URL/api/auth/login" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "username=admin&password=<your-admin-password>"
+```
 
-1. **Create `.env.production` in frontend root:**
-   ```env
-   REACT_APP_API_URL=https://textile-printing-api.onrender.com
-   REACT_APP_ENVIRONMENT=production
-   ```
+## 🎨 Frontend Deployment
 
-2. **Update `src/config/api.js`:**
-   ```javascript
-   const config = {
-     API_URL: process.env.REACT_APP_API_URL || 'http://localhost:8000',
-     ENVIRONMENT: process.env.REACT_APP_ENVIRONMENT || 'development'
-   };
+### Step 1: Prepare Frontend
 
-   export default config;
-   ```
+```bash
+cd frontend
 
-3. **Create `netlify.toml` in frontend root:**
-   ```toml
-   [build]
-     publish = "build"
-     command = "npm run build"
+# Update API configuration
+cat > src/config/api.ts << EOF
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://your-service.onrender.com';
 
-   [build.environment]
-     REACT_APP_API_URL = "https://textile-printing-api.onrender.com"
+export { API_BASE_URL };
+EOF
 
-   [[redirects]]
-     from = "/*"
-     to = "/index.html"
-     status = 200
+# Update environment variables
+cat > .env.production << EOF
+REACT_APP_API_URL=https://your-service.onrender.com
+REACT_APP_APP_NAME=Digital Textile Printing Management System
+REACT_APP_VERSION=2.0.0
+GENERATE_SOURCEMAP=false
+EOF
 
-   [[headers]]
-     for = "/static/*"
-     [headers.values]
-       Cache-Control = "public, max-age=31536000, immutable"
-   ```
+# Build for production
+npm install
+npm run build
+```
 
-### Step 3.2: Deploy Frontend to Netlify
+### Step 2: Deploy to Netlify
 
-1. **Build and Test Locally:**
-   ```bash
-   cd frontend
-   npm install
-   npm run build
-   # Verify build success
-   ```
+#### Option A: Manual Deployment
+```bash
+# Install Netlify CLI
+npm install -g netlify-cli
 
-2. **Deploy to Netlify:**
+# Deploy
+netlify deploy --prod --dir=build
 
-   **Option A: GitHub Integration (Recommended)**
-   - Go to [netlify.com](https://netlify.com)
-   - Sign up/Login with GitHub
+# Configure custom domain (optional)
+netlify domains:add your-domain.com
+```
+
+#### Option B: GitHub Integration
+1. **Connect Repository**
+   - Go to Netlify Dashboard
    - Click "New site from Git"
-   - Choose GitHub and authorize
-   - Select your repository
-   - Configure build settings:
-     ```
-     Branch: main
-     Base directory: frontend (if monorepo)
-     Build command: npm run build
-     Publish directory: build
-     ```
-   - Set environment variables:
-     ```
-     REACT_APP_API_URL: https://textile-printing-api.onrender.com
-     ```
-   - Click "Deploy site"
+   - Connect GitHub repository
+   - Configure:
+     - Branch: main
+     - Base directory: frontend
+     - Build command: npm run build
+     - Publish directory: build
 
-   **Option B: Manual Deployment**
-   ```bash
-   # Install Netlify CLI
-   npm install -g netlify-cli
-   
-   # Login to Netlify
-   netlify login
-   
-   # Deploy
-   cd frontend
-   npm run build
-   netlify deploy --prod --dir=build
+2. **Set Environment Variables**
+   ```
+   REACT_APP_API_URL=https://your-service.onrender.com
+   REACT_APP_APP_NAME=Digital Textile Printing Management System
+   REACT_APP_VERSION=2.0.0
+   GENERATE_SOURCEMAP=false
    ```
 
-3. **Configure Custom Domain (Optional):**
-   - Go to Site Settings → Domain management
-   - Add custom domain
-   - Configure DNS records
+### Step 3: Update Backend CORS
 
-### Step 3.3: Verify Frontend Deployment
+```bash
+# Update backend environment variables with actual frontend URL
+# In Render dashboard, update:
+CORS_ORIGINS=https://your-app.netlify.app
+FRONTEND_URL=https://your-app.netlify.app
 
-1. **Test Application Load:**
-   - Open Netlify-provided URL
+# Redeploy backend to apply changes
+```
+
+## ✅ Post-Deployment Verification
+
+### Step 1: Automated Health Checks
+
+```bash
+# Run comprehensive deployment verification
+python3 deploy.py
+
+# Or manual verification:
+export BACKEND_URL="https://your-service.onrender.com"
+export FRONTEND_URL="https://your-app.netlify.app"
+
+# Backend health check
+curl $BACKEND_URL/health | jq .
+
+# Database health check
+curl $BACKEND_URL/health/db | jq .
+
+# Frontend accessibility
+curl -I $FRONTEND_URL
+```
+
+### Step 2: Functional Testing
+
+```bash
+# Test API endpoints
+cd backend
+
+# Run production API tests
+python -m pytest tests/test_api_security.py -v
+python -m pytest tests/test_customer_api.py -v
+
+# Test authentication flow
+curl -X POST "$BACKEND_URL/api/auth/login" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "username=admin&password=<admin-password>" | jq .
+```
+
+### Step 3: Frontend Integration Testing
+
+1. **Open Frontend URL**
+   - Navigate to your Netlify URL
    - Verify login page loads
-   - Check browser console for errors
+   - Test login with admin credentials
+   - Check all main pages load correctly
 
-2. **Test API Integration:**
-   - Try logging in with test credentials
-   - Verify data loads from backend
-   - Test form submissions
+2. **Test API Integration**
+   - Create a test customer
+   - View customer list
+   - Test search functionality
+   - Verify error handling
 
-3. **Performance Check:**
-   - Use browser DevTools → Network tab
-   - Verify assets load quickly
-   - Check for 404 errors
+### Step 4: Security Verification
 
----
-
-## 🔧 PHASE 4: Post-Deployment Configuration
-
-### Step 4.1: SSL/HTTPS Configuration
-- **Render.com**: SSL automatically provided
-- **Netlify**: SSL automatically provided
-- **Custom Domain**: Configure SSL certificate
-
-### Step 4.2: CORS Configuration Update
-Update backend CORS settings with production frontend URL:
-
-```python
-# app/main.py
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",  # Development
-        "https://your-app.netlify.app",  # Production Netlify URL
-        "https://yourdomain.com",  # Custom domain if applicable
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-```
-
-### Step 4.3: Environment Variables Final Check
-
-**Backend Environment Variables:**
-```
-DATABASE_URL=postgresql://user:pass@host:port/db
-SECRET_KEY=your-32-character-secret-key
-ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=30
-ENVIRONMENT=production
-```
-
-**Frontend Environment Variables:**
-```
-REACT_APP_API_URL=https://textile-printing-api.onrender.com
-REACT_APP_ENVIRONMENT=production
-```
-
----
-
-## 🧪 PHASE 5: Deployment Testing
-
-### Step 5.1: System Integration Test
 ```bash
-# Test complete workflow:
-# 1. Login → 2. Create Customer → 3. Create Order → 4. Generate Report
+# Test security headers
+curl -I $BACKEND_URL/health
 
-# Frontend Tests
-curl https://your-app.netlify.app
-# Should return HTML page
+# Test CORS configuration
+curl -H "Origin: https://malicious-site.com" \
+  -H "Access-Control-Request-Method: POST" \
+  -H "Access-Control-Request-Headers: X-Requested-With" \
+  -X OPTIONS $BACKEND_URL/api/customers/
 
-# Backend API Tests
-curl https://textile-printing-api.onrender.com/health
-curl https://textile-printing-api.onrender.com/api/v1/customers/
-
-# Database Tests
-# Login to Render dashboard → Database → Connections tab → Test connection
+# Test rate limiting (if enabled)
+for i in {1..10}; do curl $BACKEND_URL/health; done
 ```
 
-### Step 5.2: Performance Testing
-1. **Load Time Test:**
-   - First load should be under 3 seconds
-   - Subsequent loads under 1 second
+## 📊 Monitoring & Maintenance
 
-2. **API Response Time:**
-   - Simple queries under 1 second
-   - Report generation under 30 seconds
+### Application Monitoring
 
-3. **Concurrent User Test:**
-   - Open multiple browser tabs
-   - Test simultaneous operations
+1. **Health Monitoring Setup**
+   ```bash
+   # Create monitoring script
+   cat > monitor.sh << 'EOF'
+   #!/bin/bash
+   BACKEND_URL="https://your-service.onrender.com"
+   
+   # Check backend health
+   if curl -f $BACKEND_URL/health > /dev/null 2>&1; then
+       echo "✅ Backend healthy"
+   else
+       echo "❌ Backend unhealthy"
+       # Add notification logic here
+   fi
+   
+   # Check database health
+   if curl -f $BACKEND_URL/health/db > /dev/null 2>&1; then
+       echo "✅ Database healthy"
+   else
+       echo "❌ Database unhealthy"
+   fi
+   EOF
+   
+   chmod +x monitor.sh
+   ```
 
-### Step 5.3: Security Testing
-1. **HTTPS Verification:**
-   - All URLs should use HTTPS
-   - No mixed content warnings
+2. **Log Monitoring**
+   - Monitor Render logs for errors
+   - Set up log aggregation if needed
+   - Configure alerts for critical errors
 
-2. **Authentication Test:**
-   - Verify JWT tokens work
-   - Test session expiration
-   - Test unauthorized access protection
+### Database Maintenance
 
----
-
-## 📊 PHASE 6: Monitoring and Maintenance
-
-### Step 6.1: Monitoring Setup
-1. **Render.com Monitoring:**
-   - Check service metrics in dashboard
-   - Set up email alerts for downtime
-   - Monitor database storage usage
-
-2. **Netlify Monitoring:**
-   - Check bandwidth usage
-   - Monitor build deployments
-   - Review access logs
-
-### Step 6.2: Regular Maintenance Tasks
-
-**Weekly:**
-- Check service status in both Render and Netlify dashboards
-- Review error logs
-- Monitor database storage usage
-
-**Monthly:**
-- Review performance metrics
-- Check for security updates
-- Backup critical data
-
-**Quarterly:**
-- Performance optimization review
-- Security audit
-- Plan for scaling if needed
-
----
-
-## 🚨 Troubleshooting Common Issues
-
-### Database Connection Issues
 ```bash
-# Check database status in Render dashboard
-# Verify environment variables are set
-# Test connection string manually
+# Connect to production database for maintenance
+export DATABASE_URL="<your-render-database-external-url>"
+
+# Check database performance
+psql $DATABASE_URL -c "
+SELECT schemaname, tablename, attname, avg_width, n_distinct, correlation
+FROM pg_stats
+WHERE schemaname = 'public'
+ORDER BY tablename, attname;
+"
+
+# Update table statistics
+psql $DATABASE_URL -c "ANALYZE;"
+
+# Check for long-running queries
+psql $DATABASE_URL -c "
+SELECT pid, now() - pg_stat_activity.query_start AS duration, query
+FROM pg_stat_activity
+WHERE (now() - pg_stat_activity.query_start) > interval '5 minutes';
+"
 ```
 
-### Backend Build Failures
+### Security Maintenance
+
+1. **Regular Security Updates**
+   ```bash
+   # Update dependencies
+   cd backend
+   pip list --outdated
+   pip install --upgrade pip
+   
+   cd ../frontend
+   npm audit
+   npm update
+   ```
+
+2. **Password Rotation**
+   ```bash
+   # Change admin password (quarterly)
+   python3 change_admin_password.py
+   
+   # Rotate JWT secret key (annually)
+   # Generate new SECRET_KEY and update in Render environment
+   ```
+
+## 🔧 Troubleshooting
+
+### Common Issues
+
+#### Backend Won't Start
 ```bash
-# Common fixes:
-# 1. Check requirements.txt file
-# 2. Verify Python version compatibility
-# 3. Check for missing environment variables
-# 4. Review build logs in Render dashboard
+# Check Render logs
+# Common issues:
+# 1. Environment variables not set
+# 2. Database connection failed
+# 3. Port binding issues
+
+# Debug locally first
+cd backend
+uvicorn app.main:app --reload --log-level debug
 ```
 
-### Frontend Build Failures
+#### Database Connection Issues
 ```bash
-# Common fixes:
-# 1. Check package.json dependencies
-# 2. Verify Node.js version
-# 3. Check for missing environment variables
-# 4. Review build logs in Netlify dashboard
+# Test database connectivity
+psql $DATABASE_URL -c "SELECT version();"
+
+# Check connection pool settings
+# Ensure DB_POOL_SIZE and related vars are set correctly
+
+# Verify database URL format
+echo $DATABASE_URL | grep -E "postgresql://.*"
 ```
 
-### CORS Errors
-```python
-# Update backend CORS configuration
-# Verify frontend URL is in allowed origins
-# Check for typos in domain names
+#### Frontend API Connection Issues
+```bash
+# Check CORS configuration
+curl -H "Origin: https://your-app.netlify.app" \
+  -X OPTIONS $BACKEND_URL/api/customers/
+
+# Verify environment variables
+# Check REACT_APP_API_URL is set correctly
 ```
 
----
+#### Authentication Issues
+```bash
+# Test JWT token generation
+curl -X POST "$BACKEND_URL/api/auth/login" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "username=admin&password=<password>" -v
 
-## 💰 Free Tier Limitations and Monitoring
+# Check admin user exists
+psql $DATABASE_URL -c "SELECT username, email, role, is_active FROM users WHERE username = 'admin';"
+```
 
-### Render.com Limits
-- **Web Service**: 750 hours/month (31 days continuous)
-- **Database**: 1GB storage, expires after 90 days if inactive
-- **Automatic Sleep**: Services sleep after 15 minutes of inactivity
+### Performance Issues
 
-### Netlify Limits
-- **Bandwidth**: 100GB/month
-- **Sites**: Unlimited
-- **Build Minutes**: 300 minutes/month
+```bash
+# Database performance
+psql $DATABASE_URL -c "
+SELECT query, calls, total_time, mean_time
+FROM pg_stat_statements
+ORDER BY total_time DESC
+LIMIT 10;
+"
 
-### Monitoring Usage
-1. **Render Dashboard**: Check hours used and storage consumption
-2. **Netlify Dashboard**: Monitor bandwidth and build minutes
-3. **Set Alerts**: Configure email notifications for approaching limits
+# Backend performance
+curl -w "@curl-format.txt" -s -o /dev/null $BACKEND_URL/api/customers/
 
----
+# Frontend performance
+# Use browser dev tools to check:
+# - Network requests
+# - Bundle sizes
+# - Load times
+```
 
-## 📈 Scaling Considerations
+### Rollback Procedures
 
-### When to Upgrade from Free Tier
-- Render Web Service: When you need >750 hours/month or faster performance
-- Render Database: When you need >1GB storage or backups
-- Netlify: When you exceed 100GB bandwidth/month
+```bash
+# Backend rollback
+# 1. Revert to previous deployment in Render dashboard
+# 2. Or deploy previous git commit
 
-### Upgrade Path
-1. **Backend**: Render Starter plan ($7/month) - No hour limits, faster CPU
-2. **Database**: Render PostgreSQL Starter ($7/month) - 10GB storage, daily backups
-3. **Frontend**: Netlify Pro ($19/month) - 1TB bandwidth, more build minutes
+# Database rollback
+# 1. Restore from backup
+# 2. Or manually revert schema changes
 
----
+# Frontend rollback
+# 1. Revert to previous deployment in Netlify
+# 2. Or deploy previous git commit
+```
 
-## ✅ Deployment Checklist
+## 📞 Support Escalation
 
-### Pre-Deployment
-- [ ] Database schema ready
-- [ ] Backend tested locally
-- [ ] Frontend tested locally
-- [ ] Environment variables prepared
-- [ ] GitHub repository ready
+### Production Issues Priority
 
-### Database Deployment
-- [ ] Render account created
-- [ ] PostgreSQL database created
-- [ ] Schema deployed
-- [ ] Test data loaded
-- [ ] Connection string saved
+1. **Critical (Service Down)**
+   - Backend health check failing
+   - Database connectivity lost
+   - Authentication completely broken
 
-### Backend Deployment
-- [ ] Render web service created
-- [ ] GitHub connected
-- [ ] Environment variables set
-- [ ] Service deployed successfully
-- [ ] API endpoints tested
-- [ ] Health check passed
+2. **High (Degraded Service)**
+   - Slow response times
+   - Intermittent errors
+   - Partial functionality loss
 
-### Frontend Deployment
-- [ ] Netlify account created
-- [ ] Site connected to GitHub
-- [ ] Build settings configured
-- [ ] Environment variables set
-- [ ] Site deployed successfully
-- [ ] Application tested end-to-end
-
-### Post-Deployment
-- [ ] CORS configured
-- [ ] SSL certificates active
-- [ ] Monitoring set up
-- [ ] Performance tested
-- [ ] Security verified
-- [ ] Documentation updated
-
----
-
-## 📞 Support and Resources
-
-### Official Documentation
-- [Render.com Documentation](https://render.com/docs)
-- [Netlify Documentation](https://docs.netlify.com)
-- [FastAPI Deployment Guide](https://fastapi.tiangolo.com/deployment/)
-
-### Community Support
-- [Render Community](https://community.render.com)
-- [Netlify Community](https://community.netlify.com)
-- [FastAPI GitHub Issues](https://github.com/tiangolo/fastapi/issues)
+3. **Medium (Minor Issues)**
+   - Non-critical feature bugs
+   - UI inconsistencies
+   - Performance optimization
 
 ### Emergency Contacts
-- System Administrator: [your-email@domain.com]
-- Technical Support: [support@domain.com]
 
-This deployment guide ensures a smooth transition from development to production environment with all components properly configured and tested. 
+- Database Issues: Check Render status page
+- Frontend Issues: Check Netlify status page
+- Application Issues: Review application logs
+- Security Issues: Immediate password rotation and access review
+
+---
+
+## 🎉 Deployment Checklist
+
+- [ ] ✅ Security cleanup completed
+- [ ] ✅ Environment variables configured
+- [ ] ✅ Database deployed and migrated
+- [ ] ✅ Backend deployed and healthy
+- [ ] ✅ Frontend deployed and accessible
+- [ ] ✅ API integration working
+- [ ] ✅ Authentication functional
+- [ ] ✅ CORS properly configured
+- [ ] ✅ Admin password changed
+- [ ] ✅ Health monitoring set up
+- [ ] ✅ Documentation updated
+- [ ] ✅ Team trained on new system
+
+**🎯 Your Digital Textile Printing Management System is now production-ready with enhanced security and monitoring!**
