@@ -72,3 +72,11 @@ coverage/
 # Security files
 secure_setup_summary_*.json
 backup_credentials.json
+test_results_comprehensive.json
+create_admin_*.sql
+create_user_profile_*.sql
+*_credentials_*
+*_secrets_*
+
+# Test results with sensitive data
+test_results_*.json

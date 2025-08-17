@@ -6,8 +6,11 @@
   "scripts": {
     "test:api": "node test_api.js",
     "test:no-auth": "node test_without_auth.js",
+    "test:comprehensive": "node test_comprehensive.js",
+    "test:fixed": "node test_comprehensive_fixed.js",
     "test:auth": "node test_auth.js",
-    "test:performance": "node test_performance.js"
+    "test:performance": "node test_performance.js",
+    "test:random": "node test_cli_random.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.38.0",
