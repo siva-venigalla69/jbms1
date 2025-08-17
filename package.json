@@ -1,0 +1,19 @@
+{
+  "name": "textile-printing-api-tests",
+  "version": "1.0.0",
+  "description": "API testing suite for Digital Textile Printing System",
+  "type": "module",
+  "scripts": {
+    "test:api": "node test_api.js",
+    "test:no-auth": "node test_without_auth.js",
+    "test:auth": "node test_auth.js",
+    "test:performance": "node test_performance.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.38.0",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {},
+  "author": "",
+  "license": "MIT"
+}

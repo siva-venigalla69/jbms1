@@ -1,0 +1,20 @@
+{
+  "migration_type": "supabase_vercel",
+  "timestamp": "1b5ff82e901bffce",
+  "supabase_project_id": "pvatfzwzfgioypdnqjay",
+  "supabase_url": "https://pvatfzwzfgioypdnqjay.supabase.co",
+  "files_created": [
+    "supabase/schema.sql",
+    "supabase/config.toml",
+    "supabase/migrations/20250101000000_initial_schema.sql",
+    "frontend/.env.local",
+    "supabase/.env",
+    "vercel.env.json"
+  ],
+  "next_steps": [
+    "Run: npx supabase db push",
+    "Run: cd frontend && npm run dev",
+    "Run: vercel --prod (for deployment)",
+    "Update frontend API calls to use Supabase client"
+  ]
+}

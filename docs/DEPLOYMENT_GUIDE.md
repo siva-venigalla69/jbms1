@@ -1,5 +1,15 @@
 # 🚀 Production Deployment Guide
 
+> ⚠️ **OUTDATED**: This guide is for the old FastAPI + Render stack. 
+> 
+> **For the new Supabase + Vercel stack**, please use: [DEPLOYMENT_GUIDE_SUPABASE.md](DEPLOYMENT_GUIDE_SUPABASE.md)
+>
+> The new stack is **free**, **faster**, and **easier to deploy**!
+
+---
+
+## Legacy Guide: FastAPI + Render Stack
+
 Complete step-by-step guide for deploying the Digital Textile Printing Management System to production with enhanced security and monitoring.
 
 ## 📋 Table of Contents

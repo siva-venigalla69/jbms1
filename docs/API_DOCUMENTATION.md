@@ -1,5 +1,15 @@
 # 🔌 API Documentation
 
+> ⚠️ **OUTDATED**: This documentation is for the old FastAPI backend. 
+> 
+> **For the current Supabase stack**, please use: [API_DOCUMENTATION_SUPABASE.md](API_DOCUMENTATION_SUPABASE.md)
+>
+> The new API is **auto-generated**, **real-time**, and **easier to use**!
+
+---
+
+## Legacy Documentation: FastAPI Backend
+
 Complete API reference for the Digital Textile Printing Management System with authentication, endpoints, and examples.
 
 ## 📋 Table of Contents

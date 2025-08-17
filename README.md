@@ -1,276 +1,423 @@
-# 🧵 Digital Textile Printing Management System
+# 🏭 Digital Textile Printing Management System
 
-[![Security](https://img.shields.io/badge/Security-Enhanced-green)](docs/TESTING_GUIDE.md)
-[![Tests](https://img.shields.io/badge/Tests-Comprehensive-brightgreen)](docs/TESTING_GUIDE.md)
-[![Architecture](https://img.shields.io/badge/Architecture-Modular-blue)](docs/DEPLOYMENT_GUIDE.md)
-[![Frontend](https://img.shields.io/badge/Frontend-Live-brightgreen)](https://your-site.netlify.app)
-[![API](https://img.shields.io/badge/API-Live-brightgreen)](https://your-service.onrender.com/docs)
+[![Tech Stack](https://img.shields.io/badge/Stack-Supabase%20%2B%20Vercel-brightgreen)](https://supabase.com)
+[![Database](https://img.shields.io/badge/Database-PostgreSQL-336791)](https://postgresql.org)
+[![Frontend](https://img.shields.io/badge/Frontend-React%20%2B%20TypeScript-61DAFB)](https://reactjs.org)
+[![Authentication](https://img.shields.io/badge/Auth-Supabase%20Auth-FF6B6B)](https://supabase.com/auth)
+[![Deployment](https://img.shields.io/badge/Deploy-Vercel-000000)](https://vercel.com)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-A **secure, modular, and production-ready** full-stack web application for managing digital textile printing operations. Recently refactored with enhanced security, improved architecture, and comprehensive testing.
+> **Complete digital workflow management system for textile printing businesses with real-time collaboration, automated order tracking, and comprehensive reporting.**
 
-## 🏗️ System Architecture
+## 🌟 Features
+
+### 🎯 **Core Business Operations**
+- **Customer Management** - Complete customer profiles with GST, contact details, and order history
+- **Order Workflow** - End-to-end order processing from creation to delivery
+- **Production Tracking** - Real-time tracking through pre-treatment, printing, and post-processing stages
+- **Material Management** - Track materials in/out with customer linkage and inventory management
+- **Financial Management** - GST invoicing, payment tracking, and receivables management
+
+### 📊 **Advanced Features**
+- **Real-time Collaboration** - Multiple users can work simultaneously with live updates
+- **Comprehensive Reporting** - 15+ built-in reports with date filtering and export capabilities
+- **Role-based Access Control** - Admin, Manager, and Employee roles with granular permissions
+- **Audit Trail** - Complete tracking of who created/modified what and when
+- **Automated Numbering** - Auto-generated order, challan, and invoice numbers
+- **Data Security** - Row-level security, encrypted data, and secure authentication
+
+### 🔧 **Technical Excellence**
+- **Modern Tech Stack** - Supabase + Vercel for 100% serverless architecture
+- **Real-time Updates** - Live data synchronization across all connected clients
+- **Mobile Responsive** - Works perfectly on desktop, tablet, and mobile devices
+- **High Performance** - Sub-second response times with global CDN
+- **Zero Maintenance** - Fully managed infrastructure with automatic scaling
+
+## 🏗️ **Architecture**
+
+```mermaid
+graph TB
+    A[React Frontend] --> B[Supabase Client]
+    B --> C[Supabase Database]
+    B --> D[Supabase Auth]
+    B --> E[Supabase Edge Functions]
+    
+    F[Vercel Deployment] --> A
+    G[Global CDN] --> F
+    
+    H[Real-time Subscriptions] --> B
+    I[Row Level Security] --> C
+    J[Auto-generated API] --> C
+```
+
+### **Technology Stack**
+
+| Component | Technology | Purpose |
+|-----------|------------|---------|
+| **Frontend** | React 18 + TypeScript | Modern, type-safe UI |
+| **Backend** | Supabase (PostgreSQL) | Database, Auth, Real-time |
+| **API Layer** | Auto-generated REST + GraphQL | Type-safe API endpoints |
+| **Edge Functions** | Deno/TypeScript | Complex business logic |
+| **Deployment** | Vercel | Global CDN, automatic scaling |
+| **Authentication** | Supabase Auth | JWT-based security |
+| **Database** | PostgreSQL 15 | ACID compliance, JSON support |
+| **Real-time** | WebSocket subscriptions | Live data updates |
+
+## 🚀 **Quick Start**
+
+### **Prerequisites**
+- Node.js 16+ and npm
+- Supabase account (free)
+- Vercel account (free)
+
+### **1. Setup Supabase Project**
+
+1. **Create Supabase Project**
+   ```bash
+   # Visit https://supabase.com
+   # Click "New Project"
+   # Name: [YOUR-CUSTOM-PROJECT-NAME] (can be anything you want)
+   # Choose region closest to you
+   # Database password: [Generate a strong password]
+   ```
+   
+   > 💡 **Note**: You can use any project name you prefer. The setup script will automatically detect your project details.
+
+2. **Run Migration Setup**
+   ```bash
+   # Clone and setup
+   git clone <your-repo-url>
+   cd [YOUR-PROJECT-FOLDER-NAME]  # Use your folder name
+   
+   # Run automated Supabase migration
+   python3 setup_supabase_migration.py
+   ```
+   
+   > 🔧 **The setup script will ask for YOUR specific project details** - no need to match the examples!
+
+3. **Apply Database Schema**
+   ```bash
+   # Install Supabase CLI (use npx or official installer)
+   # Option 1: Use npx (no installation needed)
+   npx supabase --version
+   
+   # Option 2: Official installer (Linux/macOS)
+   # curl -fsSL https://supabase.com/install.sh | sh
+   
+   # Apply schema to your Supabase project
+   npx supabase db push
+   ```
+
+### **2. Frontend Development**
+
+```bash
+# Install dependencies
+cd frontend
+npm install
+
+# Start development server
+npm run dev
+```
+
+**Your app will be running at:** http://localhost:3000
+
+### **3. Production Deployment**
+
+```bash
+# Install Vercel CLI
+npm install -g vercel
+
+# Deploy to production
+vercel --prod
+```
+
+**🎉 That's it! Your system is live and ready to use.**
+
+## 🎨 **Customization Note**
+
+> 💡 **All project names in this documentation are examples!** 
+>
+> You can use **any names you prefer**:
+> - **Supabase Project**: "MyBusinessApp", "SivaTextiles", etc.
+> - **GitHub Repository**: "my-textile-system", "awesome-printing-app", etc.
+> - **Domain**: yourbusiness.com, mybrand.app, etc.
+>
+> The setup script will automatically adapt to **your choices**! 🚀
+
+## 📋 **Default Login Credentials**
 
 ```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   React.js      │    │   FastAPI        │    │  PostgreSQL     │
-│   Frontend      │◄──►│   Backend        │◄──►│   Database      │
-│   (Netlify)     │    │   (Render.com)   │    │  (Render.com)   │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
+Username: admin@textile-printing.com
+Password: Admin@123!
 ```
 
-## 🛠️ Technology Stack
+> ⚠️ **Important:** Change the default password immediately after first login.
 
-- **Backend**: Python 3.9+ with FastAPI, SQLAlchemy ORM, Pydantic
-- **Frontend**: React.js 18+ with TypeScript, Material-UI
-- **Database**: PostgreSQL 14+ with connection pooling
-- **Authentication**: Secure JWT tokens with enhanced validation
-- **Security**: bcrypt hashing, input validation, CORS protection
-- **Testing**: Pytest with comprehensive test coverage
-- **Deployment**: 
-  - Frontend: Netlify with optimized builds
-  - Backend: Render.com with health monitoring
-  - Database: Render.com PostgreSQL with migrations
+## 🎯 **User Roles & Capabilities**
 
-## 📋 Core Features
+### **👑 Admin**
+- **Full System Access** - All features and settings
+- **User Management** - Create, edit, delete users
+- **Data Management** - Edit/delete any record anytime
+- **System Configuration** - Modify system settings
+- **Advanced Reports** - Access to all reports and analytics
 
-### Business Workflow Management
-- **Customer Management**: Complete customer database with GST support
-- **Order Processing**: End-to-end order lifecycle management
-- **Production Tracking**: Three-stage production workflow (Pre-treatment → Printing → Post-process)
-- **Material Management**: Track material in/out with inventory integration
-- **Delivery Management**: Generate and manage delivery challans
-- **Invoice Management**: GST-compliant invoice generation with multiple challan consolidation
-- **Payment Tracking**: Comprehensive payment recording with outstanding management
-- **Returns Processing**: Handle damaged returns and adjustments
+### **👨‍💼 Manager**
+- **Business Operations** - All operational features
+- **Team Oversight** - View all team activities
+- **Data Correction** - Edit records within 7 days
+- **Financial Reports** - Access to financial and operational reports
+- **Approval Workflows** - Approve corrections and adjustments
 
-### Reporting & Analytics
-- **Operational Reports**: Pending orders, production status, stock holdings
-- **Financial Reports**: Receivables, payments, expenses analysis
-- **Material Flow Reports**: Track material movement across date ranges
-- **Export Capabilities**: PDF and Excel export for all reports
+### **👥 Employee**
+- **Daily Operations** - Order entry, production updates
+- **Customer Service** - Customer and material management
+- **Basic Reports** - Access to operational reports
+- **Own Data** - Edit own entries within 24 hours
+- **Limited Access** - No financial or sensitive data
 
-### Security & Audit
-- **Enhanced Security**: All hardcoded credentials removed, secure environment configuration
-- **Role-based Access Control**: Admin, Manager, Employee roles with proper authorization
-- **Audit Trail**: Automatic audit logging for all critical operations
-- **Data Protection**: SQL injection protection, XSS prevention, input sanitization
-- **Authentication**: Secure JWT tokens with proper validation and expiration
+## 📊 **Business Workflow**
 
-## 📁 Project Structure
+```mermaid
+flowchart LR
+    A[Customer Inquiry] --> B[Create Order]
+    B --> C[Material In]
+    C --> D[Pre-treatment]
+    D --> E[Printing]
+    E --> F[Post-process]
+    F --> G[Delivery Challan]
+    G --> H[Material Out]
+    H --> I[GST Invoice]
+    I --> J[Payment]
+    J --> K[Order Complete]
+    
+    L[Returns/Damage] --> M[Adjustment]
+    M --> N[Refund/Credit]
+```
 
+### **Key Business Processes**
+
+1. **Order Management**
+   - Auto-generated order numbers (ORD-2025-0001)
+   - Multiple items per order with individual tracking
+   - Status tracking: Pending → In Progress → Completed
+   - Customer order history and search
+
+2. **Production Workflow**
+   - Three-stage production: Pre-treatment → Printing → Post-process
+   - Individual item-level stage tracking
+   - Production status dashboard
+   - Stage completion timestamps and user tracking
+
+3. **Material Tracking**
+   - Material In: Record customer materials with order linkage
+   - Material Out: Track dispatched materials via delivery challans
+   - Full traceability from receipt to delivery
+
+4. **Financial Management**
+   - Multi-challan GST invoices with automatic tax calculation
+   - Payment tracking with multiple payment methods
+   - Outstanding receivables management
+   - Automated payment allocation
+
+## 📈 **Reports & Analytics**
+
+### **📋 Operational Reports**
+- **Pending Orders** - All active orders with status tracking
+- **Production Status** - Current stage of all order items
+- **Material Flow** - In/out tracking with date ranges
+- **Daily Operations** - Today's activities summary
+
+### **💰 Financial Reports**
+- **Pending Receivables** - Outstanding invoice amounts
+- **Payment History** - Received payments with trends
+- **Expense Tracking** - Business expenses by category
+- **Profit Analysis** - Revenue vs. expenses analysis
+
+### **📊 Business Intelligence**
+- **Customer Analytics** - Top customers, order patterns
+- **Production Metrics** - Efficiency, bottlenecks, trends
+- **Inventory Management** - Stock levels, reorder alerts
+- **Performance Dashboards** - Key business metrics
+
+## 🔒 **Security Features**
+
+### **🛡️ Data Protection**
+- **Row Level Security (RLS)** - Database-level access control
+- **JWT Authentication** - Secure token-based authentication
+- **Encrypted Storage** - All data encrypted at rest and in transit
+- **Secure API** - Auto-generated secure endpoints
+- **Audit Logging** - Complete activity tracking
+
+### **🔐 Access Control**
+- **Role-based Permissions** - Granular access control
+- **Session Management** - Automatic session timeout
+- **Password Security** - Strong password requirements
+- **API Security** - Rate limiting and authentication
+
+### **🔍 Compliance**
+- **Data Audit Trail** - WHO changed WHAT and WHEN
+- **Soft Deletes** - Data recovery capabilities
+- **Backup & Recovery** - Automated daily backups
+- **GDPR Compliance** - Data protection and privacy
+
+## 🛠️ **Development & Customization**
+
+### **📁 Project Structure**
 ```
 textile-printing-system/
-├── backend/                    # FastAPI Backend
-│   ├── app/
-│   │   ├── api/               # API endpoints
-│   │   ├── core/              # Configuration, security, exceptions
-│   │   ├── models/            # Database models
-│   │   ├── schemas/           # Pydantic schemas
-│   │   ├── services/          # Business logic layer (NEW)
-│   │   └── migrations/        # Database migrations (NEW)
-│   ├── tests/                 # Comprehensive test suite (ENHANCED)
-│   │   ├── conftest.py        # Test configuration
-│   │   ├── test_api_security.py # Security tests
-│   │   └── test_customer_api.py # API tests
-│   ├── requirements.txt
-│   ├── render.yaml            # Deployment configuration (UPDATED)
-│   └── .env.example           # Environment template (NEW)
-├── frontend/                   # React Frontend
+├── frontend/                 # React application
 │   ├── src/
-│   │   ├── components/        # Reusable components (ENHANCED)
-│   │   │   └── ui/            # UI components (NEW)
-│   │   ├── pages/             # Main pages
-│   │   ├── services/          # API services
-│   │   ├── hooks/             # Custom hooks (NEW)
-│   │   ├── context/           # React context
-│   │   └── types/             # TypeScript types
-│   ├── public/
-│   └── package.json
-├── database/                   # Database scripts
-│   ├── schema.sql             # Complete schema
-│   └── post_deployment_objects.sql
-├── docs/                       # Comprehensive Documentation (UPDATED)
-│   ├── DEPLOYMENT_GUIDE.md    # Step-by-step deployment
-│   ├── TESTING_GUIDE.md       # Complete testing guide
-│   ├── USER_GUIDE.md          # User documentation
-│   └── API_DOCUMENTATION.md   # API reference
-├── Security & Setup Scripts (NEW)
-│   ├── setup_secure_environment.py # Environment setup
-│   ├── remove_hardcoded_credentials.py # Security cleanup
-│   └── deploy.py              # Automated deployment
-├── FUNCTIONAL_REQUIREMENTS.md
-└── REFACTORING_SUMMARY.md     # Latest changes summary (NEW)
+│   │   ├── components/       # Reusable UI components
+│   │   ├── pages/           # Page components
+│   │   ├── services/        # API service functions
+│   │   ├── types/           # TypeScript type definitions
+│   │   └── lib/             # Utility functions
+│   └── public/              # Static assets
+├── supabase/                # Database and backend
+│   ├── migrations/          # Database schema migrations
+│   ├── functions/           # Edge functions (business logic)
+│   └── schema.sql          # Complete database schema
+├── docs/                    # Documentation
+└── backup_fastapi/         # Previous FastAPI backend (backup)
 ```
 
-## 🚀 Quick Start
+### **🔧 Customization Guide**
 
-### Prerequisites
-- Python 3.9+
-- Node.js 16+
-- PostgreSQL 14+
-- Git
-
-### 🔒 Secure Setup (Recommended)
-
-1. **Clone and Setup Security**
-   ```bash
-   git clone <repository-url>
-   cd textile-printing-system
+1. **Adding New Features**
+   ```typescript
+   // 1. Add to database schema
+   // supabase/schema.sql
    
-   # Remove any hardcoded credentials
-   python3 remove_hardcoded_credentials.py
+   // 2. Create API functions
+   // frontend/src/services/supabaseApi.ts
    
-   # Setup secure environment
-   python3 setup_secure_environment.py
-   ```
-
-2. **Backend Setup**
-   ```bash
-   cd backend
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   pip install -r requirements.txt
-   ```
-
-3. **Database Setup**
-   ```bash
-   # Create database
-   createdb textile_printing_db
+   // 3. Add UI components
+   // frontend/src/components/
    
-   # Apply latest schema with improvements
-   psql -d textile_printing_db -f app/migrations/schema_fix_v2.sql
+   // 4. Update types
+   // frontend/src/types/
    ```
 
-4. **Environment Configuration**
-   ```bash
-   # The secure setup script created .env file
-   # Verify and update if needed
-   cp .env.example .env  # If not created by setup script
+2. **Custom Reports**
+   ```typescript
+   // Create custom queries in
+   // frontend/src/services/reportsApi.ts
+   
+   export const customReports = {
+     async getCustomMetrics() {
+       const { data, error } = await supabase
+         .from('your_view')
+         .select('*')
+       return { data, error }
+     }
+   }
    ```
 
-5. **Run Tests**
-   ```bash
-   # Run comprehensive test suite
-   python -m pytest tests/ -v
+3. **Business Logic**
+   ```typescript
+   // Add complex logic to Supabase Edge Functions
+   // supabase/functions/your-function/index.ts
+   
+   Deno.serve(async (req) => {
+     // Your custom business logic
+     return new Response(JSON.stringify(result))
+   })
    ```
 
-6. **Start Backend Server**
-   ```bash
-   uvicorn app.main:app --reload
-   # Server runs on http://localhost:8000
-   # Health check: http://localhost:8000/health
-   ```
+### **🔄 Maintenance**
 
-7. **Frontend Setup**
-   ```bash
-   cd ../frontend
-   npm install
-   npm start
-   # Application runs on http://localhost:3000
-   ```
+- **Zero-downtime Deployments** - Vercel handles automatic deployments
+- **Database Migrations** - Version-controlled schema changes
+- **Monitoring** - Built-in Supabase monitoring and alerts
+- **Backup Strategy** - Automated daily backups with point-in-time recovery
 
-## 📖 Documentation Links
+## 📚 **Documentation**
 
-- [📋 Functional Requirements](FUNCTIONAL_REQUIREMENTS.md)
-- [🚀 Deployment Guide](docs/DEPLOYMENT_GUIDE.md) - **Step-by-step production deployment**
-- [🧪 Testing Guide](docs/TESTING_GUIDE.md) - **Comprehensive API testing**
-- [👤 User Guide](docs/USER_GUIDE.md) - **End-user documentation**
-- [🔧 API Documentation](docs/API_DOCUMENTATION.md) - **Complete API reference**
-- [🔄 Refactoring Summary](REFACTORING_SUMMARY.md) - **Latest changes and improvements**
+> 📋 **[Complete Documentation Guide](docs/README.md)** - Start here for organized reading order!
 
-## 🧪 Testing
+### **🚀 Quick Links**
 
-### Comprehensive Test Suite
+| Priority | Guide | Description |
+|----------|-------|-------------|
+| **🔥 High** | [Setup Guide](docs/SETUP_GUIDE_SUPABASE.md) | Environment setup and installation |
+| **🔥 High** | [Deployment Guide](docs/DEPLOYMENT_GUIDE_SUPABASE.md) | Production deployment to Supabase + Vercel |
+| **📊 Medium** | [API Documentation](docs/API_DOCUMENTATION_SUPABASE.md) | Complete API reference and examples |
+| **📊 Medium** | [Testing Guide](docs/TESTING_GUIDE_SUPABASE.md) | Testing strategies and automation |
+| **👥 User** | [User Guide](docs/USER_GUIDE.md) | End-user application guide |
+
+### **📖 Reading Order by Role**
+- **👨‍💼 Business Owner**: README.md → User Guide → Deployment Guide
+- **👨‍💻 Developer**: Setup Guide → API Docs → Testing Guide → Deployment Guide
+- **🎓 New Team Member**: README.md → Setup Guide → User Guide → API Docs
+
+## 💡 **Why Supabase + Vercel?**
+
+### **✅ Benefits**
+- **🆓 Free Tier** - Perfect for small to medium businesses
+- **⚡ Performance** - Global CDN, edge functions, real-time updates
+- **🛡️ Security** - Enterprise-grade security out of the box
+- **📈 Scalability** - Automatic scaling from 1 to 1M+ users
+- **🔧 Developer Experience** - Modern tooling, TypeScript, real-time
+- **💰 Cost Effective** - Pay only for what you use, transparent pricing
+
+### **🏆 vs. Traditional Stack**
+| Feature | Traditional (FastAPI+Server) | Supabase + Vercel |
+|---------|------------------------------|-------------------|
+| **Infrastructure** | Manual server management | Fully managed |
+| **Scaling** | Manual scaling required | Automatic scaling |
+| **Real-time** | Complex WebSocket setup | Built-in real-time |
+| **Authentication** | Custom implementation | Ready-to-use auth |
+| **Database** | Manual setup & maintenance | Managed PostgreSQL |
+| **Deployment** | Complex CI/CD setup | One-click deployment |
+| **Monitoring** | Custom monitoring setup | Built-in monitoring |
+| **Cost** | Fixed server costs | Pay-per-use |
+
+## 🤝 **Contributing**
+
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+
+### **Development Setup**
 ```bash
-cd backend
+# 1. Fork and clone the repository
+git clone https://github.com/yourusername/textile-printing-system.git
 
-# Run all tests with coverage
-python -m pytest tests/ -v --cov=app
+# 2. Setup development environment
+python3 setup_supabase_migration.py
 
-# Security-focused tests
-python -m pytest tests/test_api_security.py -v
+# 3. Start development
+cd frontend && npm run dev
 
-# API functionality tests
-python -m pytest tests/test_customer_api.py -v
-
-# Performance tests
-python -m pytest tests/ -k "performance" -v
+# 4. Make your changes and submit a PR
 ```
 
-### Frontend Tests
-```bash
-cd frontend
-npm test -- --coverage --watchAll=false
-```
+## 📞 **Support**
 
-### Automated Testing
-```bash
-# Run complete test suite with deployment checks
-python3 deploy.py
-```
+- **📧 Email:** support@textile-printing-system.com
+- **💬 Discord:** [Join our community](https://discord.gg/textile-printing)
+- **📖 Documentation:** [Full documentation](docs/)
+- **🐛 Bug Reports:** [GitHub Issues](https://github.com/yourusername/textile-printing-system/issues)
 
-## 🚀 Deployment
+## 📄 **License**
 
-### 🔄 Automated Deployment
-```bash
-# Run automated deployment script
-python3 deploy.py
-```
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-### Manual Production Deployment
-1. **Security Setup**: Run security cleanup and environment setup
-2. **Database**: Deploy PostgreSQL with schema migration
-3. **Backend**: Deploy FastAPI on Render.com with health monitoring
-4. **Frontend**: Deploy React app on Netlify with optimizations
-5. **Verification**: Run production health checks and tests
+## 🙏 **Acknowledgments**
 
-See [📖 Deployment Guide](docs/DEPLOYMENT_GUIDE.md) for detailed step-by-step instructions.
+- **Supabase** - For the amazing backend-as-a-service platform
+- **Vercel** - For seamless frontend deployment and hosting
+- **React Team** - For the excellent frontend framework
+- **PostgreSQL** - For the robust and reliable database
 
-## 📊 System Capabilities
+---
 
-- **Concurrent Users**: Up to 100+ users (optimized with connection pooling)
-- **Annual Capacity**: 50,000+ orders per year
-- **Report Generation**: Under 15 seconds (database optimized)
-- **Page Load Time**: Under 2 seconds (frontend optimized)
-- **Data Export**: PDF and Excel formats with streaming
-- **Security**: Production-ready with comprehensive protection
-
-## 🔒 Enhanced Security Features
-
-- **🛡️ Secure Authentication**: JWT tokens with proper validation and expiration
-- **🔐 Password Security**: bcrypt hashing with increased rounds, strength validation
-- **🚫 Attack Protection**: SQL injection, XSS, CSRF protection implemented
-- **👥 Access Control**: Role-based permissions with audit logging
-- **📝 Input Validation**: Comprehensive validation and sanitization
-- **🔍 Audit Trail**: Automatic logging of all critical operations
-- **🌐 Network Security**: CORS, security headers, rate limiting
-- **💾 Data Protection**: Secure environment variables, no hardcoded credentials
-
-## 🆘 Support
-
-For technical support or questions:
-1. Check the [📖 Testing Guide](docs/TESTING_GUIDE.md) for troubleshooting
-2. Review [📖 Deployment Guide](docs/DEPLOYMENT_GUIDE.md) for setup issues
-3. Check [📖 API Documentation](docs/API_DOCUMENTATION.md) for integration help
-4. Review [🔄 Refactoring Summary](REFACTORING_SUMMARY.md) for recent changes
-5. Submit issues via the project issue tracker
-
-## 🎯 What's New (Recent Refactoring)
-
-- ✅ **Security Enhanced**: All hardcoded credentials removed, secure configuration
-- ✅ **Modular Architecture**: Service layer with business logic separation
-- ✅ **Comprehensive Testing**: Security tests, API tests, performance tests
-- ✅ **Database Optimized**: Improved schema with indexes and constraints
-- ✅ **Production Ready**: Automated deployment, health monitoring, error handling
-- ✅ **Developer Experience**: Better documentation, testing tools, debugging
-
-## 📄 License
-
-This project is proprietary software developed for digital textile printing business operations.
-
-## 🔄 Version Information
-
-- **Current Version**: 2.0.0 (Recently Refactored)
-- **Last Updated**: 2025
-- **Security Status**: ✅ Production-Ready
-- **Compatibility**: All modern browsers, PostgreSQL 14+, Python 3.9+, Node.js 16+ 
+<div align="center">
+  <h3>🎉 Ready to transform your textile printing business?</h3>
+  <p><strong>Get started in 5 minutes with our automated setup!</strong></p>
+  
+  ```bash
+  python3 setup_supabase_migration.py
+  ```
+  
+  <p><em>Built with ❤️ for textile printing businesses worldwide</em></p>
+</div>

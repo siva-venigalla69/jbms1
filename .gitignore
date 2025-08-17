@@ -69,3 +69,6 @@ backend/dist/
 coverage/
 .coverage
 .pytest_cache/
+# Security files
+secure_setup_summary_*.json
+backup_credentials.json

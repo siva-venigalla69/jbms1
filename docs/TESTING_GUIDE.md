@@ -1,5 +1,15 @@
 # 🧪 Comprehensive Testing Guide
 
+> ⚠️ **OUTDATED**: This guide is for the old FastAPI + pytest stack. 
+> 
+> **For the current Supabase stack**, please use: [TESTING_GUIDE_SUPABASE.md](TESTING_GUIDE_SUPABASE.md)
+>
+> The new testing approach covers **real-time features**, **edge functions**, and **serverless testing**!
+
+---
+
+## Legacy Guide: FastAPI Testing
+
 Complete testing guide for the Digital Textile Printing Management System with security-focused testing, API validation, and automated test suites.
 
 ## 📋 Table of Contents
