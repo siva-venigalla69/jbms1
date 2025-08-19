@@ -1,47 +1,76 @@
 // Supabase API Service - Digital Textile Printing System
 // Replaces the FastAPI backend with Supabase client calls
 
-import { supabase, supabaseHelpers, businessHelpers, TABLES, ENUMS } from '../../lib/supabase'
-import type { Customer, Order, OrderItem, User, MaterialIn, DeliveryChallan, GST_Invoice, Payment, ReturnItem, InventoryItem, Expense } from '../types'
+import { supabase, supabaseHelpers, businessHelpers, TABLES, ENUMS } from '../lib/supabase'
+import type { Customer, Order, OrderItem, User, MaterialIn, DeliveryChallan, DeliveryChallanCreate, GST_Invoice, GST_InvoiceCreate, Payment, ReturnItem, InventoryItem, Expense } from '../types'
+import { apiLogger, logNetworkRequest, performance } from '../utils/debug'
+
+// API call wrapper with logging
+const withApiLogging = async <T>(
+  operation: string,
+  fn: () => Promise<T>,
+  params?: any
+): Promise<T> => {
+  const operationId = `${operation}-${Date.now()}`;
+  apiLogger.info(`Starting API operation: ${operation}`, params);
+  performance.mark(`${operation}-start`);
+  
+  try {
+    const result = await fn();
+    performance.measure(operation, `${operation}-start`);
+    apiLogger.info(`API operation completed: ${operation}`);
+    return result;
+  } catch (error) {
+    performance.measure(`${operation}-error`, `${operation}-start`);
+    apiLogger.error(`API operation failed: ${operation}`, { error, params });
+    throw error;
+  }
+};
 
 // Authentication API
 export const authApi = {
   login: async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    })
-    
-    if (error) throw new Error(error.message)
-    
-    return {
-      access_token: data.session?.access_token,
-      token_type: 'Bearer',
-      user: data.user
-    }
+    return withApiLogging('auth.login', async () => {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      })
+      
+      if (error) throw new Error(error.message)
+      
+      return {
+        access_token: data.session?.access_token,
+        token_type: 'Bearer',
+        user: data.user
+      }
+    }, { email });
   },
 
   logout: async () => {
-    const { error } = await supabase.auth.signOut()
-    if (error) throw new Error(error.message)
+    return withApiLogging('auth.logout', async () => {
+      const { error } = await supabase.auth.signOut()
+      if (error) throw new Error(error.message)
+    });
   },
 
   getCurrentUser: async (): Promise<User | null> => {
-    const { data: { user }, error } = await supabase.auth.getUser()
-    if (error) throw new Error(error.message)
-    
-    if (!user) return null
-    
-    // Get user profile from users table
-    const { data: profile, error: profileError } = await supabase
-      .from(TABLES.USERS)
-      .select('*')
-      .eq('email', user.email)
-      .single()
-    
-    if (profileError) throw new Error(profileError.message)
-    
-    return profile
+    return withApiLogging('auth.getCurrentUser', async () => {
+      const { data: { user }, error } = await supabase.auth.getUser()
+      if (error) throw new Error(error.message)
+      
+      if (!user) return null
+      
+      // Get user profile from users table
+      const { data: profile, error: profileError } = await supabase
+        .from(TABLES.USERS)
+        .select('*')
+        .eq('email', user.email)
+        .single()
+      
+      if (profileError) throw new Error(profileError.message)
+      
+      return profile
+    });
   },
 
   getUsers: async (): Promise<User[]> => {
@@ -49,7 +78,7 @@ export const authApi = {
       orderBy: { column: 'full_name' }
     })
     if (error) throw new Error(error.message)
-    return data || []
+    return (data as unknown as User[]) || []
   },
 
   register: async (userData: Partial<User>): Promise<User> => {
@@ -90,13 +119,14 @@ export const customerApi = {
     }
     
     if (error) throw new Error(error.message)
-    return data || []
+    return (data as unknown as Customer[]) || []
   },
 
   getCustomer: async (id: string): Promise<Customer> => {
     const { data, error } = await supabaseHelpers.getById(TABLES.CUSTOMERS, id)
     if (error) throw new Error(error.message)
-    return data
+    if (!data) throw new Error('Customer not found')
+    return data as unknown as Customer
   },
 
   createCustomer: async (customerData: Partial<Customer>): Promise<Customer> => {
@@ -175,22 +205,93 @@ export const orderApi = {
       customization_details?: string
     }>
   }): Promise<Order> => {
-    // This would call the Supabase Edge Function for complex order creation
-    const { data: { session } } = await supabase.auth.getSession()
-    
-    const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/orders`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${session?.access_token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(orderData)
-    })
-    
-    const result = await response.json()
-    if (!response.ok) throw new Error(result.error)
-    
-    return result.data
+    return withApiLogging('order.create', async () => {
+      // Log the input data for debugging
+      apiLogger.info('Order creation input data', orderData);
+      
+      // First verify the customer exists
+      const { data: customerCheck, error: customerError } = await supabase
+        .from(TABLES.CUSTOMERS)
+        .select('id, name')
+        .eq('id', orderData.customer_id)
+        .single();
+      
+      if (customerError || !customerCheck) {
+        apiLogger.error('Customer verification failed', { customerError, customer_id: orderData.customer_id });
+        throw new Error(`Invalid customer ID: ${orderData.customer_id}`);
+      }
+      
+      apiLogger.info('Customer verified', customerCheck);
+      
+      // Generate order number
+      const orderNumber = `ORD-${Date.now()}`;
+      
+      // Calculate total amount
+      const totalAmount = orderData.items.reduce((sum, item) => 
+        sum + (item.quantity * item.unit_price), 0
+      );
+
+      // Try minimal insert first to isolate the issue
+      const orderInsertData = {
+        order_number: orderNumber,
+        customer_id: orderData.customer_id,
+        order_date: new Date().toISOString().split('T')[0],
+        status: 'pending',
+        total_amount: totalAmount,
+      };
+      
+      apiLogger.info('Order insert data', orderInsertData);
+
+      // Create the order first
+      const { data: order, error: orderError } = await supabase
+        .from(TABLES.ORDERS)
+        .insert(orderInsertData)
+        .select(`
+          *,
+          customer:customers(*)
+        `)
+        .single();
+
+      if (orderError) {
+        apiLogger.error('Order creation failed with detailed error', {
+          error: orderError,
+          code: orderError.code,
+          message: orderError.message,
+          details: orderError.details,
+          hint: orderError.hint,
+          insertData: orderInsertData
+        });
+        throw new Error(`Failed to create order: ${orderError.message || 'Unknown error'} (Code: ${orderError.code || 'N/A'})`);
+      }
+
+      // Create order items
+      const orderItems = orderData.items.map(item => ({
+        order_id: order.id,
+        material_type: item.material_type,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        customization_details: item.customization_details || null,
+        subtotal: item.quantity * item.unit_price,
+        created_at: new Date().toISOString(),
+      }));
+
+      const { data: items, error: itemsError } = await supabase
+        .from(TABLES.ORDER_ITEMS)
+        .insert(orderItems)
+        .select('*');
+
+      if (itemsError) {
+        // Rollback: delete the order if items creation fails
+        await supabase.from(TABLES.ORDERS).delete().eq('id', order.id);
+        throw new Error(`Failed to create order items: ${itemsError.message}`);
+      }
+
+      // Return the complete order with items
+      return {
+        ...order,
+        order_items: items,
+      };
+    }, orderData);
   },
 
   updateOrder: async (id: string, orderData: Partial<Order>): Promise<Order> => {
@@ -226,6 +327,42 @@ export const orderItemApi = {
     const { data, error } = await businessHelpers.production.getProductionStatus()
     if (error) throw new Error(error.message)
     return data || []
+  },
+
+  updateOrderItem: async (id: string, itemData: Partial<OrderItem>): Promise<OrderItem> => {
+    return withApiLogging('orderItem.updateOrderItem', async () => {
+      const updateData = {
+        ...itemData,
+        subtotal: itemData.quantity && itemData.unit_price ? 
+          itemData.quantity * itemData.unit_price : undefined,
+        updated_at: new Date().toISOString()
+      };
+
+      const { data, error } = await supabaseHelpers.update(TABLES.ORDER_ITEMS, id, updateData)
+      if (error) throw new Error(error.message)
+      return data
+    }, { id, itemData })
+  },
+
+  deleteOrderItem: async (id: string): Promise<void> => {
+    return withApiLogging('orderItem.deleteOrderItem', async () => {
+      const { error } = await supabaseHelpers.delete(TABLES.ORDER_ITEMS, id)
+      if (error) throw new Error(error.message)
+    }, { id })
+  },
+
+  createOrderItem: async (itemData: any): Promise<OrderItem> => {
+    return withApiLogging('orderItem.createOrderItem', async () => {
+      const createData = {
+        ...itemData,
+        subtotal: itemData.quantity * itemData.unit_price,
+        created_at: new Date().toISOString()
+      };
+
+      const { data, error } = await supabaseHelpers.create(TABLES.ORDER_ITEMS, createData)
+      if (error) throw new Error(error.message)
+      return data
+    }, itemData)
   }
 }
 
@@ -265,6 +402,17 @@ export const materialInApi = {
     const { data, error } = await supabaseHelpers.create(TABLES.MATERIAL_IN, materialData)
     if (error) throw new Error(error.message)
     return data
+  },
+
+  updateMaterialIn: async (id: string, materialData: Partial<MaterialIn>): Promise<MaterialIn> => {
+    const { data, error } = await supabaseHelpers.update(TABLES.MATERIAL_IN, id, materialData)
+    if (error) throw new Error(error.message)
+    return data
+  },
+
+  deleteMaterialIn: async (id: string): Promise<void> => {
+    const { error } = await supabaseHelpers.delete(TABLES.MATERIAL_IN, id)
+    if (error) throw new Error(error.message)
   }
 }
 
@@ -411,7 +559,7 @@ export const inventoryApi = {
       orderBy: { column: 'item_name' }
     })
     if (error) throw new Error(error.message)
-    return data || []
+    return (data as unknown as InventoryItem[]) || []
   },
 
   createInventoryItem: async (itemData: Partial<InventoryItem>): Promise<InventoryItem> => {
@@ -509,5 +657,219 @@ export const returnsApi = {
     const { data, error } = await supabaseHelpers.create(TABLES.RETURNS, returnData)
     if (error) throw new Error(error.message)
     return data
+  }
+}
+
+// Delivery Challan API
+export const deliveryChallanApi = {
+  getDeliveryChallans: async (params?: {
+    skip?: number
+    limit?: number
+    customer_id?: string
+    status?: string
+  }): Promise<DeliveryChallan[]> => {
+    return withApiLogging('deliveryChallan.getDeliveryChallans', async () => {
+      let query = supabase
+        .from(TABLES.DELIVERY_CHALLANS)
+        .select(`
+          *,
+          customer:customers(*),
+          order:orders(
+            order_number,
+            status,
+            customer:customers(name)
+          )
+        `)
+        .order('created_at', { ascending: false })
+      
+      if (params?.customer_id) {
+        query = query.eq('customer_id', params.customer_id)
+      }
+      
+      if (params?.status) {
+        query = query.eq('status', params.status)
+      }
+      
+      if (params?.limit) {
+        query = query.limit(params.limit)
+      }
+      
+      const { data, error } = await query
+      
+      if (error) throw new Error(error.message)
+      return data || []
+    }, params)
+  },
+
+  getDeliveryChallan: async (id: string): Promise<DeliveryChallan> => {
+    return withApiLogging('deliveryChallan.getDeliveryChallan', async () => {
+      const { data, error } = await supabase
+        .from(TABLES.DELIVERY_CHALLANS)
+        .select(`
+          *,
+          customer:customers(*),
+          order:orders(
+            *,
+            customer:customers(*),
+            order_items(*)
+          )
+        `)
+        .eq('id', id)
+        .single()
+      
+      if (error) throw new Error(error.message)
+      return data
+    }, { id })
+  },
+
+  createDeliveryChallan: async (challanData: DeliveryChallanCreate): Promise<DeliveryChallan> => {
+    return withApiLogging('deliveryChallan.createDeliveryChallan', async () => {
+      // Generate challan number if not provided
+      const challanNumber = challanData.challan_number || `DC-${Date.now()}`
+      
+      // Prepare the data for insertion
+      const insertData = {
+        challan_number: challanNumber,
+        customer_id: challanData.customer_id,
+        order_id: challanData.order_id,
+        delivery_date: challanData.delivery_date,
+        status: challanData.status,
+        notes: challanData.notes || null,
+        created_at: new Date().toISOString()
+      }
+      
+      const { data, error } = await supabase
+        .from(TABLES.DELIVERY_CHALLANS)
+        .insert(insertData)
+        .select(`
+          *,
+          customer:customers(*),
+          order:orders(*)
+        `)
+        .single()
+      
+      if (error) {
+        console.error('Delivery challan creation error:', error)
+        throw new Error(error.message)
+      }
+      return data
+    }, challanData)
+  },
+
+  updateDeliveryChallan: async (id: string, updateData: Partial<DeliveryChallanCreate>): Promise<DeliveryChallan> => {
+    return withApiLogging('deliveryChallan.updateDeliveryChallan', async () => {
+      const { data, error } = await supabaseHelpers.update(TABLES.DELIVERY_CHALLANS, id, {
+        ...updateData,
+        updated_at: new Date().toISOString()
+      })
+      
+      if (error) throw new Error(error.message)
+      return data
+    }, { id, updateData })
+  },
+
+  deleteDeliveryChallan: async (id: string): Promise<void> => {
+    return withApiLogging('deliveryChallan.deleteDeliveryChallan', async () => {
+      const { error } = await supabaseHelpers.delete(TABLES.DELIVERY_CHALLANS, id)
+      if (error) throw new Error(error.message)
+    }, { id })
+  }
+}
+
+// GST Invoice API
+export const gstInvoiceApi = {
+  getGSTInvoices: async (params?: {
+    skip?: number
+    limit?: number
+    customer_id?: string
+    status?: string
+  }): Promise<GST_Invoice[]> => {
+    return withApiLogging('gstInvoice.getGSTInvoices', async () => {
+      let query = supabase
+        .from(TABLES.GST_INVOICES)
+        .select(`
+          *,
+          customer:customers(*),
+          order:orders(
+            order_number,
+            status,
+            customer:customers(name)
+          )
+        `)
+        .order('created_at', { ascending: false })
+      
+      if (params?.customer_id) {
+        query = query.eq('customer_id', params.customer_id)
+      }
+      
+      if (params?.status) {
+        query = query.eq('status', params.status)
+      }
+      
+      if (params?.limit) {
+        query = query.limit(params.limit)
+      }
+      
+      const { data, error } = await query
+      
+      if (error) throw new Error(error.message)
+      return data || []
+    }, params)
+  },
+
+  getGSTInvoice: async (id: string): Promise<GST_Invoice> => {
+    return withApiLogging('gstInvoice.getGSTInvoice', async () => {
+      const { data, error } = await supabase
+        .from(TABLES.GST_INVOICES)
+        .select(`
+          *,
+          customer:customers(*),
+          order:orders(
+            *,
+            customer:customers(*),
+            order_items(*)
+          )
+        `)
+        .eq('id', id)
+        .single()
+      
+      if (error) throw new Error(error.message)
+      return data
+    }, { id })
+  },
+
+  createGSTInvoice: async (invoiceData: GST_InvoiceCreate): Promise<GST_Invoice> => {
+    return withApiLogging('gstInvoice.createGSTInvoice', async () => {
+      // Generate invoice number if not provided
+      const invoiceNumber = invoiceData.invoice_number || `INV${Date.now()}`
+      
+      const { data, error } = await supabaseHelpers.create(TABLES.GST_INVOICES, {
+        ...invoiceData,
+        invoice_number: invoiceNumber,
+        created_at: new Date().toISOString()
+      })
+      
+      if (error) throw new Error(error.message)
+      return data
+    }, invoiceData)
+  },
+
+  updateGSTInvoice: async (id: string, updateData: Partial<GST_InvoiceCreate>): Promise<GST_Invoice> => {
+    return withApiLogging('gstInvoice.updateGSTInvoice', async () => {
+      const { data, error } = await supabaseHelpers.update(TABLES.GST_INVOICES, id, {
+        ...updateData,
+        updated_at: new Date().toISOString()
+      })
+      
+      if (error) throw new Error(error.message)
+      return data
+    }, { id, updateData })
+  },
+
+  deleteGSTInvoice: async (id: string): Promise<void> => {
+    return withApiLogging('gstInvoice.deleteGSTInvoice', async () => {
+      const { error } = await supabaseHelpers.delete(TABLES.GST_INVOICES, id)
+      if (error) throw new Error(error.message)
+    }, { id })
   }
 }

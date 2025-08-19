@@ -12,6 +12,7 @@ export interface User {
 
 export interface LoginRequest {
     username: string;
+    email?: string;
     password: string;
 }
 
@@ -112,4 +113,136 @@ export interface LoadingState {
 
 export interface ErrorState {
     [key: string]: string | null;
+}
+
+// Additional types for Supabase integration
+export interface MaterialIn {
+    id: string;
+    customer_id: string;
+    order_id?: string;
+    material_type: string;
+    quantity: number;
+    received_date: string;
+    notes?: string;
+    created_at: string;
+    customer?: Customer;
+    order?: Order;
+}
+
+export interface MaterialOut {
+    id: string;
+    order_id: string;
+    material_type: string;
+    quantity: number;
+    dispatch_date: string;
+    notes?: string;
+    created_at: string;
+    order?: Order;
+}
+
+
+
+export interface Payment {
+    id: string;
+    invoice_id: string;
+    payment_amount: number;
+    payment_date: string;
+    payment_method: 'cash' | 'upi' | 'bank_transfer' | 'cheque';
+    reference_number?: string;
+    notes?: string;
+    created_at: string;
+    invoice?: GST_Invoice;
+}
+
+export interface InventoryItem {
+    id: string;
+    item_name: string;
+    item_type: string;
+    quantity: number;
+    unit_price: number;
+    supplier?: string;
+    last_updated: string;
+    created_at: string;
+}
+
+export interface Expense {
+    id: string;
+    expense_type: string;
+    amount: number;
+    expense_date: string;
+    description?: string;
+    receipt_number?: string;
+    created_at: string;
+}
+
+export interface ReturnItem {
+    id: string;
+    order_item_id: string;
+    return_quantity: number;
+    return_date: string;
+    return_reason: string;
+    notes?: string;
+    created_at: string;
+    order_item?: OrderItem;
+}
+
+// Delivery Challan types
+export interface DeliveryChallan {
+    id: string;
+    challan_number: string;
+    customer_id: string;
+    order_id: string;
+    delivery_date: string;
+    status: 'pending' | 'delivered' | 'returned';
+    notes?: string;
+    created_at: string;
+    customer?: Customer;
+    order?: Order;
+}
+
+export interface DeliveryChallanCreate {
+    challan_number?: string;
+    customer_id: string;
+    order_ids?: string[]; // For multiple orders
+    order_id?: string; // For single order (backward compatibility)
+    delivery_date: string;
+    status: 'pending' | 'delivered' | 'returned';
+    notes?: string;
+    items?: Array<{
+        order_id: string;
+        material_type: string;
+        quantity_delivered: number;
+        notes?: string;
+    }>;
+}
+
+// GST Invoice types
+export interface GST_Invoice {
+    id: string;
+    invoice_number: string;
+    customer_id: string;
+    order_id: string;
+    invoice_date: string;
+    subtotal: number;
+    tax_amount: number;
+    total_amount: number;
+    status: 'draft' | 'sent' | 'paid' | 'overdue';
+    due_date?: string;
+    notes?: string;
+    created_at: string;
+    customer?: Customer;
+    order?: Order;
+}
+
+export interface GST_InvoiceCreate {
+    invoice_number: string;
+    customer_id: string;
+    order_id: string;
+    invoice_date: string;
+    subtotal: number;
+    tax_amount: number;
+    total_amount: number;
+    status: 'draft' | 'sent' | 'paid' | 'overdue';
+    due_date?: string;
+    notes?: string;
 } 

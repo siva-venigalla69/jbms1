@@ -4,14 +4,6 @@ import {
     Card,
     CardContent,
     Typography,
-    Button,
-    Grid,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
     CircularProgress,
     Alert,
     FormControl,
@@ -19,153 +11,349 @@ import {
     Select,
     MenuItem,
     TextField,
+    Button,
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow,
+    Paper,
+    Stack,
 } from '@mui/material';
 import {
-    Download,
     Assessment,
     TrendingUp,
-    Inventory,
     People,
+    Inventory,
     ShoppingCart,
-    LocalAtm,
+    AttachMoney,
+    DateRange,
 } from '@mui/icons-material';
-
-// API service for reports
-const reportsApi = {
-    getSalesReport: async (params: any) => {
-        const token = localStorage.getItem('access_token');
-        const queryParams = new URLSearchParams(params).toString();
-        const response = await fetch(`https://jbms1.onrender.com/api/reports/sales?${queryParams}`, {
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json',
-            },
-        });
-        if (!response.ok) throw new Error('Failed to fetch sales report');
-        return response.json();
-    },
-
-    getInventoryReport: async () => {
-        const token = localStorage.getItem('access_token');
-        const response = await fetch('https://jbms1.onrender.com/api/reports/inventory', {
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json',
-            },
-        });
-        if (!response.ok) throw new Error('Failed to fetch inventory report');
-        return response.json();
-    },
-
-    getCustomerReport: async () => {
-        const token = localStorage.getItem('access_token');
-        const response = await fetch('https://jbms1.onrender.com/api/reports/customers', {
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json',
-            },
-        });
-        if (!response.ok) throw new Error('Failed to fetch customer report');
-        return response.json();
-    },
-};
-
-// Simple inventory and customer data fetching as fallback
-const inventoryApi = {
-    getInventory: async () => {
-        const token = localStorage.getItem('access_token');
-        const response = await fetch('https://jbms1.onrender.com/api/inventory/', {
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json',
-            },
-        });
-        if (!response.ok) throw new Error('Failed to fetch inventory');
-        return response.json();
-    },
-};
-
-const customerApi = {
-    getCustomers: async () => {
-        const token = localStorage.getItem('access_token');
-        const response = await fetch('https://jbms1.onrender.com/api/customers/', {
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json',
-            },
-        });
-        if (!response.ok) throw new Error('Failed to fetch customers');
-        return response.json();
-    },
-};
+import { reportsApi, customerApi, inventoryApi } from '../services/supabaseApi';
+import { componentLogger } from '../utils/debug';
 
 const Reports: React.FC = () => {
-    const [inventoryData, setInventoryData] = useState<any[]>([]);
-    const [customerData, setCustomerData] = useState<any[]>([]);
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [selectedReport, setSelectedReport] = useState('inventory');
+    const [reportType, setReportType] = useState('overview');
+    const [dateRange, setDateRange] = useState('month');
+    const [startDate, setStartDate] = useState('');
+    const [endDate, setEndDate] = useState('');
+    
+    // Report data
+    const [pendingOrders, setPendingOrders] = useState<any[]>([]);
+    const [pendingReceivables, setPendingReceivables] = useState<any[]>([]);
+    const [customers, setCustomers] = useState<any[]>([]);
+    const [inventory, setInventory] = useState<any[]>([]);
+    const [payments, setPayments] = useState<any[]>([]);
+    const [expenses, setExpenses] = useState<any[]>([]);
 
-    const loadReports = useCallback(async () => {
+    const loadReportData = useCallback(async () => {
+        componentLogger.info('Loading report data...');
         try {
             setLoading(true);
-            setError(null);
-
-            if (selectedReport === 'inventory' || selectedReport === 'all') {
-                try {
-                    const data = await inventoryApi.getInventory();
-                    setInventoryData(data);
-                } catch (err) {
-                    console.error('Failed to load inventory:', err);
-                }
-            }
-
-            if (selectedReport === 'customers' || selectedReport === 'all') {
-                try {
-                    const data = await customerApi.getCustomers();
-                    setCustomerData(data);
-                } catch (err) {
-                    console.error('Failed to load customers:', err);
-                }
-            }
+            
+            // Set default date range if not set
+            const endDateValue = endDate || new Date().toISOString().split('T')[0];
+            const startDateValue = startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+            
+            const [
+                pendingOrdersData,
+                pendingReceivablesData,
+                customersData,
+                inventoryData,
+                paymentsData,
+                expensesData
+            ] = await Promise.all([
+                reportsApi.getPendingOrders().catch(() => []),
+                reportsApi.getPendingReceivables().catch(() => []),
+                customerApi.getCustomers().catch(() => []),
+                inventoryApi.getInventory().catch(() => []),
+                reportsApi.getPaymentsInDateRange(startDateValue, endDateValue).catch(() => []),
+                reportsApi.getExpensesInDateRange(startDateValue, endDateValue).catch(() => [])
+            ]);
+            
+            setPendingOrders(pendingOrdersData);
+            setPendingReceivables(pendingReceivablesData);
+            setCustomers(customersData);
+            setInventory(inventoryData);
+            setPayments(paymentsData);
+            setExpenses(expensesData);
+            
+            componentLogger.info('Report data loaded successfully');
         } catch (error: any) {
-            setError('Failed to load reports: ' + error.message);
+            componentLogger.error('Failed to load report data', error);
+            setError('Failed to load report data: ' + error.message);
         } finally {
             setLoading(false);
         }
-    }, [selectedReport]);
+    }, [startDate, endDate]);
 
     useEffect(() => {
-        loadReports();
-    }, [loadReports]);
+        loadReportData();
+    }, [loadReportData]);
 
-    const handleDownloadReport = () => {
-        alert('Download functionality would be implemented here');
-    };
+    useEffect(() => {
+        if (error) {
+            const timer = setTimeout(() => setError(null), 5000);
+            return () => clearTimeout(timer);
+        }
+    }, [error]);
 
-    const reportCards = [
-        {
-            title: 'Inventory Report',
-            icon: <Inventory />,
-            onClick: () => setSelectedReport('inventory'),
-            active: selectedReport === 'inventory',
-        },
-        {
-            title: 'Customer Report',
-            icon: <People />,
-            onClick: () => setSelectedReport('customers'),
-            active: selectedReport === 'customers',
-        },
-        {
-            title: 'All Reports',
-            icon: <Assessment />,
-            onClick: () => setSelectedReport('all'),
-            active: selectedReport === 'all',
-        },
-    ];
+    // Calculate summary metrics
+    const totalRevenue = payments.reduce((sum, payment) => sum + (payment.payment_amount || 0), 0);
+    const totalExpenses = expenses.reduce((sum, expense) => sum + (expense.amount || 0), 0);
+    const totalOutstanding = pendingReceivables.reduce((sum, invoice) => sum + (invoice.outstanding_amount || 0), 0);
+    const lowStockItems = inventory.filter(item => item.quantity < (item.reorder_level || 10));
 
-    const totalInventoryValue = inventoryData.reduce((sum, item) =>
-        sum + (parseFloat(item.current_stock || 0) * parseFloat(item.cost_per_unit || 0)), 0);
+    const renderOverviewReport = () => (
+        <Box>
+            {/* Summary Cards */}
+            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 3, mb: 4 }}>
+                <Card>
+                    <CardContent>
+                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                            <ShoppingCart sx={{ mr: 1, color: 'primary.main' }} />
+                            <Typography variant="h6" color="text.secondary">
+                                Pending Orders
+                            </Typography>
+                        </Box>
+                        <Typography variant="h4" fontWeight="bold">
+                            {pendingOrders.length}
+                        </Typography>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardContent>
+                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                            <AttachMoney sx={{ mr: 1, color: 'success.main' }} />
+                            <Typography variant="h6" color="text.secondary">
+                                Revenue (Period)
+                            </Typography>
+                        </Box>
+                        <Typography variant="h4" fontWeight="bold">
+                            ₹{totalRevenue.toFixed(2)}
+                        </Typography>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardContent>
+                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                            <TrendingUp sx={{ mr: 1, color: 'warning.main' }} />
+                            <Typography variant="h6" color="text.secondary">
+                                Outstanding
+                            </Typography>
+                        </Box>
+                        <Typography variant="h4" fontWeight="bold">
+                            ₹{totalOutstanding.toFixed(2)}
+                        </Typography>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardContent>
+                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                            <Inventory sx={{ mr: 1, color: 'error.main' }} />
+                            <Typography variant="h6" color="text.secondary">
+                                Low Stock Items
+                            </Typography>
+                        </Box>
+                        <Typography variant="h4" fontWeight="bold">
+                            {lowStockItems.length}
+                        </Typography>
+                    </CardContent>
+                </Card>
+            </Box>
+
+            {/* Recent Activity */}
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3 }}>
+                <Card>
+                    <CardContent>
+                        <Typography variant="h6" gutterBottom>
+                            Pending Orders
+                        </Typography>
+                        <TableContainer>
+                            <Table size="small">
+                                <TableHead>
+                                    <TableRow>
+                                        <TableCell>Order Number</TableCell>
+                                        <TableCell>Customer</TableCell>
+                                        <TableCell>Amount</TableCell>
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {pendingOrders.slice(0, 5).map((order) => (
+                                        <TableRow key={order.id}>
+                                            <TableCell>{order.order_number}</TableCell>
+                                            <TableCell>{order.customer?.name || 'Unknown'}</TableCell>
+                                            <TableCell>₹{order.total_amount?.toFixed(2) || '0.00'}</TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardContent>
+                        <Typography variant="h6" gutterBottom>
+                            Outstanding Invoices
+                        </Typography>
+                        <TableContainer>
+                            <Table size="small">
+                                <TableHead>
+                                    <TableRow>
+                                        <TableCell>Invoice Number</TableCell>
+                                        <TableCell>Customer</TableCell>
+                                        <TableCell>Outstanding</TableCell>
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {pendingReceivables.slice(0, 5).map((invoice) => (
+                                        <TableRow key={invoice.id}>
+                                            <TableCell>{invoice.invoice_number}</TableCell>
+                                            <TableCell>{invoice.customer?.name || 'Unknown'}</TableCell>
+                                            <TableCell>₹{invoice.outstanding_amount?.toFixed(2) || '0.00'}</TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
+                    </CardContent>
+                </Card>
+            </Box>
+        </Box>
+    );
+
+    const renderCustomerReport = () => (
+        <Card>
+            <CardContent>
+                <Typography variant="h6" gutterBottom>
+                    Customer Summary
+                </Typography>
+                <TableContainer>
+                    <Table>
+                        <TableHead>
+                            <TableRow>
+                                <TableCell>Customer Name</TableCell>
+                                <TableCell>Phone</TableCell>
+                                <TableCell>Email</TableCell>
+                                <TableCell>Created Date</TableCell>
+                            </TableRow>
+                        </TableHead>
+                        <TableBody>
+                            {customers.map((customer) => (
+                                <TableRow key={customer.id}>
+                                    <TableCell>{customer.name}</TableCell>
+                                    <TableCell>{customer.phone || '-'}</TableCell>
+                                    <TableCell>{customer.email || '-'}</TableCell>
+                                    <TableCell>{new Date(customer.created_at).toLocaleDateString()}</TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </TableContainer>
+            </CardContent>
+        </Card>
+    );
+
+    const renderInventoryReport = () => (
+        <Card>
+            <CardContent>
+                <Typography variant="h6" gutterBottom>
+                    Inventory Status
+                </Typography>
+                <TableContainer>
+                    <Table>
+                        <TableHead>
+                            <TableRow>
+                                <TableCell>Item Name</TableCell>
+                                <TableCell>Quantity</TableCell>
+                                <TableCell>Unit Price</TableCell>
+                                <TableCell>Status</TableCell>
+                            </TableRow>
+                        </TableHead>
+                        <TableBody>
+                            {inventory.map((item) => (
+                                <TableRow key={item.id}>
+                                    <TableCell>{item.item_name}</TableCell>
+                                    <TableCell>{item.quantity}</TableCell>
+                                    <TableCell>₹{item.unit_price?.toFixed(2) || '0.00'}</TableCell>
+                                    <TableCell>
+                                        <Typography 
+                                            color={item.quantity < (item.reorder_level || 10) ? 'error' : 'success'}
+                                            variant="body2"
+                                        >
+                                            {item.quantity < (item.reorder_level || 10) ? 'Low Stock' : 'In Stock'}
+                                        </Typography>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </TableContainer>
+            </CardContent>
+        </Card>
+    );
+
+    const renderFinancialReport = () => (
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3 }}>
+            <Card>
+                <CardContent>
+                    <Typography variant="h6" gutterBottom>
+                        Recent Payments
+                    </Typography>
+                    <TableContainer>
+                        <Table>
+                            <TableHead>
+                                <TableRow>
+                                    <TableCell>Date</TableCell>
+                                    <TableCell>Amount</TableCell>
+                                    <TableCell>Method</TableCell>
+                                </TableRow>
+                            </TableHead>
+                            <TableBody>
+                                {payments.map((payment) => (
+                                    <TableRow key={payment.id}>
+                                        <TableCell>{new Date(payment.payment_date).toLocaleDateString()}</TableCell>
+                                        <TableCell>₹{payment.payment_amount?.toFixed(2) || '0.00'}</TableCell>
+                                        <TableCell>{payment.payment_method}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
+                </CardContent>
+            </Card>
+            <Card>
+                <CardContent>
+                    <Typography variant="h6" gutterBottom>
+                        Recent Expenses
+                    </Typography>
+                    <TableContainer>
+                        <Table>
+                            <TableHead>
+                                <TableRow>
+                                    <TableCell>Date</TableCell>
+                                    <TableCell>Amount</TableCell>
+                                    <TableCell>Type</TableCell>
+                                </TableRow>
+                            </TableHead>
+                            <TableBody>
+                                {expenses.map((expense) => (
+                                    <TableRow key={expense.id}>
+                                        <TableCell>{new Date(expense.expense_date).toLocaleDateString()}</TableCell>
+                                        <TableCell>₹{expense.amount?.toFixed(2) || '0.00'}</TableCell>
+                                        <TableCell>{expense.expense_type}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
+                </CardContent>
+            </Card>
+        </Box>
+    );
 
     return (
         <Box>
@@ -174,219 +362,77 @@ const Reports: React.FC = () => {
                 <Typography variant="h4" fontWeight="bold">
                     Reports & Analytics
                 </Typography>
-                <Button variant="contained" startIcon={<Download />} onClick={handleDownloadReport} sx={{ px: 3 }}>
-                    Download Report
-                </Button>
             </Box>
 
-            {/* Error Alert */}
+            {/* Alerts */}
             {error && (
                 <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
                     {error}
                 </Alert>
             )}
 
-            {/* Report Type Selection */}
-            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 2, mb: 3 }}>
-                {reportCards.map((card, index) => (
-                    <Card
-                        key={index}
-                        sx={{
-                            cursor: 'pointer',
-                            border: card.active ? 2 : 1,
-                            borderColor: card.active ? 'primary.main' : 'divider',
-                            '&:hover': { borderColor: 'primary.main' }
-                        }}
-                        onClick={card.onClick}
-                    >
-                        <CardContent sx={{ textAlign: 'center' }}>
-                            <Box sx={{ color: card.active ? 'primary.main' : 'text.secondary', mb: 1 }}>
-                                {React.cloneElement(card.icon, { fontSize: 'large' })}
-                            </Box>
-                            <Typography variant="h6" fontWeight={card.active ? 'bold' : 'normal'}>
-                                {card.title}
-                            </Typography>
-                        </CardContent>
-                    </Card>
-                ))}
-            </Box>
+            {/* Filters */}
+            <Card sx={{ mb: 3 }}>
+                <CardContent>
+                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={3} alignItems="center">
+                        <Box sx={{ minWidth: 200 }}>
+                            <FormControl fullWidth>
+                                <InputLabel>Report Type</InputLabel>
+                                <Select
+                                    value={reportType}
+                                    label="Report Type"
+                                    onChange={(e) => setReportType(e.target.value)}
+                                >
+                                    <MenuItem value="overview">Overview</MenuItem>
+                                    <MenuItem value="customers">Customers</MenuItem>
+                                    <MenuItem value="inventory">Inventory</MenuItem>
+                                    <MenuItem value="financial">Financial</MenuItem>
+                                </Select>
+                            </FormControl>
+                        </Box>
+                        <TextField
+                            type="date"
+                            label="Start Date"
+                            value={startDate}
+                            onChange={(e) => setStartDate(e.target.value)}
+                            InputLabelProps={{ shrink: true }}
+                            sx={{ minWidth: 150 }}
+                        />
+                        <TextField
+                            type="date"
+                            label="End Date"
+                            value={endDate}
+                            onChange={(e) => setEndDate(e.target.value)}
+                            InputLabelProps={{ shrink: true }}
+                            sx={{ minWidth: 150 }}
+                        />
+                        <Button
+                            variant="contained"
+                            onClick={loadReportData}
+                            startIcon={<Assessment />}
+                            sx={{ minWidth: 120 }}
+                        >
+                            Refresh
+                        </Button>
+                    </Stack>
+                </CardContent>
+            </Card>
 
-            {/* Loading State */}
-            {loading && (
+            {/* Report Content */}
+            {loading ? (
                 <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
                     <CircularProgress />
                 </Box>
-            )}
-
-            {/* Summary Cards */}
-            {!loading && (
-                <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 3, mb: 3 }}>
-                    <Card>
-                        <CardContent>
-                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                                <Inventory sx={{ color: 'primary.main', mr: 1 }} />
-                                <Typography variant="h6" color="text.secondary">
-                                    Total Items
-                                </Typography>
-                            </Box>
-                            <Typography variant="h4" fontWeight="bold">
-                                {inventoryData.length}
-                            </Typography>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent>
-                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                                <LocalAtm sx={{ color: 'success.main', mr: 1 }} />
-                                <Typography variant="h6" color="text.secondary">
-                                    Inventory Value
-                                </Typography>
-                            </Box>
-                            <Typography variant="h4" fontWeight="bold">
-                                ₹{totalInventoryValue.toFixed(2)}
-                            </Typography>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent>
-                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                                <People sx={{ color: 'info.main', mr: 1 }} />
-                                <Typography variant="h6" color="text.secondary">
-                                    Total Customers
-                                </Typography>
-                            </Box>
-                            <Typography variant="h4" fontWeight="bold">
-                                {customerData.length}
-                            </Typography>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent>
-                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                                <TrendingUp sx={{ color: 'warning.main', mr: 1 }} />
-                                <Typography variant="h6" color="text.secondary">
-                                    Categories
-                                </Typography>
-                            </Box>
-                            <Typography variant="h4" fontWeight="bold">
-                                {Array.from(new Set(inventoryData.map(item => item.category))).filter(Boolean).length}
-                            </Typography>
-                        </CardContent>
-                    </Card>
+            ) : (
+                <Box>
+                    {reportType === 'overview' && renderOverviewReport()}
+                    {reportType === 'customers' && renderCustomerReport()}
+                    {reportType === 'inventory' && renderInventoryReport()}
+                    {reportType === 'financial' && renderFinancialReport()}
                 </Box>
-            )}
-
-            {/* Inventory Report */}
-            {!loading && (selectedReport === 'inventory' || selectedReport === 'all') && (
-                <Card sx={{ mb: 3 }}>
-                    <CardContent>
-                        <Typography variant="h6" gutterBottom>
-                            Inventory Report
-                        </Typography>
-                        {inventoryData && inventoryData.length > 0 ? (
-                            <TableContainer>
-                                <Table>
-                                    <TableHead>
-                                        <TableRow>
-                                            <TableCell>Item</TableCell>
-                                            <TableCell>Category</TableCell>
-                                            <TableCell>Current Stock</TableCell>
-                                            <TableCell>Unit</TableCell>
-                                            <TableCell>Cost per Unit</TableCell>
-                                            <TableCell>Total Value</TableCell>
-                                            <TableCell>Status</TableCell>
-                                        </TableRow>
-                                    </TableHead>
-                                    <TableBody>
-                                        {inventoryData.map((item: any, index: number) => {
-                                            const currentStock = parseFloat(item.current_stock || 0);
-                                            const costPerUnit = parseFloat(item.cost_per_unit || 0);
-                                            const reorderLevel = parseFloat(item.reorder_level || 0);
-                                            const totalValue = currentStock * costPerUnit;
-
-                                            return (
-                                                <TableRow key={item.id || index}>
-                                                    <TableCell>{item.item_name}</TableCell>
-                                                    <TableCell>{item.category}</TableCell>
-                                                    <TableCell>{currentStock}</TableCell>
-                                                    <TableCell>{item.unit}</TableCell>
-                                                    <TableCell>₹{costPerUnit.toFixed(2)}</TableCell>
-                                                    <TableCell>₹{totalValue.toFixed(2)}</TableCell>
-                                                    <TableCell>
-                                                        {currentStock <= reorderLevel ? (
-                                                            <Typography color="error.main" variant="body2">Low Stock</Typography>
-                                                        ) : (
-                                                            <Typography color="success.main" variant="body2">Good</Typography>
-                                                        )}
-                                                    </TableCell>
-                                                </TableRow>
-                                            );
-                                        })}
-                                    </TableBody>
-                                </Table>
-                            </TableContainer>
-                        ) : (
-                            <Typography color="text.secondary">No inventory data available</Typography>
-                        )}
-                    </CardContent>
-                </Card>
-            )}
-
-            {/* Customer Report */}
-            {!loading && (selectedReport === 'customers' || selectedReport === 'all') && (
-                <Card sx={{ mb: 3 }}>
-                    <CardContent>
-                        <Typography variant="h6" gutterBottom>
-                            Customer Report
-                        </Typography>
-                        {customerData && customerData.length > 0 ? (
-                            <TableContainer>
-                                <Table>
-                                    <TableHead>
-                                        <TableRow>
-                                            <TableCell>Customer Name</TableCell>
-                                            <TableCell>Phone</TableCell>
-                                            <TableCell>Email</TableCell>
-                                            <TableCell>Address</TableCell>
-                                            <TableCell>GST Number</TableCell>
-                                        </TableRow>
-                                    </TableHead>
-                                    <TableBody>
-                                        {customerData.map((customer: any, index: number) => (
-                                            <TableRow key={customer.id || index}>
-                                                <TableCell>{customer.name}</TableCell>
-                                                <TableCell>{customer.phone || 'N/A'}</TableCell>
-                                                <TableCell>{customer.email || 'N/A'}</TableCell>
-                                                <TableCell>{customer.address || 'N/A'}</TableCell>
-                                                <TableCell>{customer.gst_number || 'N/A'}</TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </TableContainer>
-                        ) : (
-                            <Typography color="text.secondary">No customer data available</Typography>
-                        )}
-                    </CardContent>
-                </Card>
-            )}
-
-            {/* No Data State */}
-            {!loading && inventoryData.length === 0 && customerData.length === 0 && (
-                <Card>
-                    <CardContent sx={{ textAlign: 'center', py: 8 }}>
-                        <Assessment sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
-                        <Typography variant="h6" color="text.secondary">
-                            No report data available
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                            Reports will appear here once you have inventory and customer data
-                        </Typography>
-                    </CardContent>
-                </Card>
             )}
         </Box>
     );
 };
 
-export default Reports; 
+export default Reports;

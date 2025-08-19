@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
 import { User, AuthToken, LoginRequest } from '../types';
-import { apiClient, API_ENDPOINTS } from '../config/api';
+import { supabase, authHelpers } from '../lib/supabase';
+import { authLogger, logAuthState, performance } from '../utils/debug';
 
 interface AuthState {
   user: User | null;
@@ -27,14 +28,23 @@ const initialState: AuthState = {
 };
 
 const authReducer = (state: AuthState, action: AuthAction): AuthState => {
+  authLogger.debug('Auth reducer action', { 
+    type: action.type, 
+    payload: 'payload' in action ? action.payload : undefined 
+  });
+  
   switch (action.type) {
     case 'LOGIN_START':
+      logAuthState('LOGIN_START');
       return {
         ...state,
         isLoading: true,
         error: null,
       };
     case 'LOGIN_SUCCESS':
+      logAuthState('LOGIN_SUCCESS', { user: action.payload.user.email, hasToken: !!action.payload.token });
+      // Store token in localStorage
+      localStorage.setItem('access_token', action.payload.token);
       return {
         ...state,
         user: action.payload.user,
@@ -44,6 +54,7 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         error: null,
       };
     case 'LOGIN_FAILURE':
+      logAuthState('LOGIN_FAILURE', { error: action.payload });
       return {
         ...state,
         user: null,
@@ -53,6 +64,9 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         error: action.payload,
       };
     case 'LOGOUT':
+      logAuthState('LOGOUT');
+      // Clear token from localStorage
+      localStorage.removeItem('access_token');
       return {
         ...state,
         user: null,
@@ -61,23 +75,28 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         error: null,
       };
     case 'SET_USER':
+      logAuthState('SET_USER', { user: action.payload.email });
       return {
         ...state,
         user: action.payload,
         isAuthenticated: true,
+        token: state.token || localStorage.getItem('access_token'),
       };
     case 'CLEAR_ERROR':
+      logAuthState('CLEAR_ERROR');
       return {
         ...state,
         error: null,
       };
     default:
+      authLogger.warn('Unknown auth action type', action);
       return state;
   }
 };
 
 interface AuthContextType {
   state: AuthState;
+  token: string | null;
   login: (credentials: LoginRequest) => Promise<void>;
   logout: () => void;
   clearError: () => void;
@@ -103,93 +122,165 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Check if user is already logged in on app start
   useEffect(() => {
     const checkAuth = async () => {
-      const token = localStorage.getItem('access_token');
-      const storedUser = localStorage.getItem('user');
-
-      if (token && storedUser) {
-        try {
-          // First try to use stored user data
-          const userData = JSON.parse(storedUser);
-          dispatch({ type: 'SET_USER', payload: userData });
-
-          // Then verify with server (but don't fail if server is unreachable)
-          try {
-            const response = await apiClient.get(API_ENDPOINTS.ME);
-            dispatch({ type: 'SET_USER', payload: response.data });
-          } catch (verifyError) {
-            // If server verification fails, still use stored data
-            console.log('Server verification failed, using stored user data');
-          }
-        } catch (error) {
-          // Token or stored data is invalid, remove it
-          localStorage.removeItem('access_token');
-          localStorage.removeItem('user');
+      authLogger.info('Starting auth check');
+      performance.mark('auth-check-start');
+      
+      try {
+        const { user, error } = await authHelpers.getCurrentUser();
+        performance.measure('auth-check', 'auth-check-start');
+        
+        if (error) {
+          authLogger.warn('Auth check error', error);
+          return;
         }
+        
+        if (user) {
+          authLogger.info('User found in auth check', { email: user.email, id: user.id });
+          dispatch({ 
+            type: 'SET_USER', 
+            payload: user 
+          });
+        } else {
+          authLogger.info('No user found in auth check');
+        }
+      } catch (error) {
+        authLogger.error('Auth check failed', error);
       }
     };
 
     checkAuth();
+
+    // Listen for auth changes
+    authLogger.info('Setting up auth state change listener');
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        authLogger.info('Auth state change event', { event, hasSession: !!session });
+        
+        if (event === 'SIGNED_IN' && session) {
+          authLogger.info('Processing SIGNED_IN event', { 
+            sessionId: session.access_token?.slice(0, 10) + '...',
+            expiresAt: session.expires_at 
+          });
+          
+          const { user, error } = await authHelpers.getCurrentUser();
+          if (error) {
+            authLogger.error('Failed to get user after SIGNED_IN', error);
+            return;
+          }
+          
+          if (user) {
+            authLogger.info('Successfully got user after SIGNED_IN', { email: user.email });
+            // Store token in localStorage
+            localStorage.setItem('access_token', session.access_token);
+            dispatch({ 
+              type: 'LOGIN_SUCCESS', 
+              payload: { 
+                user, 
+                token: session.access_token 
+              } 
+            });
+          }
+        } else if (event === 'SIGNED_OUT') {
+          authLogger.info('Processing SIGNED_OUT event');
+          localStorage.removeItem('access_token');
+          dispatch({ type: 'LOGOUT' });
+        } else {
+          authLogger.debug('Other auth event', { event });
+        }
+      }
+    );
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const login = async (credentials: LoginRequest) => {
+    authLogger.info('Starting login process', { 
+      email: credentials.email || credentials.username,
+      hasPassword: !!credentials.password 
+    });
+    performance.mark('login-start');
+    
     dispatch({ type: 'LOGIN_START' });
 
     try {
-      // Create form data for OAuth2 login
-      const formData = new FormData();
-      formData.append('username', credentials.username);
-      formData.append('password', credentials.password);
-
-      const authResponse = await apiClient.post(API_ENDPOINTS.LOGIN, formData, {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
+      // Use email field if available, otherwise use username as email
+      const email = credentials.email || credentials.username;
+      authLogger.debug('Attempting Supabase signInWithPassword', { email });
+      
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password: credentials.password,
       });
 
-      const authData: AuthToken = authResponse.data;
-
-      // Store token
-      localStorage.setItem('access_token', authData.access_token);
-
-      // Try to get user details, but don't fail if it doesn't work
-      let user: User;
-      try {
-        const userResponse = await apiClient.get(API_ENDPOINTS.ME);
-        user = userResponse.data;
-        localStorage.setItem('user', JSON.stringify(user));
-      } catch (userError) {
-        console.warn('Failed to get user details, using basic user info from token');
-        // Create a basic user object from the token/credentials
-        user = {
-          id: 'temp-user-id', // String ID to match User interface
-          username: credentials.username,
-          email: `${credentials.username}@example.com`,
-          full_name: credentials.username,
-          role: 'admin', // Assume admin since login worked
-          is_active: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
-        localStorage.setItem('user', JSON.stringify(user));
+      if (error) {
+        authLogger.error('Supabase signInWithPassword failed', error);
+        throw new Error(error.message);
       }
 
+      if (!data.user || !data.session) {
+        authLogger.error('Login failed - no user data received', { data });
+        throw new Error('Login failed - no user data received');
+      }
+
+      authLogger.info('Supabase signInWithPassword successful', { 
+        userId: data.user.id,
+        email: data.user.email,
+        hasSession: !!data.session 
+      });
+
+      // Get user profile
+      authLogger.debug('Getting user profile');
+      const { user: userProfile, error: profileError } = await authHelpers.getCurrentUser();
+      
+      if (profileError) {
+        authLogger.error('Failed to get user profile', profileError);
+        throw new Error('Failed to get user profile');
+      }
+      
+      if (!userProfile) {
+        authLogger.error('User profile is null');
+        throw new Error('Failed to get user profile');
+      }
+
+      authLogger.info('User profile retrieved successfully', { 
+        email: userProfile.email,
+        role: userProfile.role 
+      });
+
+      performance.measure('login-success', 'login-start');
+      
       dispatch({
         type: 'LOGIN_SUCCESS',
         payload: {
-          user,
-          token: authData.access_token,
+          user: userProfile,
+          token: data.session.access_token,
         },
       });
+      
+      authLogger.info('Login completed successfully');
     } catch (error: any) {
-      const errorMessage = error.response?.data?.detail || 'Login failed. Please try again.';
+      const errorMessage = error.message || 'Login failed. Please try again.';
+      authLogger.error('Login failed', { error: errorMessage, originalError: error });
+      performance.measure('login-failure', 'login-start');
       dispatch({ type: 'LOGIN_FAILURE', payload: errorMessage });
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('user');
-    dispatch({ type: 'LOGOUT' });
+  const logout = async () => {
+    authLogger.info('Starting logout process');
+    
+    try {
+      await supabase.auth.signOut();
+      authLogger.info('Supabase signOut successful');
+      dispatch({ type: 'LOGOUT' });
+    } catch (error) {
+      authLogger.error('Logout error', error);
+      // Force logout even if signOut fails
+      dispatch({ type: 'LOGOUT' });
+      authLogger.info('Forced logout due to signOut failure');
+    }
   };
 
   const clearError = () => {
@@ -198,6 +289,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const value = {
     state,
+    token: state.token,
     login,
     logout,
     clearError,

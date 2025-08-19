@@ -11,7 +11,6 @@ import {
     TableContainer,
     TableHead,
     TableRow,
-    Chip,
     CircularProgress,
     Alert,
     TextField,
@@ -20,113 +19,136 @@ import {
     DialogTitle,
     DialogContent,
     DialogActions,
-    Grid,
-    FormControl,
-    InputLabel,
     Select,
     MenuItem,
+    FormControl,
+    InputLabel,
+    Autocomplete,
+    IconButton,
 } from '@mui/material';
 import {
     Add,
     Search,
+    Inventory2,
+    CalendarToday,
+    Person,
     Category,
-    Palette,
-    Science,
+    Visibility,
+    Edit,
+    Delete,
+    AddCircle,
+    RemoveCircle,
 } from '@mui/icons-material';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm, Controller, useFieldArray } from 'react-hook-form';
+import { yupResolver } from '@hookform/resolvers/yup';
+import * as yup from 'yup';
+import { MaterialIn, Customer } from '../types';
+import { materialInApi, customerApi } from '../services/supabaseApi';
+import { componentLogger } from '../utils/debug';
 
-// API service for materials
-const materialsApi = {
-    getMaterials: async () => {
-        const token = localStorage.getItem('access_token');
-        const response = await fetch('https://jbms1.onrender.com/api/materials/', {
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json',
-            },
-        });
-        if (!response.ok) throw new Error('Failed to fetch materials');
-        return response.json();
-    },
+// Form validation schemas
+const materialItemSchema = yup.object({
+    material_type: yup.string().required('Material type is required'),
+    quantity: yup.number().positive('Quantity must be positive').required('Quantity is required'),
+    notes: yup.string(),
+});
 
-    createMaterial: async (materialData: any) => {
-        const token = localStorage.getItem('access_token');
-        const response = await fetch('https://jbms1.onrender.com/api/materials/', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(materialData),
-        });
-        if (!response.ok) throw new Error('Failed to create material');
-        return response.json();
-    },
+const materialTransactionSchema = yup.object({
+    customer_id: yup.string().required('Customer is required'),
+    received_date: yup.string().required('Received date is required'),
+    items: yup.array().of(materialItemSchema).min(1, 'At least one material item is required'),
+    transaction_notes: yup.string(),
+});
 
-    updateMaterial: async (id: string, materialData: any) => {
-        const token = localStorage.getItem('access_token');
-        const response = await fetch(`https://jbms1.onrender.com/api/materials/${id}`, {
-            method: 'PUT',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(materialData),
-        });
-        if (!response.ok) throw new Error('Failed to update material');
-        return response.json();
-    },
+const materialEditSchema = yup.object({
+    material_type: yup.string().required('Material type is required'),
+    quantity: yup.number().positive('Quantity must be positive').required('Quantity is required'),
+    notes: yup.string(),
+});
 
-    deleteMaterial: async (id: string) => {
-        const token = localStorage.getItem('access_token');
-        const response = await fetch(`https://jbms1.onrender.com/api/materials/${id}`, {
-            method: 'DELETE',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json',
-            },
-        });
-        if (!response.ok) throw new Error('Failed to delete material');
-        return response.json();
-    },
-};
+const materialTypes = [
+    { value: 'saree', label: 'Saree' },
+    { value: 'dupatta', label: 'Dupatta' },
+    { value: 'voni', label: 'Voni' },
+    { value: 'running_material', label: 'Running Material' },
+    { value: 'blouse_material', label: 'Blouse Material' },
+    { value: 'other', label: 'Other' },
+];
 
 const Materials: React.FC = () => {
-    const [materials, setMaterials] = useState<any[]>([]);
+    const [materials, setMaterials] = useState<MaterialIn[]>([]);
+    const [customers, setCustomers] = useState<Customer[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
-    const [typeFilter, setTypeFilter] = useState('');
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
     const [dialogOpen, setDialogOpen] = useState(false);
-    const [editingMaterial, setEditingMaterial] = useState<any>(null);
+    const [viewDialogOpen, setViewDialogOpen] = useState(false);
+    const [editDialogOpen, setEditDialogOpen] = useState(false);
+    const [selectedMaterial, setSelectedMaterial] = useState<MaterialIn | null>(null);
 
+    // Create transaction form (multiple items)
     const { control, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm({
+        resolver: yupResolver(materialTransactionSchema),
         defaultValues: {
-            name: '',
-            type: '',
-            color: '',
-            cost_per_unit: 0,
-            supplier: '',
-            description: '',
+            customer_id: '',
+            received_date: new Date().toISOString().split('T')[0],
+            items: [{ material_type: 'saree', quantity: 1, notes: '' }],
+            transaction_notes: '',
+        },
+    });
+
+    const { fields, append, remove } = useFieldArray({
+        control,
+        name: "items"
+    });
+
+    // Edit material form
+    const { 
+        control: editControl, 
+        handleSubmit: handleEditSubmit, 
+        reset: editReset, 
+        formState: { errors: editErrors, isSubmitting: isEditSubmitting } 
+    } = useForm({
+        resolver: yupResolver(materialEditSchema),
+        defaultValues: {
+            material_type: 'saree',
+            quantity: 1,
+            notes: '',
         },
     });
 
     const loadMaterials = useCallback(async () => {
+        componentLogger.info('Loading materials...');
         try {
             setLoading(true);
-            const data = await materialsApi.getMaterials();
-            setMaterials(data);
+            const materialsData = await materialInApi.getMaterialIn();
+            componentLogger.info('Materials loaded successfully', { count: materialsData.length });
+            setMaterials(materialsData);
         } catch (error: any) {
+            componentLogger.error('Failed to load materials', error);
             setError('Failed to load materials: ' + error.message);
         } finally {
             setLoading(false);
         }
     }, []);
 
+    const loadCustomers = useCallback(async () => {
+        componentLogger.info('Loading customers for materials...');
+        try {
+            const customersData = await customerApi.getCustomers();
+            componentLogger.info('Customers loaded successfully for materials', { count: customersData.length });
+            setCustomers(customersData);
+        } catch (error: any) {
+            componentLogger.error('Failed to load customers for materials', error);
+            setError('Failed to load customers: ' + error.message);
+        }
+    }, []);
+
     useEffect(() => {
         loadMaterials();
-    }, [loadMaterials]);
+        loadCustomers();
+    }, [loadMaterials, loadCustomers]);
 
     useEffect(() => {
         if (error || success) {
@@ -139,105 +161,122 @@ const Materials: React.FC = () => {
     }, [error, success]);
 
     const handleCreateMaterial = () => {
-        setEditingMaterial(null);
+        componentLogger.info('Opening create material transaction dialog');
         reset({
-            name: '',
-            type: '',
-            color: '',
-            cost_per_unit: 0,
-            supplier: '',
-            description: '',
+            customer_id: '',
+            received_date: new Date().toISOString().split('T')[0],
+            items: [{ material_type: 'saree', quantity: 1, notes: '' }],
+            transaction_notes: '',
         });
         setDialogOpen(true);
     };
 
-    const handleEditMaterial = (material: any) => {
-        setEditingMaterial(material);
-        reset({
-            name: material.name,
-            type: material.type,
-            color: material.color || '',
-            cost_per_unit: material.cost_per_unit,
-            supplier: material.supplier || '',
-            description: material.description || '',
+    const handleEditMaterial = (material: MaterialIn) => {
+        componentLogger.info('Opening edit material dialog', { materialId: material.id });
+        setSelectedMaterial(material);
+        editReset({
+            material_type: material.material_type,
+            quantity: material.quantity,
+            notes: material.notes || '',
         });
-        setDialogOpen(true);
+        setEditDialogOpen(true);
     };
 
-    const handleDeleteMaterial = async (material: any) => {
-        if (window.confirm(`Are you sure you want to delete ${material.name}?`)) {
-            try {
-                await materialsApi.deleteMaterial(material.id);
-                setSuccess('Material deleted successfully');
-                loadMaterials();
-            } catch (error: any) {
-                setError('Failed to delete material: ' + error.message);
-            }
+    const addMaterialItem = () => {
+        append({ material_type: 'saree', quantity: 1, notes: '' });
+    };
+
+    const removeMaterialItem = (index: number) => {
+        if (fields.length > 1) {
+            remove(index);
         }
     };
 
     const onSubmit = async (data: any) => {
+        componentLogger.info('Submitting material transaction', data);
         try {
-            if (editingMaterial) {
-                await materialsApi.updateMaterial(editingMaterial.id, data);
-                setSuccess('Material updated successfully');
-            } else {
-                await materialsApi.createMaterial(data);
-                setSuccess('Material created successfully');
-            }
+            // Create multiple material entries for each item
+            const promises = data.items.map((item: any) => {
+                const materialData = {
+                    customer_id: data.customer_id,
+                    material_type: item.material_type,
+                    quantity: Number(item.quantity),
+                    received_date: data.received_date,
+                    notes: item.notes || data.transaction_notes || '',
+                };
+                return materialInApi.createMaterialIn(materialData);
+            });
+
+            await Promise.all(promises);
+            componentLogger.info('Material transaction created successfully');
+            setSuccess(`Material transaction recorded successfully with ${data.items.length} items`);
             setDialogOpen(false);
             loadMaterials();
         } catch (error: any) {
-            setError('Failed to save material: ' + error.message);
+            componentLogger.error('Failed to create material transaction', error);
+            setError('Failed to record material transaction: ' + error.message);
         }
     };
 
-    const getTypeIcon = (type: string) => {
-        switch (type.toLowerCase()) {
-            case 'dye':
-            case 'pigment':
-                return <Palette />;
-            case 'chemical':
-                return <Science />;
-            default:
-                return <Category />;
+    const onEditSubmit = async (data: any) => {
+        if (!selectedMaterial) return;
+        
+        componentLogger.info('Submitting material edit', { materialId: selectedMaterial.id, data });
+        try {
+            await materialInApi.updateMaterialIn(selectedMaterial.id, {
+                material_type: data.material_type,
+                quantity: Number(data.quantity),
+                notes: data.notes,
+            });
+            componentLogger.info('Material updated successfully');
+            setSuccess('Material updated successfully');
+            setEditDialogOpen(false);
+            setSelectedMaterial(null);
+            loadMaterials();
+        } catch (error: any) {
+            componentLogger.error('Failed to update material', error);
+            setError('Failed to update material: ' + error.message);
         }
     };
 
-    const getTypeColor = (type: string) => {
-        switch (type.toLowerCase()) {
-            case 'dye':
-                return 'primary';
-            case 'pigment':
-                return 'secondary';
-            case 'chemical':
-                return 'warning';
-            case 'auxiliary':
-                return 'info';
-            default:
-                return 'default';
+    const handleDeleteMaterial = async (materialId: string) => {
+        if (!window.confirm('Are you sure you want to delete this material record?')) {
+            return;
+        }
+        
+        componentLogger.info('Deleting material', { materialId });
+        try {
+            await materialInApi.deleteMaterialIn(materialId);
+            componentLogger.info('Material deleted successfully');
+            setSuccess('Material record deleted successfully');
+            loadMaterials();
+        } catch (error: any) {
+            componentLogger.error('Failed to delete material', error);
+            setError('Failed to delete material: ' + error.message);
         }
     };
 
-    const types = Array.from(new Set(materials.map(material => material.type))).filter(Boolean);
+    const filteredMaterials = materials.filter((material) =>
+        material.material_type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        material.customer?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        material.notes?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
 
-    const filteredMaterials = materials.filter((material) => {
-        const matchesSearch = material.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            material.type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            material.color?.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesType = !typeFilter || material.type === typeFilter;
-        return matchesSearch && matchesType;
-    });
+    const handleViewMaterial = (material: MaterialIn) => {
+        componentLogger.info('Viewing material details', { materialId: material.id });
+        setSelectedMaterial(material);
+        setViewDialogOpen(true);
+    };
 
     return (
         <Box>
             {/* Header */}
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                 <Typography variant="h4" fontWeight="bold">
-                    Materials & Chemicals
+                    Material Management
                 </Typography>
                 <Button variant="contained" startIcon={<Add />} onClick={handleCreateMaterial} sx={{ px: 3 }}>
-                    Add Material
+                    Record Material In
                 </Button>
             </Box>
 
@@ -258,7 +297,7 @@ const Materials: React.FC = () => {
                 <Card>
                     <CardContent>
                         <Typography variant="h6" color="text.secondary" gutterBottom>
-                            Total Materials
+                            TOTAL MATERIALS
                         </Typography>
                         <Typography variant="h4" fontWeight="bold">
                             {materials.length}
@@ -268,72 +307,51 @@ const Materials: React.FC = () => {
                 <Card>
                     <CardContent>
                         <Typography variant="h6" color="text.secondary" gutterBottom>
-                            Material Types
+                            TOTAL QUANTITY
                         </Typography>
                         <Typography variant="h4" fontWeight="bold">
-                            {types.length}
+                            {materials.reduce((total, material) => total + (material.quantity || 0), 0)}
                         </Typography>
                     </CardContent>
                 </Card>
                 <Card>
                     <CardContent>
                         <Typography variant="h6" color="text.secondary" gutterBottom>
-                            Dyes & Pigments
+                            UNIQUE CUSTOMERS
                         </Typography>
                         <Typography variant="h4" fontWeight="bold">
-                            {materials.filter(m => ['dye', 'pigment'].includes(m.type?.toLowerCase())).length}
+                            {new Set(materials.map(m => m.customer_id)).size}
                         </Typography>
                     </CardContent>
                 </Card>
                 <Card>
                     <CardContent>
                         <Typography variant="h6" color="text.secondary" gutterBottom>
-                            Chemicals
+                            MATERIAL TYPES
                         </Typography>
                         <Typography variant="h4" fontWeight="bold">
-                            {materials.filter(m => m.type?.toLowerCase() === 'chemical').length}
+                            {new Set(materials.map(m => m.material_type)).size}
                         </Typography>
                     </CardContent>
                 </Card>
             </Box>
 
-            {/* Search and Filters */}
+            {/* Search */}
             <Card sx={{ mb: 3 }}>
                 <CardContent>
-                    <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', md: 'row' } }}>
-                        <Box sx={{ flex: 2 }}>
-                            <TextField
-                                fullWidth
-                                placeholder="Search materials by name, type, or color..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                InputProps={{
-                                    startAdornment: (
-                                        <InputAdornment position="start">
-                                            <Search />
-                                        </InputAdornment>
-                                    ),
-                                }}
-                            />
-                        </Box>
-                        <Box sx={{ flex: 1 }}>
-                            <FormControl fullWidth>
-                                <InputLabel>Material Type</InputLabel>
-                                <Select
-                                    value={typeFilter}
-                                    onChange={(e) => setTypeFilter(e.target.value)}
-                                    label="Material Type"
-                                >
-                                    <MenuItem value="">All Types</MenuItem>
-                                    {types.map((type) => (
-                                        <MenuItem key={type} value={type}>
-                                            {type.charAt(0).toUpperCase() + type.slice(1)}
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
-                        </Box>
-                    </Box>
+                    <TextField
+                        fullWidth
+                        placeholder="Search materials by type, customer, or notes..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        InputProps={{
+                            startAdornment: (
+                                <InputAdornment position="start">
+                                    <Search />
+                                </InputAdornment>
+                            ),
+                        }}
+                    />
                 </CardContent>
             </Card>
 
@@ -346,16 +364,16 @@ const Materials: React.FC = () => {
                         </Box>
                     ) : filteredMaterials.length === 0 ? (
                         <Box sx={{ textAlign: 'center', py: 8 }}>
-                            <Palette sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
+                            <Inventory2 sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
                             <Typography variant="h6" color="text.secondary">
-                                {searchTerm || typeFilter ? 'No materials found matching your criteria' : 'No materials yet'}
+                                {searchTerm ? 'No materials found matching your search' : 'No materials recorded yet'}
                             </Typography>
                             <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                                {searchTerm || typeFilter ? 'Try adjusting your search or filters' : 'Add your first material to get started'}
+                                {searchTerm ? 'Try adjusting your search terms' : 'Record your first material intake to get started'}
                             </Typography>
-                            {!searchTerm && !typeFilter && (
+                            {!searchTerm && (
                                 <Button variant="contained" startIcon={<Add />} onClick={handleCreateMaterial}>
-                                    Add First Material
+                                    Record First Material
                                 </Button>
                             )}
                         </Box>
@@ -364,11 +382,11 @@ const Materials: React.FC = () => {
                             <Table>
                                 <TableHead>
                                     <TableRow>
-                                        <TableCell>Material Name</TableCell>
-                                        <TableCell>Type</TableCell>
-                                        <TableCell>Color</TableCell>
-                                        <TableCell>Cost per Unit</TableCell>
-                                        <TableCell>Supplier</TableCell>
+                                        <TableCell>Customer</TableCell>
+                                        <TableCell>Material Type</TableCell>
+                                        <TableCell>Quantity</TableCell>
+                                        <TableCell>Received Date</TableCell>
+                                        <TableCell>Notes</TableCell>
                                         <TableCell>Actions</TableCell>
                                     </TableRow>
                                 </TableHead>
@@ -377,44 +395,49 @@ const Materials: React.FC = () => {
                                         <TableRow key={material.id} hover>
                                             <TableCell>
                                                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                                    {getTypeIcon(material.type)}
-                                                    <Typography sx={{ ml: 1 }}>{material.name}</Typography>
+                                                    <Person sx={{ mr: 1, color: 'text.secondary' }} />
+                                                    {material.customer?.name || 'Unknown Customer'}
                                                 </Box>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Chip
-                                                    label={material.type}
-                                                    color={getTypeColor(material.type) as any}
-                                                    variant="outlined"
-                                                    size="small"
-                                                />
                                             </TableCell>
                                             <TableCell>
                                                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                                    {material.color && (
-                                                        <Box
-                                                            sx={{
-                                                                width: 20,
-                                                                height: 20,
-                                                                borderRadius: '50%',
-                                                                backgroundColor: material.color.toLowerCase(),
-                                                                border: '1px solid #ccc',
-                                                                mr: 1,
-                                                            }}
-                                                        />
-                                                    )}
-                                                    {material.color || 'N/A'}
+                                                    <Category sx={{ mr: 1, color: 'text.secondary' }} />
+                                                    {material.material_type}
                                                 </Box>
                                             </TableCell>
-                                            <TableCell>₹{parseFloat(material.cost_per_unit).toFixed(2)}</TableCell>
-                                            <TableCell>{material.supplier || 'N/A'}</TableCell>
+                                            <TableCell>{material.quantity}</TableCell>
                                             <TableCell>
-                                                <Button size="small" onClick={() => handleEditMaterial(material)} sx={{ mr: 1 }}>
-                                                    Edit
-                                                </Button>
-                                                <Button size="small" color="error" onClick={() => handleDeleteMaterial(material)}>
-                                                    Delete
-                                                </Button>
+                                                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                                    <CalendarToday sx={{ mr: 1, color: 'text.secondary', fontSize: 16 }} />
+                                                    {new Date(material.received_date).toLocaleDateString()}
+                                                </Box>
+                                            </TableCell>
+                                            <TableCell>{material.notes || '-'}</TableCell>
+                                            <TableCell>
+                                                <Box sx={{ display: 'flex', gap: 1 }}>
+                                                    <IconButton 
+                                                        size="small" 
+                                                        onClick={() => handleViewMaterial(material)}
+                                                        title="View Material Details"
+                                                    >
+                                                        <Visibility />
+                                                    </IconButton>
+                                                    <IconButton 
+                                                        size="small" 
+                                                        onClick={() => handleEditMaterial(material)}
+                                                        title="Edit Material"
+                                                    >
+                                                        <Edit />
+                                                    </IconButton>
+                                                    <IconButton 
+                                                        size="small" 
+                                                        onClick={() => handleDeleteMaterial(material.id)}
+                                                        title="Delete Material"
+                                                        color="error"
+                                                    >
+                                                        <Delete />
+                                                    </IconButton>
+                                                </Box>
                                             </TableCell>
                                         </TableRow>
                                     ))}
@@ -425,102 +448,151 @@ const Materials: React.FC = () => {
                 </CardContent>
             </Card>
 
-            {/* Create/Edit Material Dialog */}
+            {/* Create Material Transaction Dialog */}
             <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="md" fullWidth>
-                <DialogTitle>{editingMaterial ? 'Edit Material' : 'Add New Material'}</DialogTitle>
+                <DialogTitle>Record Material Transaction</DialogTitle>
                 <form onSubmit={handleSubmit(onSubmit)}>
                     <DialogContent>
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                            {/* Customer and Date Selection */}
                             <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', md: 'row' } }}>
                                 <Controller
-                                    name="name"
+                                    name="customer_id"
                                     control={control}
-                                    rules={{ required: 'Material name is required' }}
-                                    render={({ field }) => (
-                                        <TextField
-                                            {...field}
-                                            fullWidth
-                                            label="Material Name"
-                                            error={!!errors.name}
-                                            helperText={errors.name?.message}
-                                        />
-                                    )}
-                                />
-                                <Controller
-                                    name="type"
-                                    control={control}
-                                    rules={{ required: 'Material type is required' }}
-                                    render={({ field }) => (
-                                        <FormControl fullWidth error={!!errors.type}>
-                                            <InputLabel>Material Type</InputLabel>
-                                            <Select {...field} label="Material Type">
-                                                <MenuItem value="dye">Dye</MenuItem>
-                                                <MenuItem value="pigment">Pigment</MenuItem>
-                                                <MenuItem value="chemical">Chemical</MenuItem>
-                                                <MenuItem value="auxiliary">Auxiliary</MenuItem>
-                                                <MenuItem value="other">Other</MenuItem>
-                                            </Select>
-                                            {errors.type && (
-                                                <Typography variant="caption" color="error">
-                                                    {errors.type.message}
-                                                </Typography>
+                                    render={({ field: { onChange, value } }) => (
+                                        <Autocomplete
+                                            options={customers}
+                                            getOptionLabel={(customer) => `${customer.name} (${customer.phone || customer.email})`}
+                                            value={customers.find(c => c.id === value) || null}
+                                            onChange={(_, customer) => onChange(customer?.id || '')}
+                                            renderInput={(params) => (
+                                                <TextField
+                                                    {...params}
+                                                    label="Customer"
+                                                    error={!!errors.customer_id}
+                                                    helperText={errors.customer_id?.message}
+                                                />
                                             )}
-                                        </FormControl>
+                                            loading={customers.length === 0}
+                                            loadingText="Loading customers..."
+                                            noOptionsText="No customers found"
+                                            sx={{ flex: 1 }}
+                                        />
                                     )}
                                 />
-                            </Box>
-                            <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', md: 'row' } }}>
+                                
                                 <Controller
-                                    name="color"
+                                    name="received_date"
                                     control={control}
                                     render={({ field }) => (
                                         <TextField
                                             {...field}
-                                            fullWidth
-                                            label="Color"
-                                            placeholder="e.g., Red, Blue, #FF0000"
-                                        />
-                                    )}
-                                />
-                                <Controller
-                                    name="cost_per_unit"
-                                    control={control}
-                                    rules={{ required: 'Cost per unit is required' }}
-                                    render={({ field }) => (
-                                        <TextField
-                                            {...field}
-                                            fullWidth
-                                            label="Cost per Unit (₹)"
-                                            type="number"
-                                            error={!!errors.cost_per_unit}
-                                            helperText={errors.cost_per_unit?.message}
+                                            type="date"
+                                            label="Received Date"
+                                            InputLabelProps={{ shrink: true }}
+                                            error={!!errors.received_date}
+                                            helperText={errors.received_date?.message}
+                                            sx={{ flex: 1 }}
                                         />
                                     )}
                                 />
                             </Box>
+
+                            {/* Material Items */}
+                            <Box>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                                    <Typography variant="h6">Material Items</Typography>
+                                    <Button
+                                        startIcon={<AddCircle />}
+                                        onClick={addMaterialItem}
+                                        variant="outlined"
+                                        size="small"
+                                    >
+                                        Add Item
+                                    </Button>
+                                </Box>
+                                
+                                {fields.map((field, index) => (
+                                    <Card key={field.id} variant="outlined" sx={{ mb: 2 }}>
+                                        <CardContent>
+                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                                                <Typography variant="subtitle1">Item {index + 1}</Typography>
+                                                {fields.length > 1 && (
+                                                    <IconButton
+                                                        size="small"
+                                                        onClick={() => removeMaterialItem(index)}
+                                                        color="error"
+                                                    >
+                                                        <RemoveCircle />
+                                                    </IconButton>
+                                                )}
+                                            </Box>
+                                            
+                                            <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', md: 'row' } }}>
+                                                <Controller
+                                                    name={`items.${index}.material_type`}
+                                                    control={control}
+                                                    render={({ field }) => (
+                                                        <FormControl fullWidth>
+                                                            <InputLabel>Material Type</InputLabel>
+                                                            <Select {...field} label="Material Type">
+                                                                {materialTypes.map((type) => (
+                                                                    <MenuItem key={type.value} value={type.value}>
+                                                                        {type.label}
+                                                                    </MenuItem>
+                                                                ))}
+                                                            </Select>
+                                                        </FormControl>
+                                                    )}
+                                                />
+                                                
+                                                <Controller
+                                                    name={`items.${index}.quantity`}
+                                                    control={control}
+                                                    render={({ field }) => (
+                                                        <TextField
+                                                            {...field}
+                                                            type="number"
+                                                            label="Quantity"
+                                                            inputProps={{ min: 1 }}
+                                                            sx={{ minWidth: 120 }}
+                                                        />
+                                                    )}
+                                                />
+                                            </Box>
+                                            
+                                            <Controller
+                                                name={`items.${index}.notes`}
+                                                control={control}
+                                                render={({ field }) => (
+                                                    <TextField
+                                                        {...field}
+                                                        fullWidth
+                                                        label="Item Notes"
+                                                        multiline
+                                                        rows={2}
+                                                        placeholder="Notes specific to this item..."
+                                                        sx={{ mt: 2 }}
+                                                    />
+                                                )}
+                                            />
+                                        </CardContent>
+                                    </Card>
+                                ))}
+                            </Box>
+
+                            {/* Transaction Notes */}
                             <Controller
-                                name="supplier"
+                                name="transaction_notes"
                                 control={control}
                                 render={({ field }) => (
                                     <TextField
                                         {...field}
                                         fullWidth
-                                        label="Supplier"
-                                        placeholder="Supplier name or company"
-                                    />
-                                )}
-                            />
-                            <Controller
-                                name="description"
-                                control={control}
-                                render={({ field }) => (
-                                    <TextField
-                                        {...field}
-                                        fullWidth
-                                        label="Description"
+                                        label="Transaction Notes"
                                         multiline
                                         rows={3}
-                                        placeholder="Material description, usage instructions, etc."
+                                        placeholder="General notes about this transaction..."
                                     />
                                 )}
                             />
@@ -529,7 +601,156 @@ const Materials: React.FC = () => {
                     <DialogActions>
                         <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
                         <Button type="submit" variant="contained" disabled={isSubmitting}>
-                            {isSubmitting ? (editingMaterial ? 'Updating...' : 'Creating...') : (editingMaterial ? 'Update' : 'Create')}
+                            {isSubmitting ? 'Recording...' : 'Record Transaction'}
+                        </Button>
+                    </DialogActions>
+                </form>
+            </Dialog>
+
+            {/* View Material Dialog */}
+            <Dialog open={viewDialogOpen} onClose={() => setViewDialogOpen(false)} maxWidth="sm" fullWidth>
+                <DialogTitle>Material Details</DialogTitle>
+                <DialogContent>
+                    {selectedMaterial && (
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                            {/* Material Information */}
+                            <Card>
+                                <CardContent>
+                                    <Typography variant="h6" gutterBottom>Material Information</Typography>
+                                    <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+                                        <Box>
+                                            <Typography variant="caption" color="text.secondary">Material Type</Typography>
+                                            <Typography variant="body1">
+                                                {materialTypes.find(t => t.value === selectedMaterial.material_type)?.label || selectedMaterial.material_type}
+                                            </Typography>
+                                        </Box>
+                                        <Box>
+                                            <Typography variant="caption" color="text.secondary">Quantity</Typography>
+                                            <Typography variant="body1">{selectedMaterial.quantity}</Typography>
+                                        </Box>
+                                        <Box>
+                                            <Typography variant="caption" color="text.secondary">Received Date</Typography>
+                                            <Typography variant="body1">{new Date(selectedMaterial.received_date).toLocaleDateString()}</Typography>
+                                        </Box>
+                                        <Box>
+                                            <Typography variant="caption" color="text.secondary">Status</Typography>
+                                            <Typography variant="body1">Received</Typography>
+                                        </Box>
+                                    </Box>
+                                    {selectedMaterial.notes && (
+                                        <Box sx={{ mt: 2 }}>
+                                            <Typography variant="caption" color="text.secondary">Notes</Typography>
+                                            <Typography variant="body1">{selectedMaterial.notes}</Typography>
+                                        </Box>
+                                    )}
+                                </CardContent>
+                            </Card>
+
+                            {/* Customer Information */}
+                            <Card>
+                                <CardContent>
+                                    <Typography variant="h6" gutterBottom>Customer Information</Typography>
+                                    <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+                                        <Box>
+                                            <Typography variant="caption" color="text.secondary">Name</Typography>
+                                            <Typography variant="body1">{selectedMaterial.customer?.name || 'N/A'}</Typography>
+                                        </Box>
+                                        <Box>
+                                            <Typography variant="caption" color="text.secondary">Phone</Typography>
+                                            <Typography variant="body1">{selectedMaterial.customer?.phone || 'N/A'}</Typography>
+                                        </Box>
+                                        <Box>
+                                            <Typography variant="caption" color="text.secondary">Email</Typography>
+                                            <Typography variant="body1">{selectedMaterial.customer?.email || 'N/A'}</Typography>
+                                        </Box>
+                                        <Box>
+                                            <Typography variant="caption" color="text.secondary">Address</Typography>
+                                            <Typography variant="body1">{selectedMaterial.customer?.address || 'N/A'}</Typography>
+                                        </Box>
+                                    </Box>
+                                </CardContent>
+                            </Card>
+                        </Box>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setViewDialogOpen(false)}>Close</Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Edit Material Dialog */}
+            <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)} maxWidth="sm" fullWidth>
+                <DialogTitle>Edit Material</DialogTitle>
+                <form onSubmit={handleEditSubmit(onEditSubmit)}>
+                    <DialogContent>
+                        {selectedMaterial && (
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                                <Alert severity="info">
+                                    Editing material record for: {selectedMaterial.customer?.name}
+                                </Alert>
+
+                                {/* Material Type */}
+                                <Controller
+                                    name="material_type"
+                                    control={editControl}
+                                    render={({ field }) => (
+                                        <FormControl fullWidth error={!!editErrors.material_type}>
+                                            <InputLabel>Material Type</InputLabel>
+                                            <Select {...field} label="Material Type">
+                                                {materialTypes.map((type) => (
+                                                    <MenuItem key={type.value} value={type.value}>
+                                                        {type.label}
+                                                    </MenuItem>
+                                                ))}
+                                            </Select>
+                                            {editErrors.material_type && (
+                                                <Typography variant="caption" color="error">
+                                                    {editErrors.material_type.message}
+                                                </Typography>
+                                            )}
+                                        </FormControl>
+                                    )}
+                                />
+
+                                {/* Quantity */}
+                                <Controller
+                                    name="quantity"
+                                    control={editControl}
+                                    render={({ field }) => (
+                                        <TextField
+                                            {...field}
+                                            type="number"
+                                            label="Quantity"
+                                            fullWidth
+                                            inputProps={{ min: 1 }}
+                                            error={!!editErrors.quantity}
+                                            helperText={editErrors.quantity?.message}
+                                        />
+                                    )}
+                                />
+
+                                {/* Notes */}
+                                <Controller
+                                    name="notes"
+                                    control={editControl}
+                                    render={({ field }) => (
+                                        <TextField
+                                            {...field}
+                                            fullWidth
+                                            label="Notes"
+                                            multiline
+                                            rows={3}
+                                            placeholder="Any additional notes about this material..."
+                                        />
+                                    )}
+                                />
+                            </Box>
+                        )}
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={() => setEditDialogOpen(false)}>Cancel</Button>
+                        <Button type="submit" variant="contained" disabled={isEditSubmitting}>
+                            {isEditSubmitting ? 'Updating...' : 'Update Material'}
                         </Button>
                     </DialogActions>
                 </form>
@@ -538,4 +759,4 @@ const Materials: React.FC = () => {
     );
 };
 
-export default Materials; 
+export default Materials;

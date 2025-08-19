@@ -25,12 +25,12 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
 const schema = yup.object({
-    username: yup.string().required('Username is required'),
+    email: yup.string().email('Invalid email').required('Email is required'),
     password: yup.string().required('Password is required'),
 });
 
 interface LoginFormData {
-    username: string;
+    email: string;
     password: string;
 }
 
@@ -64,7 +64,11 @@ const Login: React.FC = () => {
 
     const onSubmit = async (data: LoginFormData) => {
         try {
-            await login(data);
+            await login({ 
+                username: data.email, // For compatibility with AuthContext
+                email: data.email,
+                password: data.password 
+            });
         } catch (error) {
             // Error is handled in AuthContext
         }
@@ -130,13 +134,14 @@ const Login: React.FC = () => {
 
                     <form onSubmit={handleSubmit(onSubmit)}>
                         <TextField
-                            {...register('username')}
+                            {...register('email')}
                             fullWidth
-                            label="Username"
+                            label="Email"
+                            type="email"
                             variant="outlined"
                             margin="normal"
-                            error={!!errors.username}
-                            helperText={errors.username?.message}
+                            error={!!errors.email}
+                            helperText={errors.email?.message}
                             InputProps={{
                                 startAdornment: (
                                     <InputAdornment position="start">

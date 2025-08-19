@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { hooksLogger, logNetworkRequest, performance } from '../utils/debug';
 
 interface ApiState<T> {
   data: T | null;
@@ -38,10 +39,18 @@ export function useApi<T>(
   const execute = useCallback(async (
     requestOptions?: ApiOptions
   ): Promise<T | null> => {
-    setState(prev => ({ ...prev, loading: true, error: null }));
-
     const finalOptions = { ...options, ...requestOptions };
     const finalMethod = finalOptions.method || method;
+    const url = `${API_BASE_URL}/api${endpoint}`;
+    
+    hooksLogger.info(`Starting API request: ${finalMethod} ${endpoint}`, {
+      hasToken: !!token,
+      hasBody: !!finalOptions.body,
+      endpoint
+    });
+    
+    performance.mark(`api-${endpoint}-start`);
+    setState(prev => ({ ...prev, loading: true, error: null }));
 
     try {
       const headers: Record<string, string> = {
@@ -60,30 +69,56 @@ export function useApi<T>(
 
       if (finalOptions.body && finalMethod !== 'GET') {
         fetchOptions.body = JSON.stringify(finalOptions.body);
+        hooksLogger.debug(`Request body for ${endpoint}`, finalOptions.body);
       }
 
-      const response = await fetch(`${API_BASE_URL}/api${endpoint}`, fetchOptions);
+      hooksLogger.debug(`Sending request to ${url}`, { method: finalMethod, headers: { ...headers, Authorization: headers.Authorization ? 'Bearer ***' : undefined } });
+      
+      const response = await fetch(url, fetchOptions);
+      
+      hooksLogger.info(`Response received for ${endpoint}`, { 
+        status: response.status, 
+        statusText: response.statusText,
+        ok: response.ok 
+      });
 
       if (response.status === 401) {
+        hooksLogger.warn(`Unauthorized response for ${endpoint}, logging out`);
         logout();
         throw new Error('Session expired. Please log in again.');
       }
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(
-          errorData.error?.message || 
+        const errorMessage = errorData.error?.message || 
           errorData.detail || 
-          `HTTP ${response.status}: ${response.statusText}`
-        );
+          `HTTP ${response.status}: ${response.statusText}`;
+        
+        hooksLogger.error(`API request failed: ${endpoint}`, { 
+          status: response.status, 
+          errorData, 
+          errorMessage 
+        });
+        
+        logNetworkRequest(finalMethod, url, finalOptions.body, null, errorMessage);
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
+      
+      performance.measure(`api-${endpoint}`, `api-${endpoint}-start`);
+      hooksLogger.info(`API request successful: ${endpoint}`, { dataReceived: !!data });
+      logNetworkRequest(finalMethod, url, finalOptions.body, data);
+      
       setState({ data, loading: false, error: null });
       return data;
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      
+      performance.measure(`api-${endpoint}-error`, `api-${endpoint}-start`);
+      hooksLogger.error(`API request exception: ${endpoint}`, { error, errorMessage });
+      
       setState({ data: null, loading: false, error: errorMessage });
       return null;
     }
@@ -91,9 +126,10 @@ export function useApi<T>(
 
   useEffect(() => {
     if (immediate) {
+      hooksLogger.debug(`Auto-executing immediate API call for ${endpoint}`);
       execute();
     }
-  }, [execute, immediate]);
+  }, [execute, immediate, endpoint]);
 
   const reset = useCallback(() => {
     setState({ data: null, loading: false, error: null });

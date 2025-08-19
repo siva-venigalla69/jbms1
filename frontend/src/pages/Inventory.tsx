@@ -25,6 +25,7 @@ import {
     InputLabel,
     Select,
     MenuItem,
+    IconButton,
 } from '@mui/material';
 import {
     Add,
@@ -33,49 +34,13 @@ import {
     Warning,
     TrendingDown,
     Category,
+    Visibility,
+    Edit,
 } from '@mui/icons-material';
 import { useForm, Controller } from 'react-hook-form';
-
-// API service for inventory
-const inventoryApi = {
-    getInventory: async () => {
-        const token = localStorage.getItem('access_token');
-        const response = await fetch('https://jbms1.onrender.com/api/inventory/', {
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json',
-            },
-        });
-        if (!response.ok) throw new Error('Failed to fetch inventory');
-        return response.json();
-    },
-
-    getLowStock: async () => {
-        const token = localStorage.getItem('access_token');
-        const response = await fetch('https://jbms1.onrender.com/api/inventory/low-stock', {
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json',
-            },
-        });
-        if (!response.ok) throw new Error('Failed to fetch low stock items');
-        return response.json();
-    },
-
-    createItem: async (itemData: any) => {
-        const token = localStorage.getItem('access_token');
-        const response = await fetch('https://jbms1.onrender.com/api/inventory/', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(itemData),
-        });
-        if (!response.ok) throw new Error('Failed to create inventory item');
-        return response.json();
-    },
-};
+import { InventoryItem } from '../types';
+import { inventoryApi } from '../services/supabaseApi';
+import { componentLogger } from '../utils/debug';
 
 const Inventory: React.FC = () => {
     const [items, setItems] = useState<any[]>([]);
@@ -86,6 +51,9 @@ const Inventory: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
     const [dialogOpen, setDialogOpen] = useState(false);
+    const [viewDialogOpen, setViewDialogOpen] = useState(false);
+    const [editDialogOpen, setEditDialogOpen] = useState(false);
+    const [selectedItem, setSelectedItem] = useState<any | null>(null);
 
     const { control, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm({
         defaultValues: {
@@ -101,15 +69,20 @@ const Inventory: React.FC = () => {
     });
 
     const loadInventory = useCallback(async () => {
+        componentLogger.info('Loading inventory...');
         try {
             setLoading(true);
-            const [inventoryData, lowStockData] = await Promise.all([
-                inventoryApi.getInventory(),
-                inventoryApi.getLowStock().catch(() => []),
-            ]);
+            const inventoryData = await inventoryApi.getInventory();
+            componentLogger.info('Inventory loaded successfully', { count: inventoryData.length });
             setItems(inventoryData);
-            setLowStockItems(lowStockData);
+            
+            // Calculate low stock items (items where quantity < reorder_level)
+            const lowStock = inventoryData.filter((item: any) => 
+                item.quantity < (item.reorder_level || 10)
+            );
+            setLowStockItems(lowStock);
         } catch (error: any) {
+            componentLogger.error('Failed to load inventory', error);
             setError('Failed to load inventory: ' + error.message);
         } finally {
             setLoading(false);
@@ -137,7 +110,7 @@ const Inventory: React.FC = () => {
 
     const onSubmit = async (data: any) => {
         try {
-            await inventoryApi.createItem(data);
+            await inventoryApi.createInventoryItem(data);
             setSuccess('Inventory item created successfully');
             setDialogOpen(false);
             loadInventory();
@@ -169,6 +142,42 @@ const Inventory: React.FC = () => {
     });
 
     const totalValue = items.reduce((sum, item) => sum + (parseFloat(item.current_stock) * parseFloat(item.cost_per_unit)), 0);
+
+    const handleViewItem = (item: any) => {
+        componentLogger.info('Viewing inventory item details', { itemId: item.id });
+        setSelectedItem(item);
+        setViewDialogOpen(true);
+    };
+
+    const handleEditItem = (item: any) => {
+        componentLogger.info('Editing inventory item', { itemId: item.id });
+        setSelectedItem(item);
+        reset({
+            item_name: item.item_name || '',
+            category: item.category || '',
+            current_stock: item.current_stock || 0,
+            unit: item.unit || 'kg',
+            reorder_level: item.reorder_level || 0,
+            cost_per_unit: item.cost_per_unit || 0,
+            supplier_name: item.supplier_name || '',
+            supplier_contact: item.supplier_contact || '',
+        });
+        setEditDialogOpen(true);
+    };
+
+    const handleUpdateItem = async (data: any) => {
+        if (!selectedItem) return;
+        
+        try {
+            await inventoryApi.updateInventoryItem(selectedItem.id, data);
+            setSuccess('Inventory item updated successfully');
+            setEditDialogOpen(false);
+            setSelectedItem(null);
+            loadInventory();
+        } catch (error: any) {
+            setError('Failed to update inventory item: ' + error.message);
+        }
+    };
 
     return (
         <Box>
@@ -325,6 +334,7 @@ const Inventory: React.FC = () => {
                                         <TableCell>Cost per Unit</TableCell>
                                         <TableCell>Total Value</TableCell>
                                         <TableCell>Status</TableCell>
+                                        <TableCell>Actions</TableCell>
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
@@ -363,6 +373,24 @@ const Inventory: React.FC = () => {
                                                         size="small"
                                                         icon={status.color === 'error' ? <Warning /> : undefined}
                                                     />
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Box sx={{ display: 'flex', gap: 1 }}>
+                                                        <IconButton 
+                                                            size="small" 
+                                                            onClick={() => handleViewItem(item)}
+                                                            title="View Item Details"
+                                                        >
+                                                            <Visibility />
+                                                        </IconButton>
+                                                        <IconButton 
+                                                            size="small" 
+                                                            onClick={() => handleEditItem(item)}
+                                                            title="Edit Item"
+                                                        >
+                                                            <Edit />
+                                                        </IconButton>
+                                                    </Box>
                                                 </TableCell>
                                             </TableRow>
                                         );
@@ -499,6 +527,254 @@ const Inventory: React.FC = () => {
                         <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
                         <Button type="submit" variant="contained" disabled={isSubmitting}>
                             {isSubmitting ? 'Creating...' : 'Create Item'}
+                        </Button>
+                    </DialogActions>
+                </form>
+            </Dialog>
+
+            {/* View Item Dialog */}
+            <Dialog open={viewDialogOpen} onClose={() => setViewDialogOpen(false)} maxWidth="md" fullWidth>
+                <DialogTitle>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <InventoryIcon />
+                        <Typography variant="h6">Inventory Item Details</Typography>
+                    </Box>
+                </DialogTitle>
+                <DialogContent>
+                    {selectedItem && (
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, mt: 2 }}>
+                            <Grid container spacing={3}>
+                                <Grid size={{ xs: 12, md: 6 }}>
+                                    <Card variant="outlined">
+                                        <CardContent>
+                                            <Typography variant="h6" gutterBottom color="primary">
+                                                Basic Information
+                                            </Typography>
+                                            <Typography variant="body2" color="text.secondary">Item Name</Typography>
+                                            <Typography variant="body1" sx={{ mb: 2 }}>{selectedItem.item_name}</Typography>
+                                            
+                                            <Typography variant="body2" color="text.secondary">Category</Typography>
+                                            <Typography variant="body1" sx={{ mb: 2 }}>
+                                                <Chip label={selectedItem.category} variant="outlined" size="small" icon={<Category />} />
+                                            </Typography>
+                                            
+                                            <Typography variant="body2" color="text.secondary">Unit</Typography>
+                                            <Typography variant="body1">{selectedItem.unit}</Typography>
+                                        </CardContent>
+                                    </Card>
+                                </Grid>
+
+                                <Grid size={{ xs: 12, md: 6 }}>
+                                    <Card variant="outlined">
+                                        <CardContent>
+                                            <Typography variant="h6" gutterBottom color="primary">
+                                                Stock Information
+                                            </Typography>
+                                            <Typography variant="body2" color="text.secondary">Current Stock</Typography>
+                                            <Typography variant="h5" sx={{ mb: 2, fontWeight: 'bold' }}>
+                                                {selectedItem.current_stock} {selectedItem.unit}
+                                            </Typography>
+                                            
+                                            <Typography variant="body2" color="text.secondary">Reorder Level</Typography>
+                                            <Typography variant="body1" sx={{ mb: 2 }}>{selectedItem.reorder_level}</Typography>
+                                            
+                                            <Typography variant="body2" color="text.secondary">Stock Status</Typography>
+                                            <Box sx={{ mb: 2 }}>
+                                                {(() => {
+                                                    const status = getStockStatus(selectedItem);
+                                                    return (
+                                                        <Chip
+                                                            label={status.label}
+                                                            color={status.color}
+                                                            variant="outlined"
+                                                            icon={status.color === 'error' ? <Warning /> : undefined}
+                                                        />
+                                                    );
+                                                })()}
+                                            </Box>
+                                        </CardContent>
+                                    </Card>
+                                </Grid>
+
+                                <Grid size={{ xs: 12, md: 6 }}>
+                                    <Card variant="outlined">
+                                        <CardContent>
+                                            <Typography variant="h6" gutterBottom color="primary">
+                                                Financial Information
+                                            </Typography>
+                                            <Typography variant="body2" color="text.secondary">Cost per Unit</Typography>
+                                            <Typography variant="body1" sx={{ mb: 2 }}>₹{parseFloat(selectedItem.cost_per_unit).toFixed(2)}</Typography>
+                                            
+                                            <Typography variant="body2" color="text.secondary">Total Value</Typography>
+                                            <Typography variant="h5" sx={{ fontWeight: 'bold', color: 'success.main' }}>
+                                                ₹{(parseFloat(selectedItem.current_stock) * parseFloat(selectedItem.cost_per_unit)).toFixed(2)}
+                                            </Typography>
+                                        </CardContent>
+                                    </Card>
+                                </Grid>
+
+                                <Grid size={{ xs: 12, md: 6 }}>
+                                    <Card variant="outlined">
+                                        <CardContent>
+                                            <Typography variant="h6" gutterBottom color="primary">
+                                                Supplier Information
+                                            </Typography>
+                                            <Typography variant="body2" color="text.secondary">Supplier Name</Typography>
+                                            <Typography variant="body1" sx={{ mb: 2 }}>
+                                                {selectedItem.supplier_name || 'Not specified'}
+                                            </Typography>
+                                            
+                                            <Typography variant="body2" color="text.secondary">Supplier Contact</Typography>
+                                            <Typography variant="body1">
+                                                {selectedItem.supplier_contact || 'Not specified'}
+                                            </Typography>
+                                        </CardContent>
+                                    </Card>
+                                </Grid>
+                            </Grid>
+                        </Box>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setViewDialogOpen(false)}>Close</Button>
+                    <Button 
+                        variant="contained" 
+                        startIcon={<Edit />} 
+                        onClick={() => {
+                            setViewDialogOpen(false);
+                            handleEditItem(selectedItem);
+                        }}
+                    >
+                        Edit Item
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Edit Item Dialog */}
+            <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)} maxWidth="md" fullWidth>
+                <DialogTitle>Edit Inventory Item</DialogTitle>
+                <form onSubmit={handleSubmit(handleUpdateItem)}>
+                    <DialogContent>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                            <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', md: 'row' } }}>
+                                <Controller
+                                    name="item_name"
+                                    control={control}
+                                    rules={{ required: 'Item name is required' }}
+                                    render={({ field }) => (
+                                        <TextField
+                                            {...field}
+                                            fullWidth
+                                            label="Item Name"
+                                            error={!!errors.item_name}
+                                            helperText={errors.item_name?.message}
+                                        />
+                                    )}
+                                />
+                                <Controller
+                                    name="category"
+                                    control={control}
+                                    rules={{ required: 'Category is required' }}
+                                    render={({ field }) => (
+                                        <TextField
+                                            {...field}
+                                            fullWidth
+                                            label="Category"
+                                            error={!!errors.category}
+                                            helperText={errors.category?.message}
+                                        />
+                                    )}
+                                />
+                            </Box>
+                            <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', md: 'row' } }}>
+                                <Controller
+                                    name="current_stock"
+                                    control={control}
+                                    rules={{ required: 'Current stock is required' }}
+                                    render={({ field }) => (
+                                        <TextField
+                                            {...field}
+                                            fullWidth
+                                            label="Current Stock"
+                                            type="number"
+                                            error={!!errors.current_stock}
+                                            helperText={errors.current_stock?.message}
+                                        />
+                                    )}
+                                />
+                                <Controller
+                                    name="unit"
+                                    control={control}
+                                    render={({ field }) => (
+                                        <FormControl fullWidth>
+                                            <InputLabel>Unit</InputLabel>
+                                            <Select {...field} label="Unit">
+                                                <MenuItem value="kg">Kilograms (kg)</MenuItem>
+                                                <MenuItem value="liters">Liters</MenuItem>
+                                                <MenuItem value="pieces">Pieces</MenuItem>
+                                                <MenuItem value="meters">Meters</MenuItem>
+                                                <MenuItem value="grams">Grams</MenuItem>
+                                            </Select>
+                                        </FormControl>
+                                    )}
+                                />
+                            </Box>
+                            <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', md: 'row' } }}>
+                                <Controller
+                                    name="reorder_level"
+                                    control={control}
+                                    render={({ field }) => (
+                                        <TextField
+                                            {...field}
+                                            fullWidth
+                                            label="Reorder Level"
+                                            type="number"
+                                        />
+                                    )}
+                                />
+                                <Controller
+                                    name="cost_per_unit"
+                                    control={control}
+                                    render={({ field }) => (
+                                        <TextField
+                                            {...field}
+                                            fullWidth
+                                            label="Cost per Unit (₹)"
+                                            type="number"
+                                        />
+                                    )}
+                                />
+                            </Box>
+                            <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', md: 'row' } }}>
+                                <Controller
+                                    name="supplier_name"
+                                    control={control}
+                                    render={({ field }) => (
+                                        <TextField
+                                            {...field}
+                                            fullWidth
+                                            label="Supplier Name"
+                                        />
+                                    )}
+                                />
+                                <Controller
+                                    name="supplier_contact"
+                                    control={control}
+                                    render={({ field }) => (
+                                        <TextField
+                                            {...field}
+                                            fullWidth
+                                            label="Supplier Contact"
+                                        />
+                                    )}
+                                />
+                            </Box>
+                        </Box>
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={() => setEditDialogOpen(false)}>Cancel</Button>
+                        <Button type="submit" variant="contained" disabled={isSubmitting}>
+                            {isSubmitting ? 'Updating...' : 'Update Item'}
                         </Button>
                     </DialogActions>
                 </form>

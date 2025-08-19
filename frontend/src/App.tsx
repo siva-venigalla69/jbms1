@@ -14,6 +14,11 @@ import Production from './pages/Production';
 import Inventory from './pages/Inventory';
 import Reports from './pages/Reports';
 import Materials from './pages/Materials';
+import DeliveryChallans from './pages/DeliveryChallans';
+import GSTInvoices from './pages/GSTInvoices';
+import DebugPanel from './components/debug/DebugPanel';
+import './utils/debugDatabase'; // Import debug database helpers
+import './utils/loginDebugHelper'; // Import login debug helpers
 
 function App() {
   return (
@@ -105,7 +110,7 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Layout>
-                    <div>Delivery Challans - Coming Soon</div>
+                    <DeliveryChallans />
                   </Layout>
                 </ProtectedRoute>
               }
@@ -115,7 +120,7 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Layout>
-                    <div>Invoices - Coming Soon</div>
+                    <GSTInvoices />
                   </Layout>
                 </ProtectedRoute>
               }
@@ -125,6 +130,9 @@ function App() {
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </Router>
+        
+        {/* Debug Panel - Only show in development */}
+        {process.env.NODE_ENV === 'development' && <DebugPanel />}
       </AuthProvider>
     </ThemeProvider>
   );

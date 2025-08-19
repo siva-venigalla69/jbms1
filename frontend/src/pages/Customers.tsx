@@ -42,7 +42,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { Customer, CustomerCreate } from '../types';
-import { customerApi } from '../services/api';
+import { customerApi } from '../services/supabaseApi';
 
 const customerSchema: yup.ObjectSchema<CustomerCreate> = yup.object({
     name: yup.string().required('Customer name is required'),
