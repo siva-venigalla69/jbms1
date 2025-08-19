@@ -36,6 +36,7 @@ import {
   Assignment,
   Factory,
   Edit,
+  Visibility,
 } from '@mui/icons-material';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -50,6 +51,14 @@ const productionUpdateSchema = yup.object({
   notes: yup.string(),
 });
 
+// Form validation schema for design updates
+const designUpdateSchema = yup.object({
+  design_received: yup.boolean(),
+  design_ready: yup.boolean(),
+  design_file_url: yup.string().url('Must be a valid URL'),
+  design_notes: yup.string(),
+});
+
 const Production: React.FC = () => {
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -59,13 +68,30 @@ const Production: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
+  const [designDialogOpen, setDesignDialogOpen] = useState(false);
   const [selectedOrderItem, setSelectedOrderItem] = useState<OrderItem | null>(null);
 
   const { control, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm({
     resolver: yupResolver(productionUpdateSchema),
     defaultValues: {
-      stage: 'pre_treatment' as ProductionStage,
+      stage: 'design_pending' as ProductionStage,
       notes: '',
+    },
+  });
+
+  // Design update form
+  const { 
+    control: designControl, 
+    handleSubmit: handleDesignSubmit, 
+    reset: designReset, 
+    formState: { errors: designErrors, isSubmitting: isDesignSubmitting } 
+  } = useForm({
+    resolver: yupResolver(designUpdateSchema),
+    defaultValues: {
+      design_received: false,
+      design_ready: false,
+      design_file_url: '',
+      design_notes: '',
     },
   });
 
@@ -111,10 +137,49 @@ const Production: React.FC = () => {
   const handleUpdateStage = (orderItem: OrderItem) => {
     setSelectedOrderItem(orderItem);
     reset({
-      stage: orderItem.current_stage,
+      stage: orderItem.current_stage || 'design_pending',
       notes: '',
     });
     setUpdateDialogOpen(true);
+  };
+
+  const handleDesignUpdate = (orderItem: OrderItem) => {
+    setSelectedOrderItem(orderItem);
+    designReset({
+      design_received: orderItem.design_received || false,
+      design_ready: orderItem.design_ready || false,
+      design_file_url: orderItem.design_file_url || '',
+      design_notes: orderItem.design_notes || '',
+    });
+    setDesignDialogOpen(true);
+  };
+
+  const onDesignSubmit = async (data: any) => {
+    if (!selectedOrderItem) return;
+
+    try {
+      // Update design information
+      await orderItemApi.updateDesignInfo(selectedOrderItem.id, data);
+      
+      // Auto-update production stage based on design status
+      let newStage = selectedOrderItem.current_stage || 'design_pending';
+      if (data.design_ready && (selectedOrderItem.current_stage || 'design_pending') === 'design_pending') {
+        newStage = 'design_ready';
+      } else if (!data.design_received && (selectedOrderItem.current_stage || 'design_pending') !== 'design_pending') {
+        newStage = 'design_pending';
+      }
+      
+      if (newStage !== (selectedOrderItem.current_stage || 'design_pending')) {
+        await orderItemApi.updateProductionStage(selectedOrderItem.id, newStage);
+      }
+      
+      setSuccess(`Design information updated successfully for order item ${selectedOrderItem.id}`);
+      setDesignDialogOpen(false);
+      setSelectedOrderItem(null);
+      loadProductionData();
+    } catch (error: any) {
+      setError('Failed to update design information: ' + error.message);
+    }
   };
 
   const onSubmit = async (data: any) => {
@@ -133,10 +198,14 @@ const Production: React.FC = () => {
 
   const getStageProgress = (stage: ProductionStage): number => {
     switch (stage) {
+      case 'design_pending':
+        return 10;
+      case 'design_ready':
+        return 25;
       case 'pre_treatment':
-        return 33;
+        return 50;
       case 'printing':
-        return 66;
+        return 75;
       case 'post_process':
         return 100;
       default:
@@ -146,10 +215,14 @@ const Production: React.FC = () => {
 
   const getStageColor = (stage: ProductionStage) => {
     switch (stage) {
-      case 'pre_treatment':
+      case 'design_pending':
+        return 'error';
+      case 'design_ready':
         return 'warning';
-      case 'printing':
+      case 'pre_treatment':
         return 'info';
+      case 'printing':
+        return 'primary';
       case 'post_process':
         return 'success';
       default:
@@ -159,6 +232,10 @@ const Production: React.FC = () => {
 
   const getStageIcon = (stage: ProductionStage) => {
     switch (stage) {
+      case 'design_pending':
+        return <Pending />;
+      case 'design_ready':
+        return <CheckCircle />;
       case 'pre_treatment':
         return <Assignment />;
       case 'printing':
@@ -174,7 +251,7 @@ const Production: React.FC = () => {
     const matchesSearch = 
       item.material_type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.customization_details?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStage = stageFilter === 'all' || item.current_stage === stageFilter;
+    const matchesStage = stageFilter === 'all' || (item.current_stage || 'design_pending') === stageFilter;
     return matchesSearch && matchesStage;
   });
 
@@ -183,13 +260,15 @@ const Production: React.FC = () => {
     return orders.find(order => order.id === orderItem?.order_id);
   };
 
-  const stageOptions: ProductionStage[] = ['pre_treatment', 'printing', 'post_process'];
+  const stageOptions: ProductionStage[] = ['design_pending', 'design_ready', 'pre_treatment', 'printing', 'post_process'];
 
   // Calculate summary statistics
   const totalItems = orderItems.length;
-  const pretreatmentItems = orderItems.filter(item => item.current_stage === 'pre_treatment').length;
-  const printingItems = orderItems.filter(item => item.current_stage === 'printing').length;
-  const completedItems = orderItems.filter(item => item.current_stage === 'post_process').length;
+  const designPendingItems = orderItems.filter(item => (item.current_stage || 'design_pending') === 'design_pending').length;
+  const designReadyItems = orderItems.filter(item => (item.current_stage || 'design_pending') === 'design_ready').length;
+  const pretreatmentItems = orderItems.filter(item => (item.current_stage || 'design_pending') === 'pre_treatment').length;
+  const printingItems = orderItems.filter(item => (item.current_stage || 'design_pending') === 'printing').length;
+  const completedItems = orderItems.filter(item => (item.current_stage || 'design_pending') === 'post_process').length;
 
   return (
     <Box>
@@ -220,11 +299,11 @@ const Production: React.FC = () => {
       )}
 
       {/* Summary Cards */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 3, mb: 3 }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 2, mb: 3 }}>
         <Card>
           <CardContent>
             <Typography variant="h6" color="text.secondary" gutterBottom>
-              Total Items in Production
+              Total Items
             </Typography>
             <Typography variant="h4" fontWeight="bold">
               {totalItems}
@@ -234,9 +313,29 @@ const Production: React.FC = () => {
         <Card>
           <CardContent>
             <Typography variant="h6" color="text.secondary" gutterBottom>
-              Pre-treatment
+              Design Pending
+            </Typography>
+            <Typography variant="h4" fontWeight="bold" color="error.main">
+              {designPendingItems}
+            </Typography>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent>
+            <Typography variant="h6" color="text.secondary" gutterBottom>
+              Design Ready
             </Typography>
             <Typography variant="h4" fontWeight="bold" color="warning.main">
+              {designReadyItems}
+            </Typography>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent>
+            <Typography variant="h6" color="text.secondary" gutterBottom>
+              Pre-treatment
+            </Typography>
+            <Typography variant="h4" fontWeight="bold" color="info.main">
               {pretreatmentItems}
             </Typography>
           </CardContent>
@@ -246,7 +345,7 @@ const Production: React.FC = () => {
             <Typography variant="h6" color="text.secondary" gutterBottom>
               Printing
             </Typography>
-            <Typography variant="h4" fontWeight="bold" color="info.main">
+            <Typography variant="h4" fontWeight="bold" color="primary.main">
               {printingItems}
             </Typography>
           </CardContent>
@@ -291,6 +390,8 @@ const Production: React.FC = () => {
                   label="Production Stage"
                 >
                   <MenuItem value="all">All Stages</MenuItem>
+                  <MenuItem value="design_pending">Design Pending</MenuItem>
+                  <MenuItem value="design_ready">Design Ready</MenuItem>
                   <MenuItem value="pre_treatment">Pre-treatment</MenuItem>
                   <MenuItem value="printing">Printing</MenuItem>
                   <MenuItem value="post_process">Post Process</MenuItem>
@@ -335,7 +436,7 @@ const Production: React.FC = () => {
                 <TableBody>
                   {filteredOrderItems.map((item) => {
                     const order = getOrderByItemId(item.id);
-                    const progress = getStageProgress(item.current_stage);
+                    const progress = getStageProgress(item.current_stage || 'design_pending');
                     
                     return (
                       <TableRow key={item.id} hover>
@@ -353,11 +454,11 @@ const Production: React.FC = () => {
                         <TableCell>{item.quantity}</TableCell>
                         <TableCell>
                           <Chip
-                            label={item.current_stage.replace('_', ' ').toUpperCase()}
-                            color={getStageColor(item.current_stage) as any}
+                            label={(item.current_stage || 'design_pending').replace('_', ' ').toUpperCase()}
+                            color={getStageColor(item.current_stage || 'design_pending') as any}
                             variant="outlined"
                             size="small"
-                            icon={getStageIcon(item.current_stage)}
+                            icon={getStageIcon(item.current_stage || 'design_pending')}
                           />
                         </TableCell>
                         <TableCell>
@@ -366,7 +467,7 @@ const Production: React.FC = () => {
                               variant="determinate"
                               value={progress}
                               sx={{ width: 100, height: 8, borderRadius: 4 }}
-                              color={getStageColor(item.current_stage) as any}
+                              color={getStageColor(item.current_stage || 'design_pending') as any}
                             />
                             <Typography variant="caption">{progress}%</Typography>
                           </Box>
@@ -378,6 +479,14 @@ const Production: React.FC = () => {
                         </TableCell>
                         <TableCell>
                           <Box sx={{ display: 'flex', gap: 1 }}>
+                            <IconButton 
+                              size="small" 
+                              onClick={() => handleDesignUpdate(item)}
+                              title="Manage Design"
+                              color={item.design_ready ? 'success' : 'warning'}
+                            >
+                              <Visibility />
+                            </IconButton>
                             <IconButton 
                               size="small" 
                               onClick={() => handleUpdateStage(item)}
@@ -454,6 +563,140 @@ const Production: React.FC = () => {
             <Button onClick={() => setUpdateDialogOpen(false)}>Cancel</Button>
             <Button type="submit" variant="contained" disabled={isSubmitting}>
               {isSubmitting ? 'Updating...' : 'Update Stage'}
+            </Button>
+          </DialogActions>
+        </form>
+      </Dialog>
+
+      {/* Design Management Dialog */}
+      <Dialog open={designDialogOpen} onClose={() => setDesignDialogOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Visibility />
+            <Typography variant="h6">Design Management</Typography>
+          </Box>
+        </DialogTitle>
+        <form onSubmit={handleDesignSubmit(onDesignSubmit)}>
+          <DialogContent>
+            {selectedOrderItem && (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                <Alert severity="info">
+                  Managing design for: {selectedOrderItem.material_type} (Qty: {selectedOrderItem.quantity})
+                  {selectedOrderItem.customization_details && ` - ${selectedOrderItem.customization_details}`}
+                </Alert>
+
+                <Box sx={{ display: 'flex', gap: 3, flexDirection: { xs: 'column', md: 'row' } }}>
+                  <Card variant="outlined" sx={{ flex: 1 }}>
+                    <CardContent>
+                      <Typography variant="h6" gutterBottom color="primary">
+                        Design Status
+                      </Typography>
+                      
+                      <Controller
+                        name="design_received"
+                        control={designControl}
+                        render={({ field: { value, onChange, ...field } }) => (
+                          <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                            <input
+                              type="checkbox"
+                              {...field}
+                              checked={!!value}
+                              onChange={(e) => onChange(e.target.checked)}
+                              style={{ marginRight: 8 }}
+                            />
+                            <Typography>Design received from customer</Typography>
+                          </Box>
+                        )}
+                      />
+
+                      <Controller
+                        name="design_ready"
+                        control={designControl}
+                        render={({ field: { value, onChange, ...field } }) => (
+                          <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                            <input
+                              type="checkbox"
+                              {...field}
+                              checked={!!value}
+                              onChange={(e) => onChange(e.target.checked)}
+                              style={{ marginRight: 8 }}
+                            />
+                            <Typography>Design ready for printing</Typography>
+                          </Box>
+                        )}
+                      />
+                    </CardContent>
+                  </Card>
+
+                  <Card variant="outlined" sx={{ flex: 1 }}>
+                    <CardContent>
+                      <Typography variant="h6" gutterBottom color="primary">
+                        Current Status
+                      </Typography>
+                      
+                      <Box sx={{ mb: 2 }}>
+                        <Typography variant="body2" color="text.secondary">Current Stage</Typography>
+                        <Chip
+                          label={(selectedOrderItem.current_stage || 'design_pending').replace('_', ' ').toUpperCase()}
+                          color={getStageColor(selectedOrderItem.current_stage || 'design_pending') as any}
+                          variant="outlined"
+                          icon={getStageIcon(selectedOrderItem.current_stage || 'design_pending')}
+                          sx={{ mt: 1 }}
+                        />
+                      </Box>
+
+                      <Box>
+                        <Typography variant="body2" color="text.secondary">Progress</Typography>
+                        <LinearProgress
+                          variant="determinate"
+                          value={getStageProgress(selectedOrderItem.current_stage || 'design_pending')}
+                          sx={{ height: 8, borderRadius: 4, mt: 1 }}
+                          color={getStageColor(selectedOrderItem.current_stage || 'design_pending') as any}
+                        />
+                        <Typography variant="caption" sx={{ mt: 1, display: 'block' }}>
+                          {getStageProgress(selectedOrderItem.current_stage || 'design_pending')}% Complete
+                        </Typography>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Box>
+
+                <Controller
+                  name="design_file_url"
+                  control={designControl}
+                  render={({ field }) => (
+                    <TextField
+                      {...field}
+                      fullWidth
+                      label="Design File URL (Optional)"
+                      placeholder="https://example.com/design-file.pdf"
+                      error={!!designErrors.design_file_url}
+                      helperText={designErrors.design_file_url?.message || 'Provide a link to the design file if available'}
+                    />
+                  )}
+                />
+
+                <Controller
+                  name="design_notes"
+                  control={designControl}
+                  render={({ field }) => (
+                    <TextField
+                      {...field}
+                      fullWidth
+                      label="Design Notes"
+                      multiline
+                      rows={4}
+                      placeholder="Add notes about the design, any special requirements, or status updates..."
+                    />
+                  )}
+                />
+              </Box>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setDesignDialogOpen(false)}>Cancel</Button>
+            <Button type="submit" variant="contained" disabled={isDesignSubmitting}>
+              {isDesignSubmitting ? 'Updating...' : 'Update Design'}
             </Button>
           </DialogActions>
         </form>

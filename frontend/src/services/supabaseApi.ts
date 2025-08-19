@@ -4,6 +4,7 @@
 import { supabase, supabaseHelpers, businessHelpers, TABLES, ENUMS } from '../lib/supabase'
 import type { Customer, Order, OrderItem, User, MaterialIn, DeliveryChallan, DeliveryChallanCreate, GST_Invoice, GST_InvoiceCreate, Payment, ReturnItem, InventoryItem, Expense } from '../types'
 import { apiLogger, logNetworkRequest, performance } from '../utils/debug'
+import { auditTrail, logOrderCreated, logMaterialReceived, logPaymentReceived, logDeliveryCompleted, logInvoiceGenerated, logProductionStageChange } from './auditTrailService'
 
 // API call wrapper with logging
 const withApiLogging = async <T>(
@@ -180,7 +181,8 @@ export const orderApi = {
       .from(TABLES.ORDERS)
       .select(`
         *,
-        customer:customers(*)
+        customer:customers(*),
+        order_items:order_items(*)
       `)
       .eq('is_deleted', false)
       .order('order_date', { ascending: false })
@@ -286,11 +288,20 @@ export const orderApi = {
         throw new Error(`Failed to create order items: ${itemsError.message}`);
       }
 
-      // Return the complete order with items
-      return {
+      const completeOrder = {
         ...order,
         order_items: items,
       };
+
+      // Log order creation to audit trail
+      try {
+        await logOrderCreated(order.id, orderData.customer_id, completeOrder);
+      } catch (auditError) {
+        apiLogger.warn('Failed to log order creation to audit trail', auditError);
+      }
+
+      // Return the complete order with items
+      return completeOrder;
     }, orderData);
   },
 
@@ -301,9 +312,28 @@ export const orderApi = {
   },
 
   updateOrderStatus: async (id: string, status: string): Promise<Order> => {
-    const { data, error } = await businessHelpers.orders.updateStatus(id, status)
-    if (error) throw new Error(error.message)
-    return data
+    return withApiLogging('order.updateStatus', async () => {
+      // Get the existing order for audit logging
+      const { data: existingOrder, error: fetchError } = await supabase
+        .from(TABLES.ORDERS)
+        .select('*, customer:customers(*), order_items:order_items(*)')
+        .eq('id', id)
+        .single();
+      
+      if (fetchError) throw new Error(fetchError.message);
+      
+      const { data, error } = await businessHelpers.orders.updateStatus(id, status);
+      if (error) throw new Error(error.message);
+      
+      // Log order update to audit trail
+      try {
+        await auditTrail.logOrderTransaction('updated', id, existingOrder.customer_id, data, existingOrder);
+      } catch (auditError) {
+        apiLogger.warn('Failed to log order status update to audit trail', auditError);
+      }
+      
+      return data;
+    }, { id, status });
   },
 
   deleteOrder: async (id: string): Promise<void> => {
@@ -315,12 +345,36 @@ export const orderApi = {
 // Order Items API
 export const orderItemApi = {
   updateProductionStage: async (id: string, stage: string): Promise<OrderItem> => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) throw new Error('User not authenticated')
-    
-    const { data, error } = await businessHelpers.production.updateStage(id, stage, user.id)
-    if (error) throw new Error(error.message)
-    return data
+    return withApiLogging('orderItem.updateProductionStage', async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('User not authenticated')
+      
+      // Get the existing order item for audit logging
+      const { data: existingItem, error: fetchError } = await supabase
+        .from(TABLES.ORDER_ITEMS)
+        .select('*, order:orders(customer_id)')
+        .eq('id', id)
+        .single();
+      
+      if (fetchError) throw new Error(fetchError.message);
+      
+      const { data, error } = await businessHelpers.production.updateStage(id, stage, user.id)
+      if (error) throw new Error(error.message)
+      
+      // Log production stage change to audit trail
+      try {
+        await logProductionStageChange(
+          id,
+          existingItem.order.customer_id,
+          { ...data, current_stage: stage },
+          existingItem
+        );
+      } catch (auditError) {
+        apiLogger.warn('Failed to log production stage change to audit trail', auditError);
+      }
+      
+      return data;
+    }, { id, stage });
   },
 
   getProductionStatus: async (): Promise<OrderItem[]> => {
@@ -363,6 +417,52 @@ export const orderItemApi = {
       if (error) throw new Error(error.message)
       return data
     }, itemData)
+  },
+
+  updateDesignInfo: async (id: string, designData: any): Promise<OrderItem> => {
+    return withApiLogging('orderItem.updateDesignInfo', async () => {
+      // Get the existing order item for audit logging
+      const { data: existingItem, error: fetchError } = await supabase
+        .from(TABLES.ORDER_ITEMS)
+        .select('*, order:orders(customer_id)')
+        .eq('id', id)
+        .single();
+      
+      if (fetchError) throw new Error(fetchError.message);
+      
+      // Only update basic fields that exist in the current schema
+      const updateData = {
+        customization_details: `Design Status: ${designData.design_received ? 'Received' : 'Pending'}, Ready: ${designData.design_ready ? 'Yes' : 'No'}${designData.design_notes ? ', Notes: ' + designData.design_notes : ''}`,
+        updated_at: new Date().toISOString()
+      };
+
+      const { data, error } = await supabaseHelpers.update(TABLES.ORDER_ITEMS, id, updateData)
+      if (error) throw new Error(error.message)
+      
+      const updatedItem = {
+        ...data,
+        design_received: designData.design_received,
+        design_ready: designData.design_ready,
+        design_file_url: designData.design_file_url,
+        design_notes: designData.design_notes
+      };
+      
+      // Log design update to audit trail
+      try {
+        await auditTrail.logProductionTransaction(
+          'design_updated',
+          id,
+          existingItem.order.customer_id,
+          updatedItem,
+          existingItem
+        );
+      } catch (auditError) {
+        apiLogger.warn('Failed to log design update to audit trail', auditError);
+      }
+      
+      // Return the updated item with design info for consistency
+      return updatedItem;
+    }, { id, designData })
   }
 }
 
@@ -399,22 +499,280 @@ export const materialInApi = {
   },
 
   createMaterialIn: async (materialData: Partial<MaterialIn>): Promise<MaterialIn> => {
-    const { data, error } = await supabaseHelpers.create(TABLES.MATERIAL_IN, materialData)
-    if (error) throw new Error(error.message)
-    return data
+    return withApiLogging('materialIn.createMaterialIn', async () => {
+      const { data, error } = await supabaseHelpers.create(TABLES.MATERIAL_IN, materialData)
+      if (error) throw new Error(error.message)
+      
+      // Update material stock after recording material receipt
+      let stockAudit = null;
+      if (materialData.customer_id && materialData.material_type && materialData.quantity) {
+        // Get current stock for audit
+        const { data: currentStock } = await supabase
+          .from(TABLES.MATERIAL_STOCK)
+          .select('current_stock')
+          .eq('customer_id', materialData.customer_id)
+          .eq('material_type', materialData.material_type)
+          .single();
+        
+        const previousStock = currentStock?.current_stock || 0;
+        
+        await updateMaterialStockAfterReceiving(
+          materialData.customer_id, 
+          materialData.material_type, 
+          materialData.quantity
+        );
+        
+        stockAudit = {
+          customer_id: materialData.customer_id,
+          material_type: materialData.material_type,
+          previous_stock: previousStock,
+          quantity_change: materialData.quantity,
+          new_stock: previousStock + materialData.quantity,
+          reason: 'material_in' as const,
+          reference_type: 'material_in',
+          reference_id: data.id
+        };
+      }
+      
+      // Log material receipt to audit trail
+      if (stockAudit) {
+        try {
+          await logMaterialReceived(
+            stockAudit,
+            `Material received: ${materialData.material_type} (Qty: ${materialData.quantity})`
+          );
+        } catch (auditError) {
+          apiLogger.warn('Failed to log material receipt to audit trail', auditError);
+        }
+      }
+      
+      return data
+    }, materialData);
   },
 
   updateMaterialIn: async (id: string, materialData: Partial<MaterialIn>): Promise<MaterialIn> => {
-    const { data, error } = await supabaseHelpers.update(TABLES.MATERIAL_IN, id, materialData)
-    if (error) throw new Error(error.message)
-    return data
+    return withApiLogging('materialIn.updateMaterialIn', async () => {
+      // Get the original material record to calculate quantity difference
+      const { data: originalData, error: fetchError } = await supabaseHelpers.getById(TABLES.MATERIAL_IN, id)
+      if (fetchError) throw new Error(fetchError.message)
+      
+      const { data, error } = await supabaseHelpers.update(TABLES.MATERIAL_IN, id, materialData)
+      if (error) throw new Error(error.message)
+      
+      // Update material stock if quantity was changed
+      if (materialData.quantity && originalData && 'quantity' in originalData && 'customer_id' in originalData && 'material_type' in originalData) {
+        const originalQuantity = originalData.quantity as number;
+        if (originalQuantity !== materialData.quantity) {
+          const quantityDifference = materialData.quantity - originalQuantity;
+          if (quantityDifference !== 0) {
+            await updateMaterialStockAfterReceiving(
+              originalData.customer_id as string, 
+              originalData.material_type as string, 
+              quantityDifference
+            );
+          }
+        }
+      }
+      
+      return data
+    }, { id, materialData });
   },
 
   deleteMaterialIn: async (id: string): Promise<void> => {
-    const { error } = await supabaseHelpers.delete(TABLES.MATERIAL_IN, id)
-    if (error) throw new Error(error.message)
+    return withApiLogging('materialIn.deleteMaterialIn', async () => {
+      // Get the material record before deletion to adjust stock
+      const { data: materialData, error: fetchError } = await supabaseHelpers.getById(TABLES.MATERIAL_IN, id)
+      if (fetchError) throw new Error(fetchError.message)
+      
+      const { error } = await supabaseHelpers.delete(TABLES.MATERIAL_IN, id)
+      if (error) throw new Error(error.message)
+      
+      // Remove the deleted quantity from material stock
+      if (materialData && 'customer_id' in materialData && 'material_type' in materialData && 'quantity' in materialData) {
+        await updateMaterialStockAfterReceiving(
+          materialData.customer_id as string, 
+          materialData.material_type as string, 
+          -(materialData.quantity as number) // Negative to reduce stock
+        );
+      }
+    }, { id });
   }
 }
+
+// Material Stock Management Functions
+const updateMaterialStockAfterDelivery = async (customerId: string, deliveryItems: any[]) => {
+  return withApiLogging('materialStock.updateAfterDelivery', async () => {
+    // Group delivery items by material type
+    const materialSummary: { [key: string]: number } = {};
+    
+    deliveryItems.forEach(item => {
+      const key = `${item.material_type}`;
+      materialSummary[key] = (materialSummary[key] || 0) + item.quantity_delivered;
+    });
+
+    // Update material stock for each material type
+    for (const [materialType, quantityDelivered] of Object.entries(materialSummary)) {
+      // Get or create material stock record
+      let { data: stockRecord, error: fetchError } = await supabase
+        .from(TABLES.MATERIAL_STOCK)
+        .select('*')
+        .eq('customer_id', customerId)
+        .eq('material_type', materialType)
+        .single();
+
+      if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 = no rows returned
+        throw new Error(`Failed to fetch material stock: ${fetchError.message}`);
+      }
+
+      if (!stockRecord) {
+        // Create new stock record if none exists
+        const { data: newStock, error: createError } = await supabase
+          .from(TABLES.MATERIAL_STOCK)
+          .insert({
+            customer_id: customerId,
+            material_type: materialType,
+            total_received: 0,
+            total_delivered: quantityDelivered,
+            current_stock: -quantityDelivered, // Negative indicates over-delivery
+            last_updated: new Date().toISOString()
+          })
+          .select()
+          .single();
+
+        if (createError) {
+          throw new Error(`Failed to create material stock record: ${createError.message}`);
+        }
+      } else {
+        // Update existing stock record
+        const newTotalDelivered = stockRecord.total_delivered + quantityDelivered;
+        const newCurrentStock = stockRecord.total_received - newTotalDelivered;
+
+        const { error: updateError } = await supabase
+          .from(TABLES.MATERIAL_STOCK)
+          .update({
+            total_delivered: newTotalDelivered,
+            current_stock: newCurrentStock,
+            last_updated: new Date().toISOString()
+          })
+          .eq('id', stockRecord.id);
+
+        if (updateError) {
+          throw new Error(`Failed to update material stock: ${updateError.message}`);
+        }
+      }
+    }
+  }, { customerId, deliveryItems });
+};
+
+const updateMaterialStockAfterReceiving = async (customerId: string, materialType: string, quantity: number) => {
+  return withApiLogging('materialStock.updateAfterReceiving', async () => {
+    // Get or create material stock record
+    let { data: stockRecord, error: fetchError } = await supabase
+      .from(TABLES.MATERIAL_STOCK)
+      .select('*')
+      .eq('customer_id', customerId)
+      .eq('material_type', materialType)
+      .single();
+
+    if (fetchError && fetchError.code !== 'PGRST116') {
+      throw new Error(`Failed to fetch material stock: ${fetchError.message}`);
+    }
+
+    if (!stockRecord) {
+      // Create new stock record
+      const { error: createError } = await supabase
+        .from(TABLES.MATERIAL_STOCK)
+        .insert({
+          customer_id: customerId,
+          material_type: materialType,
+          total_received: quantity,
+          total_delivered: 0,
+          current_stock: quantity,
+          last_updated: new Date().toISOString()
+        });
+
+      if (createError) {
+        throw new Error(`Failed to create material stock record: ${createError.message}`);
+      }
+    } else {
+      // Update existing stock record
+      const newTotalReceived = stockRecord.total_received + quantity;
+      const newCurrentStock = newTotalReceived - stockRecord.total_delivered;
+
+      const { error: updateError } = await supabase
+        .from(TABLES.MATERIAL_STOCK)
+        .update({
+          total_received: newTotalReceived,
+          current_stock: newCurrentStock,
+          last_updated: new Date().toISOString()
+        })
+        .eq('id', stockRecord.id);
+
+      if (updateError) {
+        throw new Error(`Failed to update material stock: ${updateError.message}`);
+      }
+    }
+  }, { customerId, materialType, quantity });
+};
+
+// Material Stock API
+export const materialStockApi = {
+  getCustomerStock: async (customerId?: string): Promise<any[]> => {
+    return withApiLogging('materialStock.getCustomerStock', async () => {
+      let query = supabase
+        .from(TABLES.MATERIAL_STOCK)
+        .select(`
+          *,
+          customer:customers(name, phone, email)
+        `)
+        .order('last_updated', { ascending: false });
+
+      if (customerId) {
+        query = query.eq('customer_id', customerId);
+      }
+
+      const { data, error } = await query;
+      
+      if (error) throw new Error(error.message);
+      return data || [];
+    }, { customerId });
+  },
+
+  getMaterialStockSummary: async (): Promise<any[]> => {
+    return withApiLogging('materialStock.getSummary', async () => {
+      const { data, error } = await supabase
+        .from(TABLES.MATERIAL_STOCK)
+        .select(`
+          material_type,
+          customer:customers(name),
+          total_received,
+          total_delivered,
+          current_stock,
+          last_updated
+        `)
+        .order('material_type');
+      
+      if (error) throw new Error(error.message);
+      return data || [];
+    });
+  },
+
+  getStockByMaterial: async (materialType: string): Promise<any[]> => {
+    return withApiLogging('materialStock.getByMaterial', async () => {
+      const { data, error } = await supabase
+        .from(TABLES.MATERIAL_STOCK)
+        .select(`
+          *,
+          customer:customers(name, phone, email)
+        `)
+        .eq('material_type', materialType)
+        .order('current_stock', { ascending: false });
+      
+      if (error) throw new Error(error.message);
+      return data || [];
+    }, { materialType });
+  }
+};
 
 // Delivery Challan API
 export const challanApi = {
@@ -519,9 +877,49 @@ export const paymentApi = {
   },
 
   createPayment: async (paymentData: Partial<Payment>): Promise<Payment> => {
-    const { data, error } = await supabaseHelpers.create(TABLES.PAYMENTS, paymentData)
-    if (error) throw new Error(error.message)
-    return data
+    return withApiLogging('payment.createPayment', async () => {
+      // Get invoice details for audit logging
+      let invoice = null;
+      let previousBalance = 0;
+      if (paymentData.invoice_id) {
+        const { data: invoiceData } = await supabase
+          .from(TABLES.GST_INVOICES)
+          .select('total_amount')
+          .eq('id', paymentData.invoice_id)
+          .single();
+        
+        invoice = invoiceData;
+        
+        // Get existing payments for this invoice to calculate previous balance
+        const { data: existingPayments } = await supabase
+          .from(TABLES.PAYMENTS)
+          .select('payment_amount')
+          .eq('invoice_id', paymentData.invoice_id);
+        
+        const totalPaid = existingPayments?.reduce((sum, p) => sum + p.payment_amount, 0) || 0;
+        previousBalance = (invoice?.total_amount || 0) - totalPaid;
+      }
+      
+      const { data, error } = await supabaseHelpers.create(TABLES.PAYMENTS, paymentData);
+      if (error) throw new Error(error.message);
+      
+      // Log payment to audit trail
+      if (paymentData.customer_id && paymentData.payment_amount) {
+        const newBalance = previousBalance - paymentData.payment_amount;
+        try {
+          await logPaymentReceived(
+            data.id,
+            paymentData.customer_id,
+            data,
+            { previous: previousBalance, new: newBalance }
+          );
+        } catch (auditError) {
+          apiLogger.warn('Failed to log payment to audit trail', auditError);
+        }
+      }
+      
+      return data;
+    }, paymentData);
   }
 }
 
@@ -722,37 +1120,170 @@ export const deliveryChallanApi = {
     }, { id })
   },
 
-  createDeliveryChallan: async (challanData: DeliveryChallanCreate): Promise<DeliveryChallan> => {
+  getDeliveryChallanItems: async (challanId: string): Promise<any[]> => {
+    return withApiLogging('deliveryChallan.getDeliveryChallanItems', async () => {
+      const { data, error } = await supabase
+        .from(TABLES.DELIVERY_CHALLAN_ITEMS)
+        .select(`
+          *,
+          order:orders(order_number),
+          order_item:order_items(material_type, customization_details)
+        `)
+        .eq('delivery_challan_id', challanId)
+      
+      if (error) throw new Error(error.message)
+      return data || []
+    }, { challanId })
+  },
+
+  generateInvoiceFromChallan: async (challanId: string): Promise<GST_Invoice> => {
+    return withApiLogging('deliveryChallan.generateInvoiceFromChallan', async () => {
+      // Get the delivery challan with items
+      const challan = await deliveryChallanApi.getDeliveryChallan(challanId);
+      const challanItems = await deliveryChallanApi.getDeliveryChallanItems(challanId);
+      
+      if (!challan) {
+        throw new Error('Delivery challan not found');
+      }
+      
+      if (challan.status !== 'delivered') {
+        throw new Error('Can only generate invoices for delivered challans');
+      }
+      
+      // Calculate invoice amounts
+      const subtotal = challanItems.reduce((sum, item) => sum + item.subtotal, 0);
+      const taxRate = 0.18; // 18% GST
+      const taxAmount = subtotal * taxRate;
+      const totalAmount = subtotal + taxAmount;
+      
+      // Generate invoice number
+      const invoiceNumber = `INV-DC-${challan.challan_number}-${Date.now()}`;
+      
+      // Create invoice data
+      const invoiceData = {
+        invoice_number: invoiceNumber,
+        customer_id: challan.customer_id,
+        order_id: challan.order_id,
+        invoice_date: new Date().toISOString().split('T')[0],
+        subtotal: subtotal,
+        tax_amount: taxAmount,
+        total_amount: totalAmount,
+        status: 'sent' as const,
+        due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days from now
+        notes: `Generated from Delivery Challan: ${challan.challan_number}. Items delivered on ${new Date(challan.delivery_date).toLocaleDateString()}.`
+      };
+      
+      // Create the invoice
+      const invoice = await gstInvoiceApi.createGSTInvoice(invoiceData);
+      
+      return invoice;
+    }, { challanId })
+  },
+
+  createDeliveryChallan: async (challanData: any): Promise<DeliveryChallan> => {
     return withApiLogging('deliveryChallan.createDeliveryChallan', async () => {
       // Generate challan number if not provided
       const challanNumber = challanData.challan_number || `DC-${Date.now()}`
       
-      // Prepare the data for insertion
+      // Use the first order ID from items for backward compatibility
+      const primaryOrderId = challanData.items?.[0]?.order_id
+      
+      // Prepare the main challan data
       const insertData = {
         challan_number: challanNumber,
         customer_id: challanData.customer_id,
-        order_id: challanData.order_id,
+        order_id: primaryOrderId, // For backward compatibility
         delivery_date: challanData.delivery_date,
         status: challanData.status,
+        total_amount: challanData.total_amount || 0,
         notes: challanData.notes || null,
         created_at: new Date().toISOString()
       }
       
-      const { data, error } = await supabase
+      // Create the delivery challan
+      const { data: challan, error: challanError } = await supabase
         .from(TABLES.DELIVERY_CHALLANS)
         .insert(insertData)
         .select(`
           *,
-          customer:customers(*),
-          order:orders(*)
+          customer:customers(*)
         `)
         .single()
       
-      if (error) {
-        console.error('Delivery challan creation error:', error)
-        throw new Error(error.message)
+      if (challanError) {
+        console.error('Delivery challan creation error:', challanError)
+        throw new Error(challanError.message)
       }
-      return data
+      
+      // Prepare material stock audit data
+      let materialImpact = [];
+      
+      // Create delivery challan items if provided
+      if (challanData.items && challanData.items.length > 0) {
+        const challanItems = challanData.items.map((item: any) => ({
+          delivery_challan_id: challan.id,
+          order_id: item.order_id,
+          order_item_id: item.order_item_id,
+          material_type: item.material_type,
+          quantity_delivered: item.quantity_delivered,
+          unit_price: item.unit_price,
+          subtotal: item.quantity_delivered * item.unit_price,
+          notes: item.notes || null,
+          created_at: new Date().toISOString()
+        }))
+        
+        const { error: itemsError } = await supabase
+          .from(TABLES.DELIVERY_CHALLAN_ITEMS)
+          .insert(challanItems)
+        
+        if (itemsError) {
+          // Rollback: delete the challan if items creation fails
+          await supabase.from(TABLES.DELIVERY_CHALLANS).delete().eq('id', challan.id)
+          console.error('Delivery challan items creation error:', itemsError)
+          throw new Error(`Failed to create delivery items: ${itemsError.message}`)
+        }
+        
+        // Collect material impact for audit logging
+        for (const item of challanData.items) {
+          // Get current stock for audit
+          const { data: currentStock } = await supabase
+            .from(TABLES.MATERIAL_STOCK)
+            .select('current_stock')
+            .eq('customer_id', challanData.customer_id)
+            .eq('material_type', item.material_type)
+            .single();
+          
+          const previousStock = currentStock?.current_stock || 0;
+          materialImpact.push({
+            customer_id: challanData.customer_id,
+            material_type: item.material_type,
+            previous_stock: previousStock,
+            quantity_change: -item.quantity_delivered, // Negative for delivery
+            new_stock: previousStock - item.quantity_delivered,
+            reason: 'delivery_out' as const,
+            reference_type: 'delivery_challan',
+            reference_id: challan.id
+          });
+        }
+        
+        // Update material stock after successful delivery challan creation
+        await updateMaterialStockAfterDelivery(challanData.customer_id, challanData.items);
+      }
+      
+      // Log delivery challan creation to audit trail
+      try {
+        await auditTrail.logDeliveryTransaction(
+          'challan_created',
+          challan.id,
+          challanData.customer_id,
+          challan,
+          materialImpact
+        );
+      } catch (auditError) {
+        apiLogger.warn('Failed to log delivery challan to audit trail', auditError);
+      }
+      
+      return challan
     }, challanData)
   },
 
@@ -785,35 +1316,48 @@ export const gstInvoiceApi = {
     status?: string
   }): Promise<GST_Invoice[]> => {
     return withApiLogging('gstInvoice.getGSTInvoices', async () => {
-      let query = supabase
-        .from(TABLES.GST_INVOICES)
-        .select(`
-          *,
-          customer:customers(*),
-          order:orders(
-            order_number,
-            status,
-            customer:customers(name)
-          )
-        `)
-        .order('created_at', { ascending: false })
-      
-      if (params?.customer_id) {
-        query = query.eq('customer_id', params.customer_id)
+      try {
+        let query = supabase
+          .from(TABLES.GST_INVOICES)
+          .select(`
+            *,
+            customer:customers(*),
+            order:orders(
+              order_number,
+              status,
+              customer:customers(name)
+            )
+          `)
+          .order('created_at', { ascending: false })
+        
+        if (params?.customer_id) {
+          query = query.eq('customer_id', params.customer_id)
+        }
+        
+        if (params?.status) {
+          query = query.eq('status', params.status)
+        }
+        
+        if (params?.limit) {
+          query = query.limit(params.limit)
+        }
+        
+        const { data, error } = await query
+        
+        if (error) {
+          // If table doesn't exist, return empty array
+          if (error.code === '42P01' || error.message.includes('does not exist')) {
+            console.warn('GST Invoices table does not exist yet. Returning empty array.');
+            return [];
+          }
+          throw new Error(error.message)
+        }
+        return data || []
+      } catch (err: any) {
+        // Handle table not existing gracefully
+        console.warn('GST Invoices not available:', err.message);
+        return [];
       }
-      
-      if (params?.status) {
-        query = query.eq('status', params.status)
-      }
-      
-      if (params?.limit) {
-        query = query.limit(params.limit)
-      }
-      
-      const { data, error } = await query
-      
-      if (error) throw new Error(error.message)
-      return data || []
     }, params)
   },
 
@@ -850,6 +1394,20 @@ export const gstInvoiceApi = {
       })
       
       if (error) throw new Error(error.message)
+      
+      // Log invoice generation to audit trail
+      try {
+        await logInvoiceGenerated(
+          data.id,
+          invoiceData.customer_id,
+          data,
+          invoiceData.notes?.includes('Delivery Challan:') ? 
+            [invoiceData.notes.match(/DC-\d+/)?.[0] || ''] : undefined
+        );
+      } catch (auditError) {
+        apiLogger.warn('Failed to log invoice generation to audit trail', auditError);
+      }
+      
       return data
     }, invoiceData)
   },

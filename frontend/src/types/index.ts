@@ -46,7 +46,20 @@ export interface CustomerUpdate extends Partial<CustomerCreate> { }
 // Order types
 export type MaterialType = 'saree' | 'dupatta' | 'voni' | 'running_material' | 'blouse_material';
 export type OrderStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
-export type ProductionStage = 'pre_treatment' | 'printing' | 'post_process';
+export type ProductionStage = 'design_pending' | 'design_ready' | 'pre_treatment' | 'printing' | 'post_process';
+
+export interface DesignInfo {
+    id?: string;
+    order_item_id: string;
+    design_received: boolean;
+    design_ready: boolean;
+    design_file_url?: string;
+    design_notes?: string;
+    design_received_date?: string;
+    design_ready_date?: string;
+    created_at?: string;
+    updated_at?: string;
+}
 
 export interface OrderItem {
     id: string;
@@ -56,6 +69,12 @@ export interface OrderItem {
     unit_price: number;
     customization_details?: string;
     current_stage: ProductionStage;
+    design_received: boolean;
+    design_ready: boolean;
+    design_file_url?: string;
+    design_notes?: string;
+    design_received_date?: string;
+    design_ready_date?: string;
     pre_treatment_completed_at?: string;
     printing_completed_at?: string;
     post_process_completed_at?: string;
@@ -67,6 +86,9 @@ export interface OrderItemCreate {
     quantity: number;
     unit_price: number;
     customization_details?: string;
+    design_received?: string;
+    design_ready?: string;
+    design_notes?: string;
 }
 
 export interface Order {
@@ -144,6 +166,7 @@ export interface MaterialOut {
 
 export interface Payment {
     id: string;
+    customer_id?: string;
     invoice_id: string;
     payment_amount: number;
     payment_date: string;
@@ -200,20 +223,45 @@ export interface DeliveryChallan {
     order?: Order;
 }
 
+export interface DeliveryChallanItem {
+    id?: string;
+    delivery_challan_id?: string;
+    order_id: string;
+    order_item_id: string;
+    material_type: string;
+    quantity_delivered: number;
+    unit_price: number;
+    subtotal: number;
+    notes?: string;
+    created_at?: string;
+}
+
 export interface DeliveryChallanCreate {
     challan_number?: string;
     customer_id: string;
-    order_ids?: string[]; // For multiple orders
-    order_id?: string; // For single order (backward compatibility)
     delivery_date: string;
     status: 'pending' | 'delivered' | 'returned';
     notes?: string;
-    items?: Array<{
+    items: Array<{
         order_id: string;
+        order_item_id: string;
         material_type: string;
         quantity_delivered: number;
+        unit_price: number;
         notes?: string;
     }>;
+}
+
+// Material stock tracking
+export interface MaterialStock {
+    id: string;
+    customer_id: string;
+    material_type: string;
+    total_received: number;
+    total_delivered: number;
+    current_stock: number;
+    last_updated: string;
+    customer?: Customer;
 }
 
 // GST Invoice types

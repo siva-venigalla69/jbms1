@@ -56,6 +56,9 @@ const orderCreateSchema = yup.object({
       quantity: yup.number().positive('Quantity must be positive').required('Quantity is required'),
       unit_price: yup.number().min(0, 'Price cannot be negative').required('Unit price is required'),
       customization_details: yup.string(),
+      design_received: yup.string(),
+      design_ready: yup.string(),
+      design_notes: yup.string(),
     })
   ).min(1, 'At least one item is required'),
 });
@@ -70,6 +73,9 @@ const orderEditSchema = yup.object({
       quantity: yup.number().positive('Quantity must be positive').required('Quantity is required'),
       unit_price: yup.number().min(0, 'Price cannot be negative').required('Unit price is required'),
       customization_details: yup.string(),
+      design_received: yup.string(),
+      design_ready: yup.string(),
+      design_notes: yup.string(),
     })
   ).min(1, 'At least one item is required'),
 });
@@ -109,6 +115,9 @@ const Orders: React.FC = () => {
           quantity: 1,
           unit_price: 0,
           customization_details: '',
+          design_received: '',
+          design_ready: '',
+          design_notes: '',
         },
       ],
     },
@@ -132,6 +141,9 @@ const Orders: React.FC = () => {
           quantity: 1,
           unit_price: 0,
           customization_details: '',
+          design_received: '',
+          design_ready: '',
+          design_notes: '',
         },
       ],
     },
@@ -273,6 +285,9 @@ const Orders: React.FC = () => {
       quantity: 1,
       unit_price: 0,
       customization_details: '',
+      design_received: '',
+      design_ready: '',
+      design_notes: '',
     });
   };
 
@@ -965,6 +980,60 @@ const Orders: React.FC = () => {
                           />
                         )}
                       />
+
+                      {/* Design Status Section */}
+                      <Box sx={{ mt: 2, p: 2, bgcolor: 'background.paper', borderRadius: 1, border: 1, borderColor: 'divider' }}>
+                        <Typography variant="subtitle2" gutterBottom color="primary">
+                          Design Status
+                        </Typography>
+                        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 2 }}>
+                          <Controller
+                            name={`items.${index}.design_received`}
+                            control={control}
+                            render={({ field }) => (
+                              <FormControl fullWidth size="small">
+                                <InputLabel>Design Received</InputLabel>
+                                <Select {...field} label="Design Received">
+                                  <MenuItem value="">Not specified</MenuItem>
+                                  <MenuItem value="pending">Pending from Customer</MenuItem>
+                                  <MenuItem value="received">Received from Customer</MenuItem>
+                                  <MenuItem value="not_required">Design Not Required</MenuItem>
+                                </Select>
+                              </FormControl>
+                            )}
+                          />
+                          
+                          <Controller
+                            name={`items.${index}.design_ready`}
+                            control={control}
+                            render={({ field }) => (
+                              <FormControl fullWidth size="small">
+                                <InputLabel>Design Ready</InputLabel>
+                                <Select {...field} label="Design Ready">
+                                  <MenuItem value="">Not ready</MenuItem>
+                                  <MenuItem value="in_progress">Design in Progress</MenuItem>
+                                  <MenuItem value="ready">Ready for Printing</MenuItem>
+                                  <MenuItem value="approved">Customer Approved</MenuItem>
+                                </Select>
+                              </FormControl>
+                            )}
+                          />
+                        </Box>
+                        
+                        <Controller
+                          name={`items.${index}.design_notes`}
+                          control={control}
+                          render={({ field }) => (
+                            <TextField
+                              {...field}
+                              fullWidth
+                              label="Design Notes"
+                              size="small"
+                              placeholder="Design requirements, customer preferences, etc."
+                            />
+                          )}
+                        />
+                      </Box>
                     </CardContent>
                   </Card>
                 ))}

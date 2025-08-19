@@ -26,6 +26,7 @@ import {
   MenuItem,
   IconButton,
   Grid,
+  Checkbox,
 } from '@mui/material';
 import {
   Add,
@@ -39,6 +40,7 @@ import {
   AddCircle,
   RemoveCircle,
   Delete,
+  Receipt,
 } from '@mui/icons-material';
 import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -50,15 +52,16 @@ import { componentLogger } from '../utils/debug';
 // Form validation schema
 const challanCreateSchema = yup.object({
   customer_id: yup.string().required('Customer is required'),
-  order_ids: yup.array().of(yup.string()).min(1, 'At least one order is required'),
   delivery_date: yup.string().required('Delivery date is required'),
   status: yup.string().required('Status is required'),
   notes: yup.string(),
   items: yup.array().of(
     yup.object({
       order_id: yup.string().required(),
+      order_item_id: yup.string().required(),
       material_type: yup.string().required(),
-      quantity_delivered: yup.number().positive().required(),
+      quantity_delivered: yup.number().positive('Quantity must be positive').required('Quantity is required'),
+      unit_price: yup.number().min(0, 'Price cannot be negative').required('Unit price is required'),
       notes: yup.string(),
     })
   ).min(1, 'At least one delivery item is required'),
@@ -83,13 +86,14 @@ const DeliveryChallans: React.FC = () => {
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedChallan, setSelectedChallan] = useState<DeliveryChallan | null>(null);
+  const [selectedChallans, setSelectedChallans] = useState<string[]>([]);
+  const [bulkInvoiceDialogOpen, setBulkInvoiceDialogOpen] = useState(false);
 
   // Create challan form
-  const { control, handleSubmit, reset, watch, formState: { errors, isSubmitting } } = useForm({
+  const { control, handleSubmit, reset, watch, setValue, formState: { errors, isSubmitting } } = useForm({
     resolver: yupResolver(challanCreateSchema),
     defaultValues: {
       customer_id: '',
-      order_ids: [],
       delivery_date: new Date().toISOString().split('T')[0],
       status: 'pending',
       notes: '',
@@ -103,7 +107,6 @@ const DeliveryChallans: React.FC = () => {
   });
 
   const watchedCustomerId = watch('customer_id');
-  const watchedOrderIds = watch('order_ids');
 
   // Edit challan form
   const { 
@@ -174,7 +177,6 @@ const DeliveryChallans: React.FC = () => {
   const handleCreateChallan = () => {
     reset({
       customer_id: '',
-      order_ids: [],
       delivery_date: new Date().toISOString().split('T')[0],
       status: 'pending',
       notes: '',
@@ -183,66 +185,97 @@ const DeliveryChallans: React.FC = () => {
     setDialogOpen(true);
   };
 
-  // Get customer orders
+  // Get customer orders with items
   const getCustomerOrders = () => {
     if (!watchedCustomerId) return [];
-    return orders.filter(order => order.customer_id === watchedCustomerId && order.status !== 'cancelled');
+    return orders.filter(order => 
+      order.customer_id === watchedCustomerId && 
+      order.status !== 'cancelled' &&
+      order.order_items && 
+      order.order_items.length > 0
+    );
   };
 
-  // Get available materials from selected orders
-  const getAvailableMaterials = () => {
+  // Get all available order items for delivery
+  const getAvailableOrderItems = () => {
     const customerOrders = getCustomerOrders();
-    const selectedOrders = customerOrders.filter(order => watchedOrderIds?.includes(order.id));
+    const availableItems: Array<{
+      order_id: string;
+      order_item_id: string;
+      order_number: string;
+      material_type: string;
+      total_quantity: number;
+      unit_price: number;
+      customization_details?: string;
+    }> = [];
     
-    const materials: Array<{order_id: string, material_type: string, order_number: string, available_quantity: number}> = [];
-    
-    selectedOrders.forEach(order => {
+    customerOrders.forEach(order => {
       order.order_items?.forEach(item => {
-        materials.push({
+        availableItems.push({
           order_id: order.id,
-          material_type: item.material_type,
+          order_item_id: item.id,
           order_number: order.order_number,
-          available_quantity: item.quantity
+          material_type: item.material_type,
+          total_quantity: item.quantity,
+          unit_price: item.unit_price,
+          customization_details: item.customization_details
         });
       });
     });
     
-    return materials;
+    return availableItems;
   };
 
   const addDeliveryItem = () => {
-    const availableMaterials = getAvailableMaterials();
-    if (availableMaterials.length > 0) {
-      const firstMaterial = availableMaterials[0];
+    const availableItems = getAvailableOrderItems();
+    if (availableItems.length > 0) {
+      const firstItem = availableItems[0];
       appendItem({
-        order_id: firstMaterial.order_id,
-        material_type: firstMaterial.material_type,
+        order_id: firstItem.order_id,
+        order_item_id: firstItem.order_item_id,
+        material_type: firstItem.material_type,
         quantity_delivered: 1,
+        unit_price: firstItem.unit_price,
         notes: ''
       });
     }
   };
 
   const removeDeliveryItem = (index: number) => {
-    if (deliveryItems.length > 1) {
-      removeItem(index);
-    }
+    removeItem(index);
   };
 
   const onSubmit = async (data: any) => {
     try {
-      // For backward compatibility, if order_ids is provided, use the first one as order_id
+      componentLogger.info('Creating delivery challan with items', data);
+      
+      // Calculate total amount
+      const totalAmount = data.items.reduce((sum: number, item: any) => 
+        sum + (item.quantity_delivered * item.unit_price), 0
+      );
+      
       const challanData = {
-        ...data,
-        order_id: data.order_ids?.[0] || data.order_id, // Use first order for main record
-        order_ids: data.order_ids,
+        customer_id: data.customer_id,
+        delivery_date: data.delivery_date,
+        status: data.status,
+        notes: data.notes,
+        total_amount: totalAmount,
+        items: data.items.map((item: any) => ({
+          order_id: item.order_id,
+          order_item_id: item.order_item_id,
+          material_type: item.material_type,
+          quantity_delivered: Number(item.quantity_delivered),
+          unit_price: Number(item.unit_price),
+          notes: item.notes || '',
+        }))
       };
       
       await deliveryChallanApi.createDeliveryChallan(challanData);
-      setSuccess('Delivery challan created successfully');
+      setSuccess(`Delivery challan created successfully with ${data.items.length} items`);
       setDialogOpen(false);
       loadDeliveryChallans();
     } catch (error: any) {
+      componentLogger.error('Failed to create delivery challan', error);
       setError('Failed to create delivery challan: ' + error.message);
     }
   };
@@ -291,6 +324,75 @@ const DeliveryChallans: React.FC = () => {
     }
   };
 
+  const handleGenerateInvoice = async (challanId: string, challanNumber: string) => {
+    if (!window.confirm(`Generate invoice for delivery challan ${challanNumber}?`)) {
+      return;
+    }
+
+    try {
+      componentLogger.info('Generating invoice from delivery challan', { challanId });
+      const invoice = await deliveryChallanApi.generateInvoiceFromChallan(challanId);
+      setSuccess(`Invoice ${invoice.invoice_number} generated successfully from challan ${challanNumber}!`);
+    } catch (error: any) {
+      componentLogger.error('Failed to generate invoice from challan', error);
+      setError('Failed to generate invoice: ' + error.message);
+    }
+  };
+
+  const handleBulkInvoiceGeneration = async () => {
+    const deliveredChallans = selectedChallans.filter(challanId => {
+      const challan = challans.find(c => c.id === challanId);
+      return challan?.status === 'delivered';
+    });
+
+    if (deliveredChallans.length === 0) {
+      setError('Please select at least one delivered challan to generate invoices.');
+      return;
+    }
+
+    if (!window.confirm(`Generate ${deliveredChallans.length} invoice(s) for selected delivery challans?`)) {
+      return;
+    }
+
+    try {
+      const invoices = [];
+      for (const challanId of deliveredChallans) {
+        const challan = challans.find(c => c.id === challanId);
+        if (challan) {
+          const invoice = await deliveryChallanApi.generateInvoiceFromChallan(challanId);
+          invoices.push(invoice);
+        }
+      }
+      
+      setSuccess(`Successfully generated ${invoices.length} invoice(s) from selected delivery challans!`);
+      setSelectedChallans([]);
+      setBulkInvoiceDialogOpen(false);
+    } catch (error: any) {
+      componentLogger.error('Failed to generate bulk invoices', error);
+      setError('Failed to generate invoices: ' + error.message);
+    }
+  };
+
+  const handleSelectChallan = (challanId: string) => {
+    setSelectedChallans(prev => 
+      prev.includes(challanId) 
+        ? prev.filter(id => id !== challanId)
+        : [...prev, challanId]
+    );
+  };
+
+  const handleSelectAllChallans = () => {
+    const deliveredChallanIds = filteredChallans
+      .filter(challan => challan.status === 'delivered')
+      .map(challan => challan.id);
+    
+    if (selectedChallans.length === deliveredChallanIds.length) {
+      setSelectedChallans([]);
+    } else {
+      setSelectedChallans(deliveredChallanIds);
+    }
+  };
+
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'pending':
@@ -335,9 +437,21 @@ const DeliveryChallans: React.FC = () => {
         <Typography variant="h4" fontWeight="bold">
           Delivery Challans
         </Typography>
-        <Button variant="contained" startIcon={<Add />} onClick={handleCreateChallan} sx={{ px: 3 }}>
-          Create Challan
-        </Button>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          {selectedChallans.length > 0 && (
+            <Button 
+              variant="outlined" 
+              startIcon={<Receipt />} 
+              onClick={() => setBulkInvoiceDialogOpen(true)}
+              color="success"
+            >
+              Generate Invoices ({selectedChallans.length})
+            </Button>
+          )}
+          <Button variant="contained" startIcon={<Add />} onClick={handleCreateChallan} sx={{ px: 3 }}>
+            Create Challan
+          </Button>
+        </Box>
       </Box>
 
       {/* Alerts */}
@@ -463,6 +577,14 @@ const DeliveryChallans: React.FC = () => {
               <Table>
                 <TableHead>
                   <TableRow>
+                    <TableCell padding="checkbox">
+                      <Checkbox
+                        indeterminate={selectedChallans.length > 0 && selectedChallans.length < filteredChallans.filter(c => c.status === 'delivered').length}
+                        checked={filteredChallans.filter(c => c.status === 'delivered').length > 0 && selectedChallans.length === filteredChallans.filter(c => c.status === 'delivered').length}
+                        onChange={handleSelectAllChallans}
+                        title="Select all delivered challans"
+                      />
+                    </TableCell>
                     <TableCell>Challan Number</TableCell>
                     <TableCell>Customer</TableCell>
                     <TableCell>Order Number</TableCell>
@@ -475,6 +597,14 @@ const DeliveryChallans: React.FC = () => {
                 <TableBody>
                   {filteredChallans.map((challan) => (
                     <TableRow key={challan.id} hover>
+                      <TableCell padding="checkbox">
+                        <Checkbox
+                          checked={selectedChallans.includes(challan.id)}
+                          onChange={() => handleSelectChallan(challan.id)}
+                          disabled={challan.status !== 'delivered'}
+                          title={challan.status === 'delivered' ? 'Select for invoice generation' : 'Only delivered challans can be selected'}
+                        />
+                      </TableCell>
                       <TableCell>
                         <Box sx={{ display: 'flex', alignItems: 'center' }}>
                           <LocalShipping sx={{ mr: 1, color: 'text.secondary' }} />
@@ -514,6 +644,16 @@ const DeliveryChallans: React.FC = () => {
                           >
                             <Edit />
                           </IconButton>
+                          {challan.status === 'delivered' && (
+                            <IconButton 
+                              size="small" 
+                              onClick={() => handleGenerateInvoice(challan.id, challan.challan_number)}
+                              title="Generate Invoice"
+                              color="success"
+                            >
+                              <Receipt />
+                            </IconButton>
+                          )}
                         </Box>
                       </TableCell>
                     </TableRow>
@@ -549,33 +689,26 @@ const DeliveryChallans: React.FC = () => {
                     </FormControl>
                   )}
                 />
-                <Controller
-                  name="order_ids"
-                  control={control}
-                  rules={{ required: 'At least one order is required' }}
-                  render={({ field }) => (
-                    <FormControl fullWidth error={!!errors.order_ids}>
-                      <InputLabel>Orders</InputLabel>
-                      <Select 
-                        {...field} 
-                        label="Orders" 
-                        multiple
-                        value={field.value || []}
-                      >
-                        {getCustomerOrders().map((order) => (
-                          <MenuItem key={order.id} value={order.id}>
-                            {order.order_number} - {order.status}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                      {!watchedCustomerId && (
-                        <Typography variant="caption" color="text.secondary">
-                          Select a customer first to see available orders
-                        </Typography>
-                      )}
-                    </FormControl>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Typography variant="h6">Available Orders</Typography>
+                  {!watchedCustomerId && (
+                    <Typography variant="caption" color="text.secondary">
+                      Select a customer first to see available orders
+                    </Typography>
                   )}
-                />
+                </Box>
+                
+                {watchedCustomerId && getCustomerOrders().length === 0 && (
+                  <Alert severity="info">
+                    No pending orders found for this customer with items ready for delivery.
+                  </Alert>
+                )}
+                
+                {watchedCustomerId && getCustomerOrders().length > 0 && (
+                  <Alert severity="success">
+                    Found {getCustomerOrders().length} orders with {getAvailableOrderItems().length} items available for delivery.
+                  </Alert>
+                )}
               </Box>
               <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', md: 'row' } }}>
                 <Controller
@@ -613,7 +746,7 @@ const DeliveryChallans: React.FC = () => {
               </Box>
 
               {/* Delivery Items Section */}
-              {watchedOrderIds && watchedOrderIds.length > 0 && (
+              {watchedCustomerId && (
                 <Box>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                     <Typography variant="h6">Delivery Items</Typography>
@@ -622,65 +755,73 @@ const DeliveryChallans: React.FC = () => {
                       onClick={addDeliveryItem}
                       variant="outlined"
                       size="small"
-                      disabled={getAvailableMaterials().length === 0}
+                      disabled={getAvailableOrderItems().length === 0}
                     >
                       Add Item
                     </Button>
                   </Box>
                   
                   {deliveryItems.map((field, index) => {
-                    const availableMaterials = getAvailableMaterials();
+                    const availableItems = getAvailableOrderItems();
+                    const selectedOrderItemId = watch(`items.${index}.order_item_id`);
+                    const selectedItem = availableItems.find(item => 
+                      item.order_item_id === selectedOrderItemId
+                    );
+                    
                     return (
                       <Card key={field.id} variant="outlined" sx={{ mb: 2 }}>
                         <CardContent>
                           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                             <Typography variant="subtitle1">Delivery Item {index + 1}</Typography>
-                            {deliveryItems.length > 1 && (
-                              <IconButton
-                                size="small"
-                                onClick={() => removeDeliveryItem(index)}
-                                color="error"
-                              >
-                                <RemoveCircle />
-                              </IconButton>
-                            )}
+                            <IconButton
+                              size="small"
+                              onClick={() => removeDeliveryItem(index)}
+                              color="error"
+                            >
+                              <RemoveCircle />
+                            </IconButton>
+                          </Box>
+                          
+                          <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', md: 'row' }, mb: 2 }}>
+                            <Controller
+                              name={`items.${index}.order_item_id`}
+                              control={control}
+                              render={({ field }) => (
+                                <FormControl fullWidth>
+                                  <InputLabel>Order Item</InputLabel>
+                                  <Select 
+                                    {...field} 
+                                    label="Order Item"
+                                    onChange={(e) => {
+                                      field.onChange(e);
+                                      // Auto-fill other fields when order item is selected
+                                      const selectedItem = availableItems.find(item => item.order_item_id === e.target.value);
+                                      if (selectedItem) {
+                                        // Update other fields automatically
+                                        const formData = {
+                                          [`items.${index}.order_id`]: selectedItem.order_id,
+                                          [`items.${index}.material_type`]: selectedItem.material_type,
+                                          [`items.${index}.unit_price`]: selectedItem.unit_price,
+                                        };
+                                        Object.entries(formData).forEach(([path, value]) => {
+                                          setValue(path as any, value);
+                                        });
+                                      }
+                                    }}
+                                  >
+                                    {availableItems.map((item) => (
+                                      <MenuItem key={item.order_item_id} value={item.order_item_id}>
+                                        {item.order_number} - {item.material_type} (Qty: {item.total_quantity})
+                                        {item.customization_details && ` - ${item.customization_details}`}
+                                      </MenuItem>
+                                    ))}
+                                  </Select>
+                                </FormControl>
+                              )}
+                            />
                           </Box>
                           
                           <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', md: 'row' } }}>
-                            <Controller
-                              name={`items.${index}.order_id`}
-                              control={control}
-                              render={({ field }) => (
-                                <FormControl fullWidth>
-                                  <InputLabel>Order</InputLabel>
-                                  <Select {...field} label="Order">
-                                    {availableMaterials.map((material, idx) => (
-                                      <MenuItem key={`${material.order_id}-${idx}`} value={material.order_id}>
-                                        {material.order_number}
-                                      </MenuItem>
-                                    ))}
-                                  </Select>
-                                </FormControl>
-                              )}
-                            />
-                            
-                            <Controller
-                              name={`items.${index}.material_type`}
-                              control={control}
-                              render={({ field }) => (
-                                <FormControl fullWidth>
-                                  <InputLabel>Material Type</InputLabel>
-                                  <Select {...field} label="Material Type">
-                                    {availableMaterials.map((material, idx) => (
-                                      <MenuItem key={`${material.material_type}-${idx}`} value={material.material_type}>
-                                        {material.material_type}
-                                      </MenuItem>
-                                    ))}
-                                  </Select>
-                                </FormControl>
-                              )}
-                            />
-                            
                             <Controller
                               name={`items.${index}.quantity_delivered`}
                               control={control}
@@ -688,11 +829,33 @@ const DeliveryChallans: React.FC = () => {
                                 <TextField
                                   {...field}
                                   type="number"
-                                  label="Quantity"
+                                  label="Quantity to Deliver"
                                   inputProps={{ min: 1 }}
+                                  sx={{ minWidth: 150 }}
+                                  helperText={selectedItem ? `Max: ${selectedItem.total_quantity}` : ''}
+                                />
+                              )}
+                            />
+                            
+                            <Controller
+                              name={`items.${index}.unit_price`}
+                              control={control}
+                              render={({ field }) => (
+                                <TextField
+                                  {...field}
+                                  type="number"
+                                  label="Unit Price"
+                                  inputProps={{ min: 0, step: 0.01 }}
                                   sx={{ minWidth: 120 }}
                                 />
                               )}
+                            />
+                            
+                            <TextField
+                              label="Subtotal"
+                              value={(watch(`items.${index}.quantity_delivered`) || 0) * (watch(`items.${index}.unit_price`) || 0)}
+                              disabled
+                              sx={{ minWidth: 120 }}
                             />
                           </Box>
                           
@@ -711,14 +874,32 @@ const DeliveryChallans: React.FC = () => {
                               />
                             )}
                           />
+                          
+                          {/* Hidden fields for auto-populated data */}
+                          <Controller
+                            name={`items.${index}.order_id`}
+                            control={control}
+                            render={({ field }) => <input type="hidden" {...field} />}
+                          />
+                          <Controller
+                            name={`items.${index}.material_type`}
+                            control={control}
+                            render={({ field }) => <input type="hidden" {...field} />}
+                          />
                         </CardContent>
                       </Card>
                     );
                   })}
                   
-                  {deliveryItems.length === 0 && watchedOrderIds.length > 0 && (
+                  {deliveryItems.length === 0 && watchedCustomerId && (
                     <Alert severity="info" sx={{ mb: 2 }}>
-                      No delivery items added yet. Click "Add Item" to specify what materials to deliver.
+                      No delivery items added yet. Click "Add Item" to specify what materials to deliver from the customer's orders.
+                    </Alert>
+                  )}
+                  
+                  {getAvailableOrderItems().length === 0 && watchedCustomerId && (
+                    <Alert severity="warning" sx={{ mb: 2 }}>
+                      No order items available for delivery for this customer. Make sure the customer has pending orders with items.
                     </Alert>
                   )}
                 </Box>
@@ -929,6 +1110,69 @@ const DeliveryChallans: React.FC = () => {
             </Button>
           </DialogActions>
         </form>
+      </Dialog>
+
+      {/* Bulk Invoice Generation Dialog */}
+      <Dialog open={bulkInvoiceDialogOpen} onClose={() => setBulkInvoiceDialogOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Receipt />
+            <Typography variant="h6">Generate Invoices for Selected Challans</Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ mt: 2 }}>
+            <Alert severity="info" sx={{ mb: 3 }}>
+              This will generate individual invoices for each selected delivery challan.
+              Only delivered challans can be converted to invoices.
+            </Alert>
+            
+            <Typography variant="h6" gutterBottom>
+              Selected Challans ({selectedChallans.length}):
+            </Typography>
+            
+            <Box sx={{ maxHeight: 300, overflow: 'auto', border: 1, borderColor: 'divider', borderRadius: 1, p: 2 }}>
+              {selectedChallans.map(challanId => {
+                const challan = challans.find(c => c.id === challanId);
+                return challan ? (
+                  <Box key={challan.id} sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1, p: 1, bgcolor: 'background.paper', borderRadius: 1 }}>
+                    <LocalShipping sx={{ color: 'text.secondary' }} />
+                    <Box sx={{ flex: 1 }}>
+                      <Typography variant="body2" fontWeight="medium">
+                        {challan.challan_number}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {challan.customer?.name} - {new Date(challan.delivery_date).toLocaleDateString()}
+                      </Typography>
+                    </Box>
+                    <Chip 
+                      label={challan.status.charAt(0).toUpperCase() + challan.status.slice(1)}
+                      size="small"
+                      color="success"
+                      variant="outlined"
+                    />
+                  </Box>
+                ) : null;
+              })}
+            </Box>
+            
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+              Each challan will generate a separate invoice with 18% GST automatically calculated.
+              Invoice numbers will be generated automatically in the format: INV-DC-[CHALLAN_NUMBER]-[TIMESTAMP]
+            </Typography>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setBulkInvoiceDialogOpen(false)}>Cancel</Button>
+          <Button 
+            variant="contained" 
+            onClick={handleBulkInvoiceGeneration}
+            startIcon={<Receipt />}
+            color="success"
+          >
+            Generate {selectedChallans.length} Invoice(s)
+          </Button>
+        </DialogActions>
       </Dialog>
     </Box>
   );

@@ -30,7 +30,7 @@ import {
     AttachMoney,
     DateRange,
 } from '@mui/icons-material';
-import { reportsApi, customerApi, inventoryApi } from '../services/supabaseApi';
+import { reportsApi, customerApi, inventoryApi, materialStockApi } from '../services/supabaseApi';
 import { componentLogger } from '../utils/debug';
 
 const Reports: React.FC = () => {
@@ -48,6 +48,8 @@ const Reports: React.FC = () => {
     const [inventory, setInventory] = useState<any[]>([]);
     const [payments, setPayments] = useState<any[]>([]);
     const [expenses, setExpenses] = useState<any[]>([]);
+    const [materialStock, setMaterialStock] = useState<any[]>([]);
+    const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
 
     const loadReportData = useCallback(async () => {
         componentLogger.info('Loading report data...');
@@ -64,14 +66,16 @@ const Reports: React.FC = () => {
                 customersData,
                 inventoryData,
                 paymentsData,
-                expensesData
+                expensesData,
+                materialStockData
             ] = await Promise.all([
                 reportsApi.getPendingOrders().catch(() => []),
                 reportsApi.getPendingReceivables().catch(() => []),
                 customerApi.getCustomers().catch(() => []),
                 inventoryApi.getInventory().catch(() => []),
                 reportsApi.getPaymentsInDateRange(startDateValue, endDateValue).catch(() => []),
-                reportsApi.getExpensesInDateRange(startDateValue, endDateValue).catch(() => [])
+                reportsApi.getExpensesInDateRange(startDateValue, endDateValue).catch(() => []),
+                materialStockApi.getCustomerStock(selectedCustomerId || undefined).catch(() => [])
             ]);
             
             setPendingOrders(pendingOrdersData);
@@ -80,6 +84,7 @@ const Reports: React.FC = () => {
             setInventory(inventoryData);
             setPayments(paymentsData);
             setExpenses(expensesData);
+            setMaterialStock(materialStockData);
             
             componentLogger.info('Report data loaded successfully');
         } catch (error: any) {
@@ -88,7 +93,7 @@ const Reports: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    }, [startDate, endDate]);
+    }, [startDate, endDate, selectedCustomerId]);
 
     useEffect(() => {
         loadReportData();
@@ -355,6 +360,242 @@ const Reports: React.FC = () => {
         </Box>
     );
 
+    const renderMaterialStockReport = () => {
+        // Group material stock by different dimensions
+        const stockByCustomer = materialStock.reduce((acc, stock) => {
+            const customerName = stock.customer?.name || 'Unknown';
+            if (!acc[customerName]) {
+                acc[customerName] = {
+                    customer: stock.customer,
+                    totalReceived: 0,
+                    totalDelivered: 0,
+                    currentStock: 0,
+                    materials: []
+                };
+            }
+            acc[customerName].totalReceived += stock.total_received;
+            acc[customerName].totalDelivered += stock.total_delivered;
+            acc[customerName].currentStock += stock.current_stock;
+            acc[customerName].materials.push(stock);
+            return acc;
+        }, {} as any);
+
+        const stockByMaterial = materialStock.reduce((acc, stock) => {
+            const materialType = stock.material_type;
+            if (!acc[materialType]) {
+                acc[materialType] = {
+                    material_type: materialType,
+                    totalReceived: 0,
+                    totalDelivered: 0,
+                    currentStock: 0,
+                    customers: []
+                };
+            }
+            acc[materialType].totalReceived += stock.total_received;
+            acc[materialType].totalDelivered += stock.total_delivered;
+            acc[materialType].currentStock += stock.current_stock;
+            acc[materialType].customers.push(stock);
+            return acc;
+        }, {} as any);
+
+        const lowStockCustomers = materialStock.filter(stock => stock.current_stock < 0);
+        const totalMaterialValue = materialStock.reduce((sum, stock) => sum + (stock.current_stock * 50), 0); // Assuming avg unit cost
+
+        return (
+            <Box>
+                {/* Material Stock Summary Cards */}
+                <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 3, mb: 4 }}>
+                    <Card>
+                        <CardContent>
+                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                                <Inventory sx={{ mr: 1, color: 'primary.main' }} />
+                                <Typography variant="h6" color="text.secondary">
+                                    Total Customers
+                                </Typography>
+                            </Box>
+                            <Typography variant="h4" fontWeight="bold">
+                                {Object.keys(stockByCustomer).length}
+                            </Typography>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent>
+                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                                <ShoppingCart sx={{ mr: 1, color: 'success.main' }} />
+                                <Typography variant="h6" color="text.secondary">
+                                    Material Types
+                                </Typography>
+                            </Box>
+                            <Typography variant="h4" fontWeight="bold">
+                                {Object.keys(stockByMaterial).length}
+                            </Typography>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent>
+                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                                <TrendingUp sx={{ mr: 1, color: 'warning.main' }} />
+                                <Typography variant="h6" color="text.secondary">
+                                    Over-Delivered
+                                </Typography>
+                            </Box>
+                            <Typography variant="h4" fontWeight="bold" color="error.main">
+                                {lowStockCustomers.length}
+                            </Typography>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent>
+                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                                <AttachMoney sx={{ mr: 1, color: 'info.main' }} />
+                                <Typography variant="h6" color="text.secondary">
+                                    Est. Value (₹)
+                                </Typography>
+                            </Box>
+                            <Typography variant="h4" fontWeight="bold">
+                                ₹{Math.abs(totalMaterialValue).toFixed(0)}
+                            </Typography>
+                        </CardContent>
+                    </Card>
+                </Box>
+
+                {/* Material Stock Tables */}
+                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' }, gap: 3, mb: 3 }}>
+                    {/* Stock by Customer */}
+                    <Card>
+                        <CardContent>
+                            <Typography variant="h6" gutterBottom>
+                                Stock by Customer
+                            </Typography>
+                            <TableContainer>
+                                <Table size="small">
+                                    <TableHead>
+                                        <TableRow>
+                                            <TableCell>Customer</TableCell>
+                                            <TableCell>Received</TableCell>
+                                            <TableCell>Delivered</TableCell>
+                                            <TableCell>Balance</TableCell>
+                                        </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                        {Object.values(stockByCustomer).map((customerStock: any) => (
+                                            <TableRow key={customerStock.customer?.id || 'unknown'}>
+                                                <TableCell>{customerStock.customer?.name || 'Unknown'}</TableCell>
+                                                <TableCell>{customerStock.totalReceived}</TableCell>
+                                                <TableCell>{customerStock.totalDelivered}</TableCell>
+                                                <TableCell>
+                                                    <Typography 
+                                                        color={customerStock.currentStock < 0 ? 'error' : 'success'}
+                                                        variant="body2"
+                                                        fontWeight="bold"
+                                                    >
+                                                        {customerStock.currentStock}
+                                                    </Typography>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
+                        </CardContent>
+                    </Card>
+
+                    {/* Stock by Material Type */}
+                    <Card>
+                        <CardContent>
+                            <Typography variant="h6" gutterBottom>
+                                Stock by Material Type
+                            </Typography>
+                            <TableContainer>
+                                <Table size="small">
+                                    <TableHead>
+                                        <TableRow>
+                                            <TableCell>Material Type</TableCell>
+                                            <TableCell>Received</TableCell>
+                                            <TableCell>Delivered</TableCell>
+                                            <TableCell>Balance</TableCell>
+                                        </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                        {Object.values(stockByMaterial).map((materialStock: any) => (
+                                            <TableRow key={materialStock.material_type}>
+                                                <TableCell>{materialStock.material_type}</TableCell>
+                                                <TableCell>{materialStock.totalReceived}</TableCell>
+                                                <TableCell>{materialStock.totalDelivered}</TableCell>
+                                                <TableCell>
+                                                    <Typography 
+                                                        color={materialStock.currentStock < 0 ? 'error' : 'success'}
+                                                        variant="body2"
+                                                        fontWeight="bold"
+                                                    >
+                                                        {materialStock.currentStock}
+                                                    </Typography>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
+                        </CardContent>
+                    </Card>
+                </Box>
+
+                {/* Detailed Material Stock */}
+                <Card>
+                    <CardContent>
+                        <Typography variant="h6" gutterBottom>
+                            Detailed Material Stock Analysis
+                        </Typography>
+                        <TableContainer>
+                            <Table>
+                                <TableHead>
+                                    <TableRow>
+                                        <TableCell>Customer</TableCell>
+                                        <TableCell>Material Type</TableCell>
+                                        <TableCell>Total Received</TableCell>
+                                        <TableCell>Total Delivered</TableCell>
+                                        <TableCell>Current Stock</TableCell>
+                                        <TableCell>Last Updated</TableCell>
+                                        <TableCell>Status</TableCell>
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {materialStock.map((stock) => (
+                                        <TableRow key={stock.id}>
+                                            <TableCell>{stock.customer?.name || 'Unknown'}</TableCell>
+                                            <TableCell>{stock.material_type}</TableCell>
+                                            <TableCell>{stock.total_received}</TableCell>
+                                            <TableCell>{stock.total_delivered}</TableCell>
+                                            <TableCell>
+                                                <Typography 
+                                                    color={stock.current_stock < 0 ? 'error' : stock.current_stock === 0 ? 'warning' : 'success'}
+                                                    variant="body2"
+                                                    fontWeight="bold"
+                                                >
+                                                    {stock.current_stock}
+                                                </Typography>
+                                            </TableCell>
+                                            <TableCell>{new Date(stock.last_updated).toLocaleDateString()}</TableCell>
+                                            <TableCell>
+                                                <Typography 
+                                                    color={stock.current_stock < 0 ? 'error' : stock.current_stock === 0 ? 'warning' : 'success'}
+                                                    variant="body2"
+                                                >
+                                                    {stock.current_stock < 0 ? 'Over-delivered' : 
+                                                     stock.current_stock === 0 ? 'Balanced' : 'In-hand'}
+                                                </Typography>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
+                    </CardContent>
+                </Card>
+            </Box>
+        );
+    };
+
     return (
         <Box>
             {/* Header */}
@@ -387,6 +628,7 @@ const Reports: React.FC = () => {
                                     <MenuItem value="customers">Customers</MenuItem>
                                     <MenuItem value="inventory">Inventory</MenuItem>
                                     <MenuItem value="financial">Financial</MenuItem>
+                                    <MenuItem value="material_stock">Material Stock</MenuItem>
                                 </Select>
                             </FormControl>
                         </Box>
@@ -406,6 +648,25 @@ const Reports: React.FC = () => {
                             InputLabelProps={{ shrink: true }}
                             sx={{ minWidth: 150 }}
                         />
+                        {reportType === 'material_stock' && (
+                            <Box sx={{ minWidth: 200 }}>
+                                <FormControl fullWidth>
+                                    <InputLabel>Customer Filter</InputLabel>
+                                    <Select
+                                        value={selectedCustomerId}
+                                        label="Customer Filter"
+                                        onChange={(e) => setSelectedCustomerId(e.target.value)}
+                                    >
+                                        <MenuItem value="">All Customers</MenuItem>
+                                        {customers.map((customer) => (
+                                            <MenuItem key={customer.id} value={customer.id}>
+                                                {customer.name}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            </Box>
+                        )}
                         <Button
                             variant="contained"
                             onClick={loadReportData}
@@ -429,6 +690,7 @@ const Reports: React.FC = () => {
                     {reportType === 'customers' && renderCustomerReport()}
                     {reportType === 'inventory' && renderInventoryReport()}
                     {reportType === 'financial' && renderFinancialReport()}
+                    {reportType === 'material_stock' && renderMaterialStockReport()}
                 </Box>
             )}
         </Box>
