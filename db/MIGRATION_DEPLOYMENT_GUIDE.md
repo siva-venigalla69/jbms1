@@ -23,6 +23,7 @@ This migration package provides everything needed to deploy the complete textile
 | `04_REFERENCE_DATA.sql` | Essential reference data and admin user | 2-3 minutes | Scripts 01-03 |
 | `05_TRIGGERS_AND_POLICIES.sql` | Business automation and security | 3-4 minutes | Scripts 01-04 |
 | `06_MIGRATION_VALIDATION.sql` | Complete system validation | 1-2 minutes | All previous |
+| `07_DELIVERY_TRACKING_ENHANCEMENTS.sql` | **ESSENTIAL**: Delivery tracking fixes | 3-4 minutes | Scripts 01-06 |
 
 ---
 
@@ -117,6 +118,21 @@ This migration package provides everything needed to deploy the complete textile
 - Readiness score 80%+ indicates success
 - Issues identified and logged
 - System ready for production
+
+#### **Script 7: Delivery Tracking Enhancements (4 minutes) ⭐ ESSENTIAL**
+```sql
+-- Copy entire contents of: db/migrations/07_DELIVERY_TRACKING_ENHANCEMENTS.sql
+-- Paste in SQL Editor and execute
+```
+
+**Expected Result:**
+- ✅ **Fixes design_url column error** (prevents app crashes)
+- ✅ **Comprehensive delivery progress tracking** enabled
+- ✅ **Order fulfillment automation** with triggers
+- ✅ **Enhanced challan creation** with delivery validation
+- ✅ **Customer delivery analytics** views created
+
+**⚠️ CRITICAL: This script is ESSENTIAL for new environments - it prevents frontend crashes and enables delivery tracking features that are expected by the application.**
 
 ---
 

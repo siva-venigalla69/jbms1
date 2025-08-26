@@ -1261,10 +1261,15 @@ export const deliveryChallanApi = {
         .select(`
           *,
           order_item:order_items(
+            id,
             material_type,
             quantity,
+            unit_price,
             design_url,
-            design_notes
+            design_notes,
+            design_ready,
+            total_delivered,
+            remaining_quantity
           )
         `)
         .eq('challan_id', challanId)
@@ -1272,6 +1277,95 @@ export const deliveryChallanApi = {
       if (error) throw new Error(error.message)
       return data || []
     }, { challanId })
+  },
+
+  // New method: Get available items for delivery (for challan creation)
+  getAvailableDeliveryItems: async (customerId: string): Promise<any[]> => {
+    return withApiLogging('deliveryChallan.getAvailableDeliveryItems', async () => {
+      const { data, error } = await supabase
+        .rpc('get_available_delivery_items', { p_customer_id: customerId })
+
+      if (error) throw new Error(error.message)
+      return data || []
+    }, { customerId })
+  },
+
+  // New method: Get order delivery status
+  getOrderDeliveryStatus: async (orderId?: string, customerId?: string): Promise<any[]> => {
+    return withApiLogging('deliveryChallan.getOrderDeliveryStatus', async () => {
+      let query = supabase
+        .from('order_delivery_status')
+        .select('*')
+        .order('order_date', { ascending: false })
+
+      if (orderId) {
+        query = query.eq('order_id', orderId)
+      } else if (customerId) {
+        query = query.eq('customer_id', customerId)
+      }
+
+      const { data, error } = await query
+
+      if (error) throw new Error(error.message)
+      return data || []
+    }, { orderId, customerId })
+  },
+
+  // New method: Get order item delivery details
+  getOrderItemDeliveryDetails: async (orderItemIds?: string[]): Promise<any[]> => {
+    return withApiLogging('deliveryChallan.getOrderItemDeliveryDetails', async () => {
+      let query = supabase
+        .from('order_item_delivery_details')
+        .select('*')
+
+      if (orderItemIds && orderItemIds.length > 0) {
+        query = query.in('order_item_id', orderItemIds)
+      }
+
+      const { data, error } = await query
+
+      if (error) throw new Error(error.message)
+      return data || []
+    }, { orderItemIds })
+  },
+
+  // New method: Get pending deliveries
+  getPendingDeliveries: async (customerId?: string): Promise<any[]> => {
+    return withApiLogging('deliveryChallan.getPendingDeliveries', async () => {
+      let query = supabase
+        .from('pending_deliveries_summary')
+        .select('*')
+        .order('urgency_level', { ascending: true })
+        .order('days_until_due', { ascending: true })
+
+      if (customerId) {
+        query = query.eq('customer_id', customerId)
+      }
+
+      const { data, error } = await query
+
+      if (error) throw new Error(error.message)
+      return data || []
+    }, { customerId })
+  },
+
+  // New method: Get customer delivery summary
+  getCustomerDeliverySummary: async (customerId?: string): Promise<any[]> => {
+    return withApiLogging('deliveryChallan.getCustomerDeliverySummary', async () => {
+      let query = supabase
+        .from('customer_delivery_summary')
+        .select('*')
+        .order('total_order_value', { ascending: false })
+
+      if (customerId) {
+        query = query.eq('customer_id', customerId)
+      }
+
+      const { data, error } = await query
+
+      if (error) throw new Error(error.message)
+      return data || []
+    }, { customerId })
   },
 
   generateInvoiceFromChallan: async (challanId: string): Promise<GST_Invoice> => {
