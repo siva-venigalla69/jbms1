@@ -397,7 +397,7 @@ const GSTInvoices: React.FC = () => {
                   <MenuItem value="">All Statuses</MenuItem>
                   {statusOptions.map((status) => (
                     <MenuItem key={status} value={status}>
-                      {status.charAt(0).toUpperCase() + status.slice(1)}
+                      {status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Unknown'}
                     </MenuItem>
                   ))}
                 </Select>
@@ -466,7 +466,7 @@ const GSTInvoices: React.FC = () => {
                       </TableCell>
                       <TableCell>
                         <Chip
-                          label={invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
+                          label={invoice.status ? invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1) : 'Unknown'}
                           color={getStatusColor(invoice.status) as any}
                           variant="outlined"
                           size="small"
@@ -637,7 +637,7 @@ const GSTInvoices: React.FC = () => {
                     <Select {...field} label="Status">
                       {statusOptions.map((status) => (
                         <MenuItem key={status} value={status}>
-                          {status.charAt(0).toUpperCase() + status.slice(1)}
+                          {status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Unknown'}
                         </MenuItem>
                       ))}
                     </Select>
@@ -703,7 +703,7 @@ const GSTInvoices: React.FC = () => {
                       <Typography variant="body2" color="text.secondary">Status</Typography>
                       <Box sx={{ mb: 2 }}>
                         <Chip
-                          label={selectedInvoice.status.charAt(0).toUpperCase() + selectedInvoice.status.slice(1)}
+                          label={selectedInvoice.status ? selectedInvoice.status.charAt(0).toUpperCase() + selectedInvoice.status.slice(1) : 'Unknown'}
                           color={getStatusColor(selectedInvoice.status) as any}
                           variant="outlined"
                           icon={getStatusIcon(selectedInvoice.status)}
@@ -772,7 +772,7 @@ const GSTInvoices: React.FC = () => {
                       <Typography variant="body2" color="text.secondary">Order Status</Typography>
                       <Typography variant="body1" sx={{ mb: 2 }}>
                         {selectedInvoice.order?.status ? 
-                          selectedInvoice.order.status.charAt(0).toUpperCase() + selectedInvoice.order.status.slice(1) : 
+                          selectedInvoice.order?.status ? selectedInvoice.order.status.charAt(0).toUpperCase() + selectedInvoice.order.status.slice(1) : 'Unknown' : 
                           'Unknown'
                         }
                       </Typography>
@@ -911,7 +911,7 @@ const GSTInvoices: React.FC = () => {
                     <Select {...field} label="Status">
                       {statusOptions.map((status) => (
                         <MenuItem key={status} value={status}>
-                          {status.charAt(0).toUpperCase() + status.slice(1)}
+                          {status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Unknown'}
                         </MenuItem>
                       ))}
                     </Select>

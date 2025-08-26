@@ -86,6 +86,7 @@ const DeliveryChallans: React.FC = () => {
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedChallan, setSelectedChallan] = useState<DeliveryChallan | null>(null);
+  const [challanItems, setChallanItems] = useState<any[]>([]);
   const [selectedChallans, setSelectedChallans] = useState<string[]>([]);
   const [bulkInvoiceDialogOpen, setBulkInvoiceDialogOpen] = useState(false);
 
@@ -283,8 +284,13 @@ const DeliveryChallans: React.FC = () => {
   const handleViewChallan = async (challanId: string) => {
     componentLogger.info('Viewing delivery challan details', { challanId });
     try {
-      const challanDetails = await deliveryChallanApi.getDeliveryChallan(challanId);
+      const [challanDetails, items] = await Promise.all([
+        deliveryChallanApi.getDeliveryChallan(challanId),
+        deliveryChallanApi.getDeliveryChallanItems(challanId)
+      ]);
+      
       setSelectedChallan(challanDetails);
+      setChallanItems(items);
       setViewDialogOpen(true);
     } catch (error: any) {
       componentLogger.error('Failed to load delivery challan details', error);
@@ -295,8 +301,14 @@ const DeliveryChallans: React.FC = () => {
   const handleEditChallan = async (challanId: string) => {
     componentLogger.info('Editing delivery challan', { challanId });
     try {
-      const challanDetails = await deliveryChallanApi.getDeliveryChallan(challanId);
+      const [challanDetails, items] = await Promise.all([
+        deliveryChallanApi.getDeliveryChallan(challanId),
+        deliveryChallanApi.getDeliveryChallanItems(challanId)
+      ]);
+      
       setSelectedChallan(challanDetails);
+      setChallanItems(items);
+      
       // Reset edit form with challan data
       editReset({
         delivery_date: challanDetails.delivery_date,
@@ -540,7 +552,7 @@ const DeliveryChallans: React.FC = () => {
                   <MenuItem value="">All Statuses</MenuItem>
                   {statusOptions.map((status) => (
                     <MenuItem key={status} value={status}>
-                      {status.charAt(0).toUpperCase() + status.slice(1)}
+                      {status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Unknown'}
                     </MenuItem>
                   ))}
                 </Select>
@@ -618,7 +630,7 @@ const DeliveryChallans: React.FC = () => {
                       </TableCell>
                       <TableCell>
                         <Chip
-                          label={challan.status.charAt(0).toUpperCase() + challan.status.slice(1)}
+                          label={challan.status ? challan.status.charAt(0).toUpperCase() + challan.status.slice(1) : 'Unknown'}
                           color={getStatusColor(challan.status) as any}
                           variant="outlined"
                           size="small"
@@ -736,7 +748,7 @@ const DeliveryChallans: React.FC = () => {
                       <Select {...field} label="Status">
                         {statusOptions.map((status) => (
                           <MenuItem key={status} value={status}>
-                            {status.charAt(0).toUpperCase() + status.slice(1)}
+                            {status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Unknown'}
                           </MenuItem>
                         ))}
                       </Select>
@@ -959,7 +971,7 @@ const DeliveryChallans: React.FC = () => {
                       <Typography variant="body2" color="text.secondary">Status</Typography>
                       <Box sx={{ mb: 2 }}>
                         <Chip
-                          label={selectedChallan.status.charAt(0).toUpperCase() + selectedChallan.status.slice(1)}
+                          label={selectedChallan.status ? selectedChallan.status.charAt(0).toUpperCase() + selectedChallan.status.slice(1) : 'Unknown'}
                           color={getStatusColor(selectedChallan.status) as any}
                           variant="outlined"
                           icon={getStatusIcon(selectedChallan.status)}
@@ -1013,6 +1025,62 @@ const DeliveryChallans: React.FC = () => {
                           <Typography variant="body2" color="text.secondary">Delivery Notes</Typography>
                           <Typography variant="body1">{selectedChallan.notes}</Typography>
                         </>
+                      )}
+                    </CardContent>
+                  </Card>
+                </Grid>
+
+                {/* Challan Items */}
+                <Grid size={12}>
+                  <Card variant="outlined">
+                    <CardContent>
+                      <Typography variant="h6" gutterBottom color="primary">
+                        Delivery Items ({challanItems.length})
+                      </Typography>
+                      
+                      {challanItems.length === 0 ? (
+                        <Typography variant="body2" color="text.secondary">
+                          No items found for this challan
+                        </Typography>
+                      ) : (
+                        <TableContainer>
+                          <Table size="small">
+                            <TableHead>
+                              <TableRow>
+                                <TableCell>Material Type</TableCell>
+                                <TableCell align="center">Quantity Delivered</TableCell>
+                                <TableCell>Order Item Details</TableCell>
+                              </TableRow>
+                            </TableHead>
+                            <TableBody>
+                              {challanItems.map((item, index) => (
+                                <TableRow key={index}>
+                                  <TableCell>
+                                    <Typography variant="body2" fontWeight="medium">
+                                      {item.order_item?.material_type ? 
+                                        item.order_item.material_type.charAt(0).toUpperCase() + item.order_item.material_type.slice(1) : 
+                                        'Unknown'
+                                      }
+                                    </Typography>
+                                  </TableCell>
+                                  <TableCell align="center">
+                                    <Chip
+                                      label={item.quantity}
+                                      color="primary"
+                                      size="small"
+                                      variant="outlined"
+                                    />
+                                  </TableCell>
+                                  <TableCell>
+                                    <Typography variant="caption" color="text.secondary">
+                                      {item.order_item?.design_notes || 'No design notes'}
+                                    </Typography>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </TableContainer>
                       )}
                     </CardContent>
                   </Card>
@@ -1074,7 +1142,7 @@ const DeliveryChallans: React.FC = () => {
                       <Select {...field} label="Status">
                         {statusOptions.map((status) => (
                           <MenuItem key={status} value={status}>
-                            {status.charAt(0).toUpperCase() + status.slice(1)}
+                            {status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Unknown'}
                           </MenuItem>
                         ))}
                       </Select>
@@ -1098,8 +1166,72 @@ const DeliveryChallans: React.FC = () => {
                 )}
               />
               
+              {/* Challan Items */}
+              <Box>
+                <Typography variant="h6" gutterBottom color="primary">
+                  Delivery Items ({challanItems.length})
+                </Typography>
+                
+                {challanItems.length === 0 ? (
+                  <Alert severity="warning">
+                    No items found for this challan
+                  </Alert>
+                ) : (
+                  <Card variant="outlined">
+                    <TableContainer>
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>Material Type</TableCell>
+                            <TableCell align="center">Current Quantity</TableCell>
+                            <TableCell>Order Item Details</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {challanItems.map((item, index) => (
+                            <TableRow key={index}>
+                              <TableCell>
+                                <Typography variant="body2" fontWeight="medium">
+                                  {item.order_item?.material_type ? 
+                                    item.order_item.material_type.charAt(0).toUpperCase() + item.order_item.material_type.slice(1) : 
+                                    'Unknown'
+                                  }
+                                </Typography>
+                              </TableCell>
+                              <TableCell align="center">
+                                <TextField
+                                  size="small"
+                                  type="number"
+                                  inputProps={{ min: 0 }}
+                                  defaultValue={item.quantity}
+                                  onChange={(e) => {
+                                    const newQuantity = parseInt(e.target.value) || 0;
+                                    setChallanItems(prev => 
+                                      prev.map((prevItem, prevIndex) => 
+                                        prevIndex === index 
+                                          ? { ...prevItem, quantity: newQuantity }
+                                          : prevItem
+                                      )
+                                    );
+                                  }}
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <Typography variant="caption" color="text.secondary">
+                                  {item.order_item?.design_notes || 'No design notes'}
+                                </Typography>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  </Card>
+                )}
+              </Box>
+
               <Alert severity="info">
-                You can edit delivery date, status, and notes. To modify customer or order, please create a new challan.
+                You can edit delivery date, status, notes, and item quantities. To modify customer or order, please create a new challan.
               </Alert>
             </Box>
           </DialogContent>
@@ -1146,7 +1278,7 @@ const DeliveryChallans: React.FC = () => {
                       </Typography>
                     </Box>
                     <Chip 
-                      label={challan.status.charAt(0).toUpperCase() + challan.status.slice(1)}
+                      label={challan.status ? challan.status.charAt(0).toUpperCase() + challan.status.slice(1) : 'Unknown'}
                       size="small"
                       color="success"
                       variant="outlined"

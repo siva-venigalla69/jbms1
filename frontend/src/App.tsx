@@ -16,6 +16,7 @@ import Reports from './pages/Reports';
 import Materials from './pages/Materials';
 import DeliveryChallans from './pages/DeliveryChallans';
 import GSTInvoices from './pages/GSTInvoices';
+import CustomerStock from './pages/CustomerStock';
 import DebugPanel from './components/debug/DebugPanel';
 import './utils/debugDatabase'; // Import debug database helpers
 import './utils/loginDebugHelper'; // Import login debug helpers
@@ -99,6 +100,16 @@ function App() {
                 <ProtectedRoute>
                   <Layout>
                     <Materials />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/customer-stock"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <CustomerStock />
                   </Layout>
                 </ProtectedRoute>
               }

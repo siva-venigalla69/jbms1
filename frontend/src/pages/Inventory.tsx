@@ -289,7 +289,7 @@ const Inventory: React.FC = () => {
                                     <MenuItem value="">All Categories</MenuItem>
                                     {categories.map((category) => (
                                         <MenuItem key={category} value={category}>
-                                            {category.charAt(0).toUpperCase() + category.slice(1)}
+                                            {category ? category.charAt(0).toUpperCase() + category.slice(1) : 'Unknown'}
                                         </MenuItem>
                                     ))}
                                 </Select>

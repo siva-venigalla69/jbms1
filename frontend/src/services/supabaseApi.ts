@@ -3,7 +3,7 @@
 
 import { supabase, supabaseHelpers, businessHelpers, TABLES, ENUMS } from '../lib/supabase'
 import type { Customer, Order, OrderItem, User, MaterialIn, DeliveryChallan, DeliveryChallanCreate, GST_Invoice, GST_InvoiceCreate, Payment, ReturnItem, InventoryItem, Expense } from '../types'
-import { apiLogger, logNetworkRequest, performance } from '../utils/debug'
+import { apiLogger, logNetworkRequest, performance, componentLogger } from '../utils/debug'
 import { auditTrail, logOrderCreated, logMaterialReceived, logPaymentReceived, logDeliveryCompleted, logInvoiceGenerated, logProductionStageChange } from './auditTrailService'
 
 // API call wrapper with logging
@@ -352,7 +352,7 @@ export const orderItemApi = {
       // Get the existing order item for audit logging
       const { data: existingItem, error: fetchError } = await supabase
         .from(TABLES.ORDER_ITEMS)
-        .select('*, order:orders(customer_id)')
+        .select('*')
         .eq('id', id)
         .single();
       
@@ -424,7 +424,7 @@ export const orderItemApi = {
       // Get the existing order item for audit logging
       const { data: existingItem, error: fetchError } = await supabase
         .from(TABLES.ORDER_ITEMS)
-        .select('*, order:orders(customer_id)')
+        .select('*')
         .eq('id', id)
         .single();
       
@@ -489,8 +489,7 @@ export const materialInApi = {
       .from(TABLES.MATERIAL_IN)
       .select(`
         *,
-        customer:customers(name),
-        order:orders(order_number)
+        customer:customers(name)
       `)
       .order('received_date', { ascending: false })
     
@@ -602,13 +601,27 @@ export const materialInApi = {
 // Material Stock Management Functions
 const updateMaterialStockAfterDelivery = async (customerId: string, deliveryItems: any[]) => {
   return withApiLogging('materialStock.updateAfterDelivery', async () => {
-    // Group delivery items by material type
+    // First, get the material types from order_items for each delivery item
     const materialSummary: { [key: string]: number } = {};
     
-    deliveryItems.forEach(item => {
-      const key = `${item.material_type}`;
-      materialSummary[key] = (materialSummary[key] || 0) + item.quantity_delivered;
-    });
+    for (const item of deliveryItems) {
+      // Get material type from order_items table
+      const { data: orderItem, error: orderItemError } = await supabase
+        .from(TABLES.ORDER_ITEMS)
+        .select('material_type')
+        .eq('id', item.order_item_id)
+        .single();
+        
+      if (orderItemError) {
+        componentLogger.warn('Could not find order item for delivery', { order_item_id: item.order_item_id, error: orderItemError });
+        continue; // Skip this item if we can't find the material type
+      }
+      
+      const materialType = orderItem.material_type;
+      const quantity = item.quantity_delivered || item.quantity;
+      
+      materialSummary[materialType] = (materialSummary[materialType] || 0) + quantity;
+    }
 
     // Update material stock for each material type
     for (const [materialType, quantityDelivered] of Object.entries(materialSummary)) {
@@ -621,6 +634,10 @@ const updateMaterialStockAfterDelivery = async (customerId: string, deliveryItem
         .single();
 
       if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 = no rows returned
+        if (fetchError.code === '42P01') {
+          componentLogger.warn('Material stock table does not exist, skipping delivery stock update');
+          continue;
+        }
         throw new Error(`Failed to fetch material stock: ${fetchError.message}`);
       }
 
@@ -640,6 +657,10 @@ const updateMaterialStockAfterDelivery = async (customerId: string, deliveryItem
           .single();
 
         if (createError) {
+          if (createError.code === '42P01') {
+            componentLogger.warn('Material stock table does not exist, skipping delivery stock creation');
+            continue;
+          }
           throw new Error(`Failed to create material stock record: ${createError.message}`);
         }
       } else {
@@ -657,6 +678,10 @@ const updateMaterialStockAfterDelivery = async (customerId: string, deliveryItem
           .eq('id', stockRecord.id);
 
         if (updateError) {
+          if (updateError.code === '42P01') {
+            componentLogger.warn('Material stock table does not exist, skipping delivery stock update');
+            continue;
+          }
           throw new Error(`Failed to update material stock: ${updateError.message}`);
         }
       }
@@ -675,6 +700,11 @@ const updateMaterialStockAfterReceiving = async (customerId: string, materialTyp
       .single();
 
     if (fetchError && fetchError.code !== 'PGRST116') {
+      // If table doesn't exist, log warning and skip stock update
+      if (fetchError.code === '42P01') {
+        componentLogger.warn('Material stock table does not exist, skipping stock update');
+        return;
+      }
       throw new Error(`Failed to fetch material stock: ${fetchError.message}`);
     }
 
@@ -692,6 +722,10 @@ const updateMaterialStockAfterReceiving = async (customerId: string, materialTyp
         });
 
       if (createError) {
+        if (createError.code === '42P01') {
+          componentLogger.warn('Material stock table does not exist, skipping stock creation');
+          return;
+        }
         throw new Error(`Failed to create material stock record: ${createError.message}`);
       }
     } else {
@@ -709,6 +743,10 @@ const updateMaterialStockAfterReceiving = async (customerId: string, materialTyp
         .eq('id', stockRecord.id);
 
       if (updateError) {
+        if (updateError.code === '42P01') {
+          componentLogger.warn('Material stock table does not exist, skipping stock update');
+          return;
+        }
         throw new Error(`Failed to update material stock: ${updateError.message}`);
       }
     }
@@ -719,22 +757,117 @@ const updateMaterialStockAfterReceiving = async (customerId: string, materialTyp
 export const materialStockApi = {
   getCustomerStock: async (customerId?: string): Promise<any[]> => {
     return withApiLogging('materialStock.getCustomerStock', async () => {
-      let query = supabase
-        .from(TABLES.MATERIAL_STOCK)
+      // Try to get from material_stock table first
+      try {
+        let query = supabase
+          .from(TABLES.MATERIAL_STOCK)
+          .select(`
+            *,
+            customer:customers(name, phone, email)
+          `)
+          .order('last_updated', { ascending: false });
+
+        if (customerId) {
+          query = query.eq('customer_id', customerId);
+        }
+
+        const { data, error } = await query;
+        
+        if (error) {
+          // If material_stock table doesn't exist, calculate dynamically
+          componentLogger.warn('Material stock table not found, calculating dynamically', error);
+          return await materialStockApi.getCustomerStockDynamic(customerId);
+        }
+        
+        return data || [];
+      } catch (error: any) {
+        // Fallback to dynamic calculation
+        componentLogger.warn('Material stock table error, falling back to dynamic calculation', error);
+        return await materialStockApi.getCustomerStockDynamic(customerId);
+      }
+    }, { customerId });
+  },
+
+  getCustomerStockDynamic: async (customerId?: string): Promise<any[]> => {
+    return withApiLogging('materialStock.getCustomerStockDynamic', async () => {
+      // Calculate stock dynamically from material_in and delivery data
+      
+      // Get all material_in records
+      let materialInQuery = supabase
+        .from(TABLES.MATERIAL_IN)
         .select(`
-          *,
+          customer_id,
+          material_type,
+          quantity,
           customer:customers(name, phone, email)
-        `)
-        .order('last_updated', { ascending: false });
+        `);
 
       if (customerId) {
-        query = query.eq('customer_id', customerId);
+        materialInQuery = materialInQuery.eq('customer_id', customerId);
       }
 
-      const { data, error } = await query;
-      
-      if (error) throw new Error(error.message);
-      return data || [];
+      const { data: materialInData, error: materialInError } = await materialInQuery;
+      if (materialInError) throw new Error(materialInError.message);
+
+      // Get all delivery challan items with material types
+      let deliveryQuery = supabase
+        .from(TABLES.DELIVERY_CHALLAN_ITEMS)
+        .select(`
+          quantity,
+          challan:delivery_challans!inner(customer_id),
+          order_item:order_items(material_type)
+        `);
+
+      const { data: deliveryData, error: deliveryError } = await deliveryQuery;
+      if (deliveryError) {
+        componentLogger.warn('Could not fetch delivery data for dynamic calculation', deliveryError);
+      }
+
+      // Calculate stock per customer and material type
+      const stockMap: { [key: string]: any } = {};
+
+      // Add received materials
+      (materialInData || []).forEach(record => {
+        const key = `${record.customer_id}-${record.material_type}`;
+        if (!stockMap[key]) {
+          stockMap[key] = {
+            id: key,
+            customer_id: record.customer_id,
+            material_type: record.material_type,
+            total_received: 0,
+            total_delivered: 0,
+            current_stock: 0,
+            last_updated: new Date().toISOString(),
+            customer: record.customer
+          };
+        }
+        stockMap[key].total_received += record.quantity || 0;
+      });
+
+      // Subtract delivered materials
+      if (deliveryData) {
+        deliveryData.forEach((record: any) => {
+          if (record.challan?.customer_id && record.order_item?.material_type) {
+            const key = `${record.challan.customer_id}-${record.order_item.material_type}`;
+            if (stockMap[key]) {
+              stockMap[key].total_delivered += record.quantity || 0;
+            }
+          }
+        });
+      }
+
+      // Calculate current stock
+      Object.values(stockMap).forEach((stock: any) => {
+        stock.current_stock = stock.total_received - stock.total_delivered;
+      });
+
+      // Filter by customer if specified
+      let result = Object.values(stockMap);
+      if (customerId) {
+        result = result.filter((stock: any) => stock.customer_id === customerId);
+      }
+
+      return result;
     }, { customerId });
   },
 
@@ -1022,14 +1155,7 @@ export const returnsApi = {
     let query = supabase
       .from(TABLES.RETURNS)
       .select(`
-        *,
-        order_item:order_items(
-          *,
-          order:orders(
-            order_number,
-            customer:customers(name)
-          )
-        )
+        *
       `)
       .order('return_date', { ascending: false })
     
@@ -1071,12 +1197,7 @@ export const deliveryChallanApi = {
         .from(TABLES.DELIVERY_CHALLANS)
         .select(`
           *,
-          customer:customers(*),
-          order:orders(
-            order_number,
-            status,
-            customer:customers(name)
-          )
+          customer:customers(*)
         `)
         .order('created_at', { ascending: false })
       
@@ -1085,7 +1206,7 @@ export const deliveryChallanApi = {
       }
       
       if (params?.status) {
-        query = query.eq('status', params.status)
+        query = query.eq('delivery_status', params.status)
       }
       
       if (params?.limit) {
@@ -1095,7 +1216,16 @@ export const deliveryChallanApi = {
       const { data, error } = await query
       
       if (error) throw new Error(error.message)
-      return data || []
+      
+      // Map database fields to frontend expected fields
+      const mappedData = (data || []).map((challan: any) => ({
+        ...challan,
+        delivery_date: challan.challan_date,
+        status: challan.delivery_status,
+        order_id: challan.order_id || null // May not exist in current schema
+      }))
+      
+      return mappedData
     }, params)
   },
 
@@ -1105,18 +1235,22 @@ export const deliveryChallanApi = {
         .from(TABLES.DELIVERY_CHALLANS)
         .select(`
           *,
-          customer:customers(*),
-          order:orders(
-            *,
-            customer:customers(*),
-            order_items(*)
-          )
+          customer:customers(*)
         `)
         .eq('id', id)
         .single()
       
       if (error) throw new Error(error.message)
-      return data
+      
+      // Map database fields to frontend expected fields
+      const mappedData = {
+        ...data,
+        delivery_date: data.challan_date || data.delivery_date,
+        status: data.delivery_status || data.status,
+        order_id: data.order_id || null
+      }
+      
+      return mappedData
     }, { id })
   },
 
@@ -1126,10 +1260,14 @@ export const deliveryChallanApi = {
         .from(TABLES.DELIVERY_CHALLAN_ITEMS)
         .select(`
           *,
-          order:orders(order_number),
-          order_item:order_items(material_type, customization_details)
+          order_item:order_items(
+            material_type,
+            quantity,
+            design_url,
+            design_notes
+          )
         `)
-        .eq('delivery_challan_id', challanId)
+        .eq('challan_id', challanId)
       
       if (error) throw new Error(error.message)
       return data || []
@@ -1185,17 +1323,14 @@ export const deliveryChallanApi = {
       // Generate challan number if not provided
       const challanNumber = challanData.challan_number || `DC-${Date.now()}`
       
-      // Use the first order ID from items for backward compatibility
-      const primaryOrderId = challanData.items?.[0]?.order_id
+      // Note: order_id not used in current schema
       
-      // Prepare the main challan data
+      // Prepare the main challan data (match database schema)
       const insertData = {
         challan_number: challanNumber,
         customer_id: challanData.customer_id,
-        order_id: primaryOrderId, // For backward compatibility
-        delivery_date: challanData.delivery_date,
-        status: challanData.status,
-        total_amount: challanData.total_amount || 0,
+        challan_date: new Date(challanData.delivery_date).toISOString(),
+        delivery_status: challanData.status,
         notes: challanData.notes || null,
         created_at: new Date().toISOString()
       }
@@ -1218,17 +1353,12 @@ export const deliveryChallanApi = {
       // Prepare material stock audit data
       let materialImpact = [];
       
-      // Create delivery challan items if provided
+      // Create delivery challan items if provided (match database schema)
       if (challanData.items && challanData.items.length > 0) {
         const challanItems = challanData.items.map((item: any) => ({
-          delivery_challan_id: challan.id,
-          order_id: item.order_id,
+          challan_id: challan.id,
           order_item_id: item.order_item_id,
-          material_type: item.material_type,
-          quantity_delivered: item.quantity_delivered,
-          unit_price: item.unit_price,
-          subtotal: item.quantity_delivered * item.unit_price,
-          notes: item.notes || null,
+          quantity: item.quantity_delivered,
           created_at: new Date().toISOString()
         }))
         
@@ -1245,21 +1375,33 @@ export const deliveryChallanApi = {
         
         // Collect material impact for audit logging
         for (const item of challanData.items) {
+          // Get material type from order_items
+          const { data: orderItem } = await supabase
+            .from(TABLES.ORDER_ITEMS)
+            .select('material_type')
+            .eq('id', item.order_item_id)
+            .single();
+            
+          if (!orderItem) continue;
+          
+          const materialType = orderItem.material_type;
+          const quantity = item.quantity_delivered || item.quantity;
+          
           // Get current stock for audit
           const { data: currentStock } = await supabase
             .from(TABLES.MATERIAL_STOCK)
             .select('current_stock')
             .eq('customer_id', challanData.customer_id)
-            .eq('material_type', item.material_type)
+            .eq('material_type', materialType)
             .single();
           
           const previousStock = currentStock?.current_stock || 0;
           materialImpact.push({
             customer_id: challanData.customer_id,
-            material_type: item.material_type,
+            material_type: materialType,
             previous_stock: previousStock,
-            quantity_change: -item.quantity_delivered, // Negative for delivery
-            new_stock: previousStock - item.quantity_delivered,
+            quantity_change: -quantity, // Negative for delivery
+            new_stock: previousStock - quantity,
             reason: 'delivery_out' as const,
             reference_type: 'delivery_challan',
             reference_id: challan.id
@@ -1289,13 +1431,33 @@ export const deliveryChallanApi = {
 
   updateDeliveryChallan: async (id: string, updateData: Partial<DeliveryChallanCreate>): Promise<DeliveryChallan> => {
     return withApiLogging('deliveryChallan.updateDeliveryChallan', async () => {
+      // Map frontend fields to database fields
+      const mappedUpdateData: any = { ...updateData }
+      if (updateData.delivery_date) {
+        mappedUpdateData.challan_date = new Date(updateData.delivery_date).toISOString()
+        delete mappedUpdateData.delivery_date
+      }
+      if (updateData.status) {
+        mappedUpdateData.delivery_status = updateData.status
+        delete mappedUpdateData.status
+      }
+      
       const { data, error } = await supabaseHelpers.update(TABLES.DELIVERY_CHALLANS, id, {
-        ...updateData,
+        ...mappedUpdateData,
         updated_at: new Date().toISOString()
       })
       
       if (error) throw new Error(error.message)
-      return data
+      
+      // Map database fields back to frontend expected fields
+      const mappedData = {
+        ...data,
+        delivery_date: data.challan_date,
+        status: data.delivery_status,
+        order_id: data.order_id || null
+      }
+      
+      return mappedData
     }, { id, updateData })
   },
 
@@ -1321,12 +1483,7 @@ export const gstInvoiceApi = {
           .from(TABLES.GST_INVOICES)
           .select(`
             *,
-            customer:customers(*),
-            order:orders(
-              order_number,
-              status,
-              customer:customers(name)
-            )
+            customer:customers(*)
           `)
           .order('created_at', { ascending: false })
         
@@ -1367,12 +1524,7 @@ export const gstInvoiceApi = {
         .from(TABLES.GST_INVOICES)
         .select(`
           *,
-          customer:customers(*),
-          order:orders(
-            *,
-            customer:customers(*),
-            order_items(*)
-          )
+          customer:customers(*)
         `)
         .eq('id', id)
         .single()
