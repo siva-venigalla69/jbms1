@@ -26,7 +26,6 @@ import {
   MenuItem,
   IconButton,
   LinearProgress,
-  Grid,
 } from '@mui/material';
 import {
   Search,
@@ -35,8 +34,8 @@ import {
   Pending,
   Assignment,
   Factory,
-  Edit,
   Visibility,
+  Clear,
 } from '@mui/icons-material';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -247,18 +246,22 @@ const Production: React.FC = () => {
     }
   };
 
-  const filteredOrderItems = orderItems.filter((item) => {
-    const matchesSearch = 
-      item.material_type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.customization_details?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStage = stageFilter === 'all' || (item.current_stage || 'design_pending') === stageFilter;
-    return matchesSearch && matchesStage;
-  });
-
   const getOrderByItemId = (orderItemId: string) => {
     const orderItem = orderItems.find(item => item.id === orderItemId);
     return orders.find(order => order.id === orderItem?.order_id);
   };
+
+  const filteredOrderItems = orderItems.filter((item) => {
+    const order = getOrderByItemId(item.id);
+    const matchesSearch = searchTerm === '' || (
+      item.material_type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.customization_details?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order?.order_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order?.customer?.name?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    const matchesStage = stageFilter === 'all' || (item.current_stage || 'design_pending') === stageFilter;
+    return matchesSearch && matchesStage;
+  });
 
   const stageOptions: ProductionStage[] = ['design_pending', 'design_ready', 'pre_treatment', 'printing', 'post_process'];
 
@@ -369,13 +372,24 @@ const Production: React.FC = () => {
             <Box sx={{ flex: 2 }}>
               <TextField
                 fullWidth
-                placeholder="Search by material type or customization details..."
+                placeholder="Search by customer name, order number, material type, or customization details..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
                       <Search />
+                    </InputAdornment>
+                  ),
+                  endAdornment: searchTerm && (
+                    <InputAdornment position="end">
+                      <IconButton 
+                        size="small" 
+                        onClick={() => setSearchTerm('')}
+                        title="Clear search"
+                      >
+                        <Clear />
+                      </IconButton>
                     </InputAdornment>
                   ),
                 }}
@@ -405,6 +419,14 @@ const Production: React.FC = () => {
       {/* Production Items Table */}
       <Card>
         <CardContent>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h6">
+              Production Queue
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Showing {filteredOrderItems.length} of {orderItems.length} items
+            </Typography>
+          </Box>
           {loading ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
               <CircularProgress />
@@ -416,8 +438,17 @@ const Production: React.FC = () => {
                 {searchTerm || stageFilter !== 'all' ? 'No items found matching your criteria' : 'No items in production'}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                {searchTerm || stageFilter !== 'all' ? 'Try adjusting your search or filters' : 'Items will appear here when orders are created'}
+                {searchTerm || stageFilter !== 'all' ? 'Try adjusting your search or filters. Check if orders have been created and have order items.' : 'Items will appear here when orders are created with pending production stages.'}
               </Typography>
+              {(searchTerm || stageFilter !== 'all') && (
+                <Button 
+                  variant="outlined" 
+                  onClick={() => { setSearchTerm(''); setStageFilter('all'); }}
+                  sx={{ mt: 2 }}
+                >
+                  Clear All Filters
+                </Button>
+              )}
             </Box>
           ) : (
             <TableContainer>
@@ -425,6 +456,7 @@ const Production: React.FC = () => {
                 <TableHead>
                   <TableRow>
                     <TableCell>Order Number</TableCell>
+                    <TableCell>Customer</TableCell>
                     <TableCell>Material Type</TableCell>
                     <TableCell>Quantity</TableCell>
                     <TableCell>Current Stage</TableCell>
@@ -444,6 +476,22 @@ const Production: React.FC = () => {
                           <Box sx={{ display: 'flex', alignItems: 'center' }}>
                             <Assignment sx={{ mr: 1, color: 'text.secondary' }} />
                             {order?.order_number || 'Unknown'}
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Box>
+                            <Typography variant="body2" fontWeight="medium" color="primary">
+                              {order?.customer?.name || 'Unknown Customer'}
+                            </Typography>
+                            {order?.status && (
+                              <Chip 
+                                label={order.status.toUpperCase()} 
+                                size="small" 
+                                color={order.status === 'pending' ? 'warning' : order.status === 'completed' ? 'success' : 'default'}
+                                variant="outlined"
+                                sx={{ mt: 0.5 }}
+                              />
+                            )}
                           </Box>
                         </TableCell>
                         <TableCell>
