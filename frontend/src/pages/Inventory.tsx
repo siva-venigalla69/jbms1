@@ -32,13 +32,11 @@ import {
     Search,
     Inventory as InventoryIcon,
     Warning,
-    TrendingDown,
     Category,
     Visibility,
     Edit,
 } from '@mui/icons-material';
 import { useForm, Controller } from 'react-hook-form';
-import { InventoryItem } from '../types';
 import { inventoryApi } from '../services/supabaseApi';
 import { componentLogger } from '../utils/debug';
 

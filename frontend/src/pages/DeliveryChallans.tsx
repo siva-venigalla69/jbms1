@@ -39,7 +39,6 @@ import {
   Error as ErrorIcon,
   AddCircle,
   RemoveCircle,
-  Delete,
   Receipt,
 } from '@mui/icons-material';
 import { useForm, Controller, useFieldArray } from 'react-hook-form';

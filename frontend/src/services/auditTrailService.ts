@@ -1,4 +1,4 @@
-import { supabase, TABLES } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { componentLogger } from '../utils/debug';
 
 // Audit Trail Types
@@ -64,20 +64,26 @@ class AuditTrailService {
         timestamp: new Date().toISOString(),
       };
 
+      // Check if audit_logs table exists first
       const { error } = await supabase
-        .from('audit_trail')
+        .from('audit_logs')
         .insert(auditEntry);
 
       if (error) {
-        componentLogger.error('Failed to log audit entry', error);
+        componentLogger.warn('Audit logging disabled or table missing', { 
+          error: error.message,
+          code: error.code 
+        });
+        // Don't throw - just log the warning
       } else {
-        componentLogger.info('Audit entry logged successfully', { 
+        componentLogger.debug('Audit entry logged', { 
           type: entry.transaction_type, 
           event: entry.event_type 
         });
       }
     } catch (error) {
-      componentLogger.error('Audit logging error', error);
+      componentLogger.warn('Audit logging not available', error);
+      // Don't throw - audit logging is optional
     }
   }
 

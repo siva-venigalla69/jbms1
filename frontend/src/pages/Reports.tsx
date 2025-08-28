@@ -18,17 +18,14 @@ import {
     TableContainer,
     TableHead,
     TableRow,
-    Paper,
     Stack,
 } from '@mui/material';
 import {
     Assessment,
     TrendingUp,
-    People,
     Inventory,
     ShoppingCart,
     AttachMoney,
-    DateRange,
 } from '@mui/icons-material';
 import { reportsApi, customerApi, inventoryApi, materialStockApi } from '../services/supabaseApi';
 import { componentLogger } from '../utils/debug';
@@ -37,7 +34,7 @@ const Reports: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [reportType, setReportType] = useState('overview');
-    const [dateRange, setDateRange] = useState('month');
+    // const [dateRange, setDateRange] = useState('month');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     
@@ -108,7 +105,7 @@ const Reports: React.FC = () => {
 
     // Calculate summary metrics
     const totalRevenue = payments.reduce((sum, payment) => sum + (payment.payment_amount || 0), 0);
-    const totalExpenses = expenses.reduce((sum, expense) => sum + (expense.amount || 0), 0);
+    // const totalExpenses = expenses.reduce((sum, expense) => sum + (expense.amount || 0), 0);
     const totalOutstanding = pendingReceivables.reduce((sum, invoice) => sum + (invoice.outstanding_amount || 0), 0);
     const lowStockItems = inventory.filter(item => item.quantity < (item.reorder_level || 10));
 

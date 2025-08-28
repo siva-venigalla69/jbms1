@@ -29,7 +29,6 @@ import {
   ExpandLess,
   Clear,
   Download,
-  Visibility,
   VisibilityOff,
   Settings
 } from '@mui/icons-material';

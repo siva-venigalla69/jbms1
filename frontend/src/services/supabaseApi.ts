@@ -1,10 +1,10 @@
 // Supabase API Service - Digital Textile Printing System
 // Replaces the FastAPI backend with Supabase client calls
 
-import { supabase, supabaseHelpers, businessHelpers, TABLES, ENUMS } from '../lib/supabase'
+import { supabase, supabaseHelpers, businessHelpers, TABLES } from '../lib/supabase'
 import type { Customer, Order, OrderItem, User, MaterialIn, DeliveryChallan, DeliveryChallanCreate, GST_Invoice, GST_InvoiceCreate, Payment, ReturnItem, InventoryItem, Expense } from '../types'
-import { apiLogger, logNetworkRequest, performance, componentLogger } from '../utils/debug'
-import { auditTrail, logOrderCreated, logMaterialReceived, logPaymentReceived, logDeliveryCompleted, logInvoiceGenerated, logProductionStageChange } from './auditTrailService'
+import { apiLogger, performance, componentLogger } from '../utils/debug'
+import { auditTrail, logOrderCreated, logMaterialReceived, logPaymentReceived, logInvoiceGenerated, logProductionStageChange } from './auditTrailService'
 
 // API call wrapper with logging
 const withApiLogging = async <T>(
@@ -12,7 +12,7 @@ const withApiLogging = async <T>(
   fn: () => Promise<T>,
   params?: any
 ): Promise<T> => {
-  const operationId = `${operation}-${Date.now()}`;
+  // const operationId = `${operation}-${Date.now()}`;
   apiLogger.info(`Starting API operation: ${operation}`, params);
   performance.mark(`${operation}-start`);
   
@@ -266,6 +266,8 @@ export const orderApi = {
         throw new Error(`Failed to create order: ${orderError.message || 'Unknown error'} (Code: ${orderError.code || 'N/A'})`);
       }
 
+      apiLogger.info('Creating order items...', { orderItemsCount: orderData.items.length });
+      
       // Create order items
       const orderItems = orderData.items.map(item => ({
         order_id: order.id,
@@ -277,29 +279,36 @@ export const orderApi = {
         created_at: new Date().toISOString(),
       }));
 
+      apiLogger.debug('Order items data', orderItems);
+
       const { data: items, error: itemsError } = await supabase
         .from(TABLES.ORDER_ITEMS)
         .insert(orderItems)
         .select('*');
 
       if (itemsError) {
+        apiLogger.error('Order items creation failed', itemsError);
         // Rollback: delete the order if items creation fails
         await supabase.from(TABLES.ORDERS).delete().eq('id', order.id);
         throw new Error(`Failed to create order items: ${itemsError.message}`);
       }
+
+      apiLogger.info('Order items created successfully', { itemsCreated: items?.length });
+    
 
       const completeOrder = {
         ...order,
         order_items: items,
       };
 
-      // Log order creation to audit trail
-      try {
-        await logOrderCreated(order.id, orderData.customer_id, completeOrder);
-      } catch (auditError) {
-        apiLogger.warn('Failed to log order creation to audit trail', auditError);
-      }
+      // Log order creation to audit trail (non-blocking)
+      logOrderCreated(order.id, orderData.customer_id, completeOrder)
+        .catch(auditError => {
+          apiLogger.warn('Failed to log order creation to audit trail', auditError);
+        });
 
+      apiLogger.info('Order created successfully', { orderId: order.id, orderNumber });
+      
       // Return the complete order with items
       return completeOrder;
     }, orderData);
@@ -339,6 +348,79 @@ export const orderApi = {
   deleteOrder: async (id: string): Promise<void> => {
     const { error } = await supabaseHelpers.softDelete(TABLES.ORDERS, id)
     if (error) throw new Error(error.message)
+  },
+
+  getOrdersInDateRange: async (startDate: string, endDate: string): Promise<Order[]> => {
+    const { data, error } = await supabase
+      .from(TABLES.ORDERS)
+      .select(`
+        *,
+        customer:customers(*),
+        order_items:order_items(*)
+      `)
+      .eq('is_deleted', false)
+      .gte('order_date', startDate)
+      .lte('order_date', endDate)
+      .order('order_date', { ascending: false })
+    
+    if (error) throw new Error(error.message)
+    return data || []
+  },
+
+  getCustomerOrders: async (customerId: string, startDate?: string, endDate?: string): Promise<Order[]> => {
+    let query = supabase
+      .from(TABLES.ORDERS)
+      .select(`
+        *,
+        customer:customers(*),
+        order_items:order_items(*)
+      `)
+      .eq('is_deleted', false)
+      .eq('customer_id', customerId)
+    
+    if (startDate) query = query.gte('order_date', startDate)
+    if (endDate) query = query.lte('order_date', endDate)
+    
+    query = query.order('order_date', { ascending: false })
+    
+    const { data, error } = await query
+    if (error) throw new Error(error.message)
+    return data || []
+  },
+
+  getDesignStatusReport: async (): Promise<any[]> => {
+    const { data, error } = await supabase
+      .from(TABLES.ORDER_ITEMS)
+      .select(`
+        *,
+        orders(
+          order_number,
+          customer:customers(name)
+        )
+      `)
+      .eq('orders.is_deleted', false)
+      .order('created_at', { ascending: false })
+    
+    if (error) throw new Error(error.message)
+    return data || []
+  },
+
+  getProductionStatusReport: async (): Promise<any[]> => {
+    const { data, error } = await supabase
+      .from(TABLES.ORDER_ITEMS)
+      .select(`
+        *,
+        orders(
+          order_number,
+          customer:customers(name)
+        ),
+        production_stages(name)
+      `)
+      .eq('orders.is_deleted', false)
+      .order('created_at', { ascending: false })
+    
+    if (error) throw new Error(error.message)
+    return data || []
   }
 }
 
@@ -643,7 +725,7 @@ const updateMaterialStockAfterDelivery = async (customerId: string, deliveryItem
 
       if (!stockRecord) {
         // Create new stock record if none exists
-        const { data: newStock, error: createError } = await supabase
+        const { error: createError } = await supabase
           .from(TABLES.MATERIAL_STOCK)
           .insert({
             customer_id: customerId,
@@ -904,6 +986,21 @@ export const materialStockApi = {
       if (error) throw new Error(error.message);
       return data || [];
     }, { materialType });
+  },
+
+  getAllStock: async (): Promise<any[]> => {
+    return withApiLogging('materialStock.getAllStock', async () => {
+      const { data, error } = await supabase
+        .from(TABLES.MATERIAL_STOCK)
+        .select(`
+          *,
+          customer:customers(*)
+        `)
+        .order('last_updated', { ascending: false })
+      
+      if (error) throw new Error(error.message)
+      return data || []
+    })
   }
 };
 
@@ -1053,6 +1150,28 @@ export const paymentApi = {
       
       return data;
     }, paymentData);
+  },
+
+  getCustomerPayments: async (customerId: string, startDate?: string, endDate?: string): Promise<any[]> => {
+    return withApiLogging('payment.getCustomerPayments', async () => {
+      let query = supabase
+        .from(TABLES.PAYMENTS)
+        .select(`
+          *,
+          customer:customers(*)
+        `)
+        .eq('customer_id', customerId)
+        .eq('is_deleted', false)
+      
+      if (startDate) query = query.gte('payment_date', startDate)
+      if (endDate) query = query.lte('payment_date', endDate)
+      
+      query = query.order('payment_date', { ascending: false })
+      
+      const { data, error } = await query
+      if (error) throw new Error(error.message)
+      return data || []
+    }, { customerId, startDate, endDate })
   }
 }
 
@@ -1560,6 +1679,28 @@ export const deliveryChallanApi = {
       const { error } = await supabaseHelpers.delete(TABLES.DELIVERY_CHALLANS, id)
       if (error) throw new Error(error.message)
     }, { id })
+  },
+
+  getDeliveriesInDateRange: async (startDate: string, endDate: string): Promise<any[]> => {
+    return withApiLogging('deliveryChallan.getDeliveriesInDateRange', async () => {
+      const { data, error } = await supabase
+        .from(TABLES.DELIVERY_CHALLANS)
+        .select(`
+          *,
+          customer:customers(*),
+          items:challan_items(
+            *,
+            order_items(*)
+          )
+        `)
+        .eq('is_deleted', false)
+        .gte('challan_date', startDate)
+        .lte('challan_date', endDate)
+        .order('challan_date', { ascending: false })
+      
+      if (error) throw new Error(error.message)
+      return data || []
+    }, { startDate, endDate })
   }
 }
 
@@ -1675,5 +1816,23 @@ export const gstInvoiceApi = {
       const { error } = await supabaseHelpers.delete(TABLES.GST_INVOICES, id)
       if (error) throw new Error(error.message)
     }, { id })
+  },
+
+  getInvoicesInDateRange: async (startDate: string, endDate: string): Promise<any[]> => {
+    return withApiLogging('gstInvoice.getInvoicesInDateRange', async () => {
+      const { data, error } = await supabase
+        .from(TABLES.GST_INVOICES)
+        .select(`
+          *,
+          customer:customers(*)
+        `)
+        .eq('is_deleted', false)
+        .gte('created_at', startDate)
+        .lte('created_at', endDate)
+        .order('created_at', { ascending: false })
+      
+      if (error) throw new Error(error.message)
+      return data || []
+    }, { startDate, endDate })
   }
 }

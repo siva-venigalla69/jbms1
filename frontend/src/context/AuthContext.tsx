@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
-import { User, AuthToken, LoginRequest } from '../types';
+import { User, LoginRequest } from '../types';
 import { supabase, authHelpers } from '../lib/supabase';
 import { authLogger, logAuthState, performance } from '../utils/debug';
 
@@ -272,14 +272,36 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     authLogger.info('Starting logout process');
     
     try {
-      await supabase.auth.signOut();
-      authLogger.info('Supabase signOut successful');
+      // Set loading state first
+      dispatch({ type: 'LOGIN_START' });
+      
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        authLogger.warn('Supabase signOut error (forcing logout anyway)', error);
+      } else {
+        authLogger.info('Supabase signOut successful');
+      }
+      
+      // Always dispatch logout regardless of signOut result
       dispatch({ type: 'LOGOUT' });
+      authLogger.info('Logout completed successfully');
+      
+      // Force page reload to clear all state
+      setTimeout(() => {
+        window.location.href = '/login';
+      }, 100);
+      
     } catch (error) {
       authLogger.error('Logout error', error);
       // Force logout even if signOut fails
       dispatch({ type: 'LOGOUT' });
       authLogger.info('Forced logout due to signOut failure');
+      
+      // Still try to redirect
+      setTimeout(() => {
+        window.location.href = '/login';
+      }, 100);
     }
   };
 

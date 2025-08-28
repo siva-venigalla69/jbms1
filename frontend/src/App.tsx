@@ -13,6 +13,7 @@ import Orders from './pages/Orders';
 import Production from './pages/Production';
 import Inventory from './pages/Inventory';
 import Reports from './pages/Reports';
+import EnhancedReports from './pages/EnhancedReports';
 import Materials from './pages/Materials';
 import DeliveryChallans from './pages/DeliveryChallans';
 import GSTInvoices from './pages/GSTInvoices';
@@ -86,6 +87,16 @@ function App() {
             />
             <Route
               path="/reports"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <EnhancedReports />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/reports/basic"
               element={
                 <ProtectedRoute>
                   <Layout>
