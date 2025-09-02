@@ -5,6 +5,22 @@ import { supabase, supabaseHelpers, businessHelpers, TABLES } from '../lib/supab
 import type { Customer, Order, OrderItem, User, MaterialIn, DeliveryChallan, DeliveryChallanCreate, GST_Invoice, GST_InvoiceCreate, Payment, ReturnItem, InventoryItem, Expense } from '../types'
 import { apiLogger, performance, componentLogger } from '../utils/debug'
 import { auditTrail, logOrderCreated, logMaterialReceived, logPaymentReceived, logInvoiceGenerated, logProductionStageChange } from './auditTrailService'
+import { filterItemsByStageAndDesign, groupItemsByStageAndDesignStatus, parseDesignStatus, parseProductionStatus } from '../utils/productionUtils'
+
+// Helper functions for parsing status from legacy data
+const parseDesignStatusFromItem = (item: any): string => {
+  const parsed = parseDesignStatus(item.customization_details, item);
+  if (item.design_ready) return 'design_ready';
+  if (item.design_received || parsed.designReceived) return 'design_received_from_customer';
+  return 'pending_from_customer';
+};
+
+const parseProductionStatusFromItem = (item: any): string => {
+  const parsed = parseProductionStatus(item.customization_details, item);
+  if (item.current_stage === 'post_process' || parsed.stage === 'post_process') return 'post_process';
+  if (item.current_stage === 'printing' || parsed.stage === 'printing') return 'printing';
+  return 'pending';
+};
 
 // API call wrapper with logging
 const withApiLogging = async <T>(
@@ -426,37 +442,98 @@ export const orderApi = {
 
 // Order Items API
 export const orderItemApi = {
-  updateProductionStage: async (id: string, stage: string): Promise<OrderItem> => {
-    return withApiLogging('orderItem.updateProductionStage', async () => {
+  updateProductionStatus: async (id: string, productionStatus: string): Promise<OrderItem> => {
+    return withApiLogging('orderItem.updateProductionStatus', async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('User not authenticated')
       
       // Get the existing order item for audit logging
+      apiLogger.info('Fetching order item for audit logging', { orderItemId: id });
+      
       const { data: existingItem, error: fetchError } = await supabase
         .from(TABLES.ORDER_ITEMS)
-        .select('*')
+        .select(`
+          *,
+          order:orders(
+            id,
+            customer_id
+          )
+        `)
         .eq('id', id)
         .single();
       
-      if (fetchError) throw new Error(fetchError.message);
-      
-      const { data, error } = await businessHelpers.production.updateStage(id, stage, user.id)
-      if (error) throw new Error(error.message)
-      
-      // Log production stage change to audit trail
-      try {
-        await logProductionStageChange(
-          id,
-          existingItem.order.customer_id,
-          { ...data, current_stage: stage },
-          existingItem
-        );
-      } catch (auditError) {
-        apiLogger.warn('Failed to log production stage change to audit trail', auditError);
+      if (fetchError) {
+        apiLogger.error('Failed to fetch order item', { 
+          orderItemId: id, 
+          error: fetchError,
+          errorCode: fetchError.code,
+          errorDetails: fetchError.details 
+        });
+        throw new Error(`Failed to fetch order item: ${fetchError.message} (Code: ${fetchError.code})`);
       }
       
-      return data;
-    }, { id, stage });
+      apiLogger.info('Order item fetched successfully', { 
+        orderItemId: id, 
+        hasOrder: !!existingItem.order,
+        customerId: existingItem.order?.customer_id 
+      });
+      
+      console.log('🏭 [PRODUCTION STATUS UPDATE] Starting:', { id, productionStatus });
+      
+      // Use safe update that works with existing schema
+      const updateData: any = {};
+
+      // Check if new columns exist, if not use fallback to customization_details
+      try {
+        updateData.production_status = productionStatus;
+        const { data, error } = await supabaseHelpers.update(TABLES.ORDER_ITEMS, id, updateData);
+        
+        if (error) {
+          // Fallback to customization_details if column doesn't exist
+          console.log('📋 [FALLBACK] Using customization_details for production status');
+          updateData.customization_details = `Production Stage: ${productionStatus.toUpperCase()}, Updated: ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`;
+          delete updateData.production_status;
+          
+          const fallbackResult = await supabaseHelpers.update(TABLES.ORDER_ITEMS, id, updateData);
+          if (fallbackResult.error) throw new Error(fallbackResult.error.message);
+          
+          // Log production status change to audit trail
+          try {
+            await logProductionStageChange(
+              id,
+              existingItem.order.customer_id,
+              { ...fallbackResult.data, production_status: productionStatus },
+              existingItem
+            );
+          } catch (auditError) {
+            apiLogger.warn('Failed to log production status change to audit trail', auditError);
+          }
+          
+          return fallbackResult.data;
+        }
+        
+        // Log production status change to audit trail
+        try {
+          await logProductionStageChange(
+            id,
+            existingItem.order.customer_id,
+            { ...data, production_status: productionStatus },
+            existingItem
+          );
+        } catch (auditError) {
+          apiLogger.warn('Failed to log production status change to audit trail', auditError);
+        }
+        
+        return data;
+      } catch (error) {
+        throw new Error(error.message);
+      }
+    }, { id, productionStatus });
+  },
+
+  // @deprecated - Use updateProductionStatus instead
+  updateProductionStage: async (id: string, stage: string): Promise<OrderItem> => {
+    return orderItemApi.updateProductionStatus(id, stage);
   },
 
   getProductionStatus: async (): Promise<OrderItem[]> => {
@@ -501,50 +578,212 @@ export const orderItemApi = {
     }, itemData)
   },
 
-  updateDesignInfo: async (id: string, designData: any): Promise<OrderItem> => {
-    return withApiLogging('orderItem.updateDesignInfo', async () => {
+  getProductionStockByStatus: async (params?: {
+    designStatus?: string
+    productionStatus?: string
+    customerId?: string
+    materialType?: string
+  }): Promise<OrderItem[]> => {
+    return withApiLogging('orderItem.getProductionStockByStatus', async () => {
+      let query = supabase
+        .from(TABLES.ORDER_ITEMS)
+        .select(`
+          *,
+          order:orders(
+            id,
+            order_number,
+            customer_id,
+            order_date,
+            status,
+            customer:customers(name, phone, email)
+          )
+        `)
+        .eq('orders.is_deleted', false)
+        .order('created_at', { ascending: false })
+
+      if (params?.customerId) {
+        query = query.eq('orders.customer_id', params.customerId)
+      }
+
+      if (params?.materialType && params.materialType !== 'all') {
+        query = query.eq('material_type', params.materialType)
+      }
+
+      const { data, error } = await query
+      if (error) throw new Error(error.message)
+
+      let filteredData = data || []
+
+      // Filter by design and production status (works with both new columns and legacy parsing)
+      if (params?.designStatus && params.designStatus !== 'all') {
+        filteredData = filteredData.filter(item => {
+          // Try new column first, fallback to parsing
+          const designStatus = item.design_status || parseDesignStatusFromItem(item);
+          return designStatus === params.designStatus;
+        });
+      }
+
+      if (params?.productionStatus && params.productionStatus !== 'all') {
+        filteredData = filteredData.filter(item => {
+          // Try new column first, fallback to parsing
+          const productionStatus = item.production_status || parseProductionStatusFromItem(item);
+          return productionStatus === params.productionStatus;
+        });
+      }
+
+      return filteredData
+    }, params)
+  },
+
+  // @deprecated - Use getProductionStockByStatus instead
+  getProductionStockByStage: async (params?: {
+    stage?: string
+    designReady?: boolean
+    designReceived?: boolean
+    customerId?: string
+    materialType?: string
+  }): Promise<OrderItem[]> => {
+    // Map old parameters to new structure
+    const newParams: any = {
+      customerId: params?.customerId,
+      materialType: params?.materialType
+    };
+    
+    if (params?.designReady !== undefined || params?.designReceived !== undefined) {
+      if (params.designReady) {
+        newParams.designStatus = 'design_ready';
+      } else if (params.designReceived) {
+        newParams.designStatus = 'design_received_from_customer';
+      } else {
+        newParams.designStatus = 'pending_from_customer';
+      }
+    }
+    
+    if (params?.stage && params.stage !== 'all') {
+      // Map old stage values to new production status
+      if (params.stage === 'printing') newParams.productionStatus = 'printing';
+      else if (params.stage === 'post_process') newParams.productionStatus = 'post_process';
+      else newParams.productionStatus = 'pending';
+    }
+    
+    return orderItemApi.getProductionStockByStatus(newParams);
+  },
+
+  getStageReadinessCombinations: async (): Promise<Array<{
+    stage: string
+    designStatus: string
+    count: number
+    items: OrderItem[]
+  }>> => {
+    return withApiLogging('orderItem.getStageReadinessCombinations', async () => {
+      const { data, error } = await supabase
+        .from(TABLES.ORDER_ITEMS)
+        .select(`
+          *,
+          order:orders(
+            id,
+            order_number,
+            customer_id,
+            order_date,
+            customer:customers(name, phone)
+          )
+        `)
+        .eq('orders.is_deleted', false)
+        .order('created_at', { ascending: false })
+
+      if (error) throw new Error(error.message)
+
+      const items = data || []
+      
+      // Use utility function to group items by stage and design status
+      return groupItemsByStageAndDesignStatus(items)
+    })
+  },
+
+  updateDesignStatus: async (id: string, designStatus: string, designData?: {
+    design_file_url?: string;
+    design_notes?: string;
+  }): Promise<OrderItem> => {
+    return withApiLogging('orderItem.updateDesignStatus', async () => {
       // Get the existing order item for audit logging
       const { data: existingItem, error: fetchError } = await supabase
         .from(TABLES.ORDER_ITEMS)
-        .select('*')
+        .select(`
+          *,
+          order:orders(
+            id,
+            customer_id
+          )
+        `)
         .eq('id', id)
         .single();
       
       if (fetchError) throw new Error(fetchError.message);
       
-      // Only update basic fields that exist in the current schema
-      const updateData = {
-        customization_details: `Design Status: ${designData.design_received ? 'Received' : 'Pending'}, Ready: ${designData.design_ready ? 'Yes' : 'No'}${designData.design_notes ? ', Notes: ' + designData.design_notes : ''}`,
-        updated_at: new Date().toISOString()
-      };
+      console.log('👁️ [DESIGN STATUS UPDATE] Starting:', { id, designStatus, designData });
+      
+      // Use safe update that works with existing schema
+      const updateData: any = {};
 
-      const { data, error } = await supabaseHelpers.update(TABLES.ORDER_ITEMS, id, updateData)
-      if (error) throw new Error(error.message)
-      
-      const updatedItem = {
-        ...data,
-        design_received: designData.design_received,
-        design_ready: designData.design_ready,
-        design_file_url: designData.design_file_url,
-        design_notes: designData.design_notes
-      };
-      
-      // Log design update to audit trail
+      // Check if new columns exist, if not use fallback to customization_details
       try {
-        await auditTrail.logProductionTransaction(
-          'design_updated',
-          id,
-          existingItem.order.customer_id,
-          updatedItem,
-          existingItem
-        );
-      } catch (auditError) {
-        apiLogger.warn('Failed to log design update to audit trail', auditError);
+        updateData.design_status = designStatus;
+        if (designData?.design_file_url) updateData.design_file_url = designData.design_file_url;
+        if (designData?.design_notes) updateData.design_notes = designData.design_notes;
+        
+        const { data, error } = await supabaseHelpers.update(TABLES.ORDER_ITEMS, id, updateData);
+        
+        if (error) {
+          // Fallback to customization_details if column doesn't exist
+          console.log('📋 [FALLBACK] Using customization_details for design status');
+          const statusText = designStatus === 'design_ready' ? 'Ready: Yes' : 
+                           designStatus === 'design_received_from_customer' ? 'Received' : 'Pending';
+          updateData.customization_details = `Design Status: ${statusText}${designData?.design_notes ? ', Notes: ' + designData.design_notes : ''}`;
+          delete updateData.design_status;
+          if (designData?.design_file_url) updateData.design_file_url = designData.design_file_url;
+          
+          const fallbackResult = await supabaseHelpers.update(TABLES.ORDER_ITEMS, id, updateData);
+          if (fallbackResult.error) throw new Error(fallbackResult.error.message);
+          
+          // Log design update to audit trail
+          try {
+            await auditTrail.logProductionTransaction(
+              'design_updated',
+              id,
+              existingItem.order?.customer_id,
+              { ...fallbackResult.data, design_status: designStatus },
+              existingItem
+            );
+          } catch (auditError) {
+            apiLogger.warn('Failed to log design update to audit trail', auditError);
+          }
+          
+          return fallbackResult.data;
+        }
+        
+        // Log design update to audit trail
+        try {
+          await auditTrail.logProductionTransaction(
+            'design_updated',
+            id,
+            existingItem.order?.customer_id,
+            data,
+            existingItem
+          );
+        } catch (auditError) {
+          apiLogger.warn('Failed to log design update to audit trail', auditError);
+        }
+        
+        return data;
+      } catch (error) {
+        throw new Error(error.message);
       }
-      
-      // Return the updated item with design info for consistency
-      return updatedItem;
-    }, { id, designData })
+    }, { id, designStatus, designData })
+  },
+
+  // Keep the old function for backward compatibility
+  updateDesignInfo: async (id: string, designData: any): Promise<OrderItem> => {
+    return orderItemApi.updateDesignStatus(id, designData);
   }
 }
 

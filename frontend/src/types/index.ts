@@ -46,8 +46,26 @@ export interface CustomerUpdate extends Partial<CustomerCreate> { }
 // Order types
 export type MaterialType = 'saree' | 'dupatta' | 'voni' | 'running_material' | 'blouse_material';
 export type OrderStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
+export type DesignStatus = 'pending_from_customer' | 'design_received_from_customer' | 'design_ready';
+export type ProductionStatus = 'pending' | 'printing' | 'post_process';
+// @deprecated - Use DesignStatus and ProductionStatus instead
 export type ProductionStage = 'design_pending' | 'design_ready' | 'pre_treatment' | 'printing' | 'post_process';
 
+export interface StageStockFilter {
+  designStatus?: DesignStatus | 'all';
+  productionStatus?: ProductionStatus | 'all';
+  customerId?: string;
+  materialType?: MaterialType | 'all';
+}
+
+export interface StageStockSummary {
+  designStatus: DesignStatus;
+  productionStatus: ProductionStatus;
+  count: number;
+  items: OrderItem[];
+}
+
+// @deprecated - Design info is now tracked in OrderItem.design_status
 export interface DesignInfo {
     id?: string;
     order_item_id: string;
@@ -67,28 +85,32 @@ export interface OrderItem {
     material_type: MaterialType;
     quantity: number;
     unit_price: number;
-    customization_details?: string;
-    current_stage: ProductionStage;
-    design_received: boolean;
-    design_ready: boolean;
+    design_status: DesignStatus;
+    production_status: ProductionStatus;
     design_file_url?: string;
     design_notes?: string;
+    created_at: string;
+    
+    // @deprecated - Legacy columns for backward compatibility
+    customization_details?: string;
+    current_stage?: ProductionStage;
+    design_received?: boolean;
+    design_ready?: boolean;
     design_received_date?: string;
     design_ready_date?: string;
     pre_treatment_completed_at?: string;
     printing_completed_at?: string;
     post_process_completed_at?: string;
-    created_at: string;
 }
 
 export interface OrderItemCreate {
     material_type: MaterialType;
     quantity: number;
     unit_price: number;
-    customization_details?: string;
-    design_received?: string;
-    design_ready?: string;
+    design_status?: DesignStatus;
+    production_status?: ProductionStatus;
     design_notes?: string;
+    design_file_url?: string;
 }
 
 export interface Order {

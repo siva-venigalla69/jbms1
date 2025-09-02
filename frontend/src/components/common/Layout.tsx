@@ -32,6 +32,9 @@ import {
     AccountCircle,
     Palette,
     Inventory2,
+    Analytics,
+    AccountTree,
+    TrendingUp,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -44,6 +47,9 @@ interface LayoutProps {
 
 const menuItems = [
     { text: 'Dashboard', icon: <Dashboard />, path: '/dashboard' },
+    { text: 'Executive Dashboard', icon: <TrendingUp />, path: '/dashboard/advanced' },
+    { text: 'Workflow Management', icon: <AccountTree />, path: '/workflow' },
+    { text: 'Business Intelligence', icon: <Analytics />, path: '/business-intelligence' },
     { text: 'Customers', icon: <People />, path: '/customers' },
     { text: 'Orders', icon: <ShoppingCart />, path: '/orders' },
     { text: 'Production', icon: <Factory />, path: '/production' },

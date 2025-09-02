@@ -1,0 +1,468 @@
+// Advanced Dashboard - Executive Overview with Real-time Analytics
+// Integrates with comprehensive business dashboard APIs
+
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  Box,
+  Grid,
+  Card,
+  CardContent,
+  Typography,
+  CircularProgress,
+  Alert,
+  Button,
+  Chip,
+  LinearProgress,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemIcon,
+  Divider,
+  IconButton,
+  Tooltip,
+  Paper,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+} from '@mui/material';
+import {
+  Dashboard as DashboardIcon,
+  TrendingUp,
+  TrendingDown,
+  AttachMoney,
+  ShoppingCart,
+  LocalShipping,
+  Warning,
+  CheckCircle,
+  Schedule,
+  Inventory,
+  People,
+  Assessment,
+  Refresh,
+  DateRange,
+} from '@mui/icons-material';
+import { businessDashboardApi } from '../services/businessReportsApi';
+import { workflowApi } from '../services/workflowApi';
+import { componentLogger } from '../utils/debug';
+
+interface DashboardMetrics {
+  totalCustomers: number;
+  activeCustomers: number;
+  totalOrders: number;
+  activeOrders: number;
+  totalRevenue: number;
+  pendingPayments: number;
+  totalStockValue: number;
+  pendingDeliveries: number;
+  productionItemsReady: number;
+  designPendingItems: number;
+}
+
+interface FinancialSummary {
+  totalInvoiced: number;
+  totalPayments: number;
+  outstandingAmount: number;
+  overdueAmount: number;
+  currentMonthRevenue: number;
+  previousMonthRevenue: number;
+  revenueGrowthPercentage: number;
+  avgPaymentDays: number;
+  topPayingCustomer: string;
+  highestOutstandingCustomer: string;
+}
+
+const AdvancedDashboard: React.FC = () => {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [dateRange, setDateRange] = useState<'7d' | '30d' | '90d'>('30d');
+  
+  // Dashboard data states
+  const [businessMetrics, setBusinessMetrics] = useState<DashboardMetrics | null>(null);
+  const [financialSummary, setFinancialSummary] = useState<FinancialSummary | null>(null);
+  const [salesPerformance, setSalesPerformance] = useState<any[]>([]);
+  const [productionEfficiency, setProductionEfficiency] = useState<any[]>([]);
+  const [quickStats, setQuickStats] = useState<any>(null);
+
+  const getDateRangeParams = () => {
+    const today = new Date();
+    const fromDate = new Date();
+    
+    switch (dateRange) {
+      case '7d':
+        fromDate.setDate(today.getDate() - 7);
+        break;
+      case '90d':
+        fromDate.setDate(today.getDate() - 90);
+        break;
+      default: // '30d'
+        fromDate.setDate(today.getDate() - 30);
+    }
+    
+    return {
+      fromDate: fromDate.toISOString().split('T')[0],
+      toDate: today.toISOString().split('T')[0]
+    };
+  };
+
+  const loadDashboardData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const { fromDate, toDate } = getDateRangeParams();
+      
+      // Load multiple dashboard APIs in parallel
+      const [
+        businessOverview,
+        financialData,
+        salesData,
+        productionData,
+        quickStatsData
+      ] = await Promise.allSettled([
+        businessDashboardApi.getBusinessOverview(fromDate, toDate),
+        businessDashboardApi.getFinancialSummary(fromDate, toDate),
+        businessDashboardApi.getSalesPerformance(fromDate, toDate, 'week'),
+        businessDashboardApi.getProductionEfficiencyReport(fromDate, toDate),
+        workflowApi.quickStats.getDashboardOverview()
+      ]);
+
+      // Process business overview
+      if (businessOverview.status === 'fulfilled') {
+        setBusinessMetrics(businessOverview.value);
+      }
+
+      // Process financial summary
+      if (financialData.status === 'fulfilled') {
+        setFinancialSummary(financialData.value);
+      }
+
+      // Process sales performance
+      if (salesData.status === 'fulfilled') {
+        setSalesPerformance(salesData.value || []);
+      }
+
+      // Process production efficiency
+      if (productionData.status === 'fulfilled') {
+        setProductionEfficiency(productionData.value || []);
+      }
+
+      // Process quick stats
+      if (quickStatsData.status === 'fulfilled') {
+        setQuickStats(quickStatsData.value);
+      }
+
+      componentLogger.info('Advanced dashboard data loaded', {
+        businessMetrics: businessOverview.status === 'fulfilled',
+        financialSummary: financialData.status === 'fulfilled',
+        salesPerformance: salesData.status === 'fulfilled',
+        productionEfficiency: productionData.status === 'fulfilled',
+        quickStats: quickStatsData.status === 'fulfilled'
+      });
+
+    } catch (err: any) {
+      const errorMessage = err.message || 'Failed to load dashboard data';
+      setError(errorMessage);
+      componentLogger.error('Dashboard loading error', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [dateRange]);
+
+  useEffect(() => {
+    loadDashboardData();
+  }, [loadDashboardData]);
+
+  const renderMetricCard = (
+    title: string,
+    value: number | string,
+    icon: React.ReactElement,
+    color: string = 'primary',
+    subtitle?: string,
+    trend?: 'up' | 'down' | 'neutral'
+  ) => (
+    <Card elevation={2} sx={{ height: '100%' }}>
+      <CardContent>
+        <Box display="flex" alignItems="flex-start" justifyContent="space-between">
+          <Box>
+            <Typography color="textSecondary" gutterBottom variant="body2">
+              {title}
+            </Typography>
+            <Typography variant="h4" component="div" color={color}>
+              {typeof value === 'number' ? value.toLocaleString() : value}
+            </Typography>
+            {subtitle && (
+              <Typography color="textSecondary" variant="body2">
+                {subtitle}
+              </Typography>
+            )}
+          </Box>
+          <Box sx={{ color: `${color}.main` }}>
+            {React.cloneElement(icon, { fontSize: 'large' })}
+          </Box>
+        </Box>
+        {trend && (
+          <Box display="flex" alignItems="center" mt={1}>
+            {trend === 'up' ? (
+              <TrendingUp color="success" fontSize="small" />
+            ) : trend === 'down' ? (
+              <TrendingDown color="error" fontSize="small" />
+            ) : null}
+          </Box>
+        )}
+      </CardContent>
+    </Card>
+  );
+
+  const renderRevenueGrowth = () => {
+    if (!financialSummary) return null;
+    
+    const isPositive = financialSummary.revenueGrowthPercentage > 0;
+    const color = isPositive ? 'success.main' : 'error.main';
+    
+    return (
+      <Card elevation={2}>
+        <CardContent>
+          <Typography variant="h6" gutterBottom>
+            Monthly Revenue Growth
+          </Typography>
+          <Box display="flex" alignItems="center" gap={2}>
+            <Box flex={1}>
+              <Typography variant="h4" sx={{ color }}>
+                {financialSummary.revenueGrowthPercentage > 0 ? '+' : ''}
+                {financialSummary.revenueGrowthPercentage.toFixed(1)}%
+              </Typography>
+              <Typography color="textSecondary" variant="body2">
+                vs Previous Month
+              </Typography>
+              <Box mt={2}>
+                <Typography variant="body2" color="textSecondary">
+                  Current: ₹{financialSummary.currentMonthRevenue?.toLocaleString()}
+                </Typography>
+                <Typography variant="body2" color="textSecondary">
+                  Previous: ₹{financialSummary.previousMonthRevenue?.toLocaleString()}
+                </Typography>
+              </Box>
+            </Box>
+            {isPositive ? (
+              <TrendingUp sx={{ fontSize: 48, color }} />
+            ) : (
+              <TrendingDown sx={{ fontSize: 48, color }} />
+            )}
+          </Box>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const renderAlerts = () => {
+    const alerts = [];
+    
+    if (quickStats?.alerts && quickStats.alerts.length > 0) {
+      alerts.push({
+        type: 'warning' as const,
+        message: `${quickStats.alerts.length} low stock alerts`,
+        icon: <Inventory />
+      });
+    }
+    
+    if (businessMetrics?.designPendingItems && businessMetrics.designPendingItems > 10) {
+      alerts.push({
+        type: 'info' as const,
+        message: `${businessMetrics.designPendingItems} items pending design approval`,
+        icon: <Schedule />
+      });
+    }
+    
+    if (financialSummary?.overdueAmount && financialSummary.overdueAmount > 0) {
+      alerts.push({
+        type: 'error' as const,
+        message: `₹${financialSummary.overdueAmount.toLocaleString()} in overdue payments`,
+        icon: <Warning />
+      });
+    }
+
+    return (
+      <Card elevation={2}>
+        <CardContent>
+          <Typography variant="h6" gutterBottom>
+            System Alerts
+          </Typography>
+          {alerts.length === 0 ? (
+            <Box display="flex" alignItems="center" gap={1} color="success.main">
+              <CheckCircle />
+              <Typography variant="body2">All systems running smoothly</Typography>
+            </Box>
+          ) : (
+            <List dense>
+              {alerts.map((alert, index) => (
+                <ListItem key={index} sx={{ pl: 0 }}>
+                  <ListItemIcon sx={{ color: `${alert.type}.main` }}>
+                    {alert.icon}
+                  </ListItemIcon>
+                  <ListItemText 
+                    primary={alert.message}
+                    primaryTypographyProps={{ variant: 'body2' }}
+                  />
+                </ListItem>
+              ))}
+            </List>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
+
+  return (
+    <Box sx={{ p: 3 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Typography variant="h4" component="h1" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <DashboardIcon color="primary" />
+          Executive Dashboard
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+          <FormControl size="small" sx={{ minWidth: 120 }}>
+            <InputLabel>Period</InputLabel>
+            <Select
+              value={dateRange}
+              label="Period"
+              onChange={(e) => setDateRange(e.target.value as '7d' | '30d' | '90d')}
+            >
+              <MenuItem value="7d">Last 7 Days</MenuItem>
+              <MenuItem value="30d">Last 30 Days</MenuItem>
+              <MenuItem value="90d">Last 90 Days</MenuItem>
+            </Select>
+          </FormControl>
+          <Button
+            variant="outlined"
+            startIcon={<Refresh />}
+            onClick={loadDashboardData}
+            disabled={loading}
+          >
+            Refresh
+          </Button>
+        </Box>
+      </Box>
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
+          {error}
+        </Alert>
+      )}
+
+      {loading && (
+        <LinearProgress sx={{ mb: 3 }} />
+      )}
+
+      {/* Key Metrics Row */}
+      <Grid container spacing={3} sx={{ mb: 3 }}>
+        <Grid item xs={12} md={3}>
+          {renderMetricCard(
+            'Active Customers',
+            businessMetrics?.activeCustomers || 0,
+            <People />,
+            'primary',
+            `${businessMetrics?.totalCustomers || 0} total`
+          )}
+        </Grid>
+        <Grid item xs={12} md={3}>
+          {renderMetricCard(
+            'Total Revenue',
+            `₹${businessMetrics?.totalRevenue?.toLocaleString() || '0'}`,
+            <AttachMoney />,
+            'success'
+          )}
+        </Grid>
+        <Grid item xs={12} md={3}>
+          {renderMetricCard(
+            'Pending Payments',
+            `₹${businessMetrics?.pendingPayments?.toLocaleString() || '0'}`,
+            <Schedule />,
+            'warning'
+          )}
+        </Grid>
+        <Grid item xs={12} md={3}>
+          {renderMetricCard(
+            'Stock Value',
+            `₹${businessMetrics?.totalStockValue?.toLocaleString() || '0'}`,
+            <Inventory />,
+            'info'
+          )}
+        </Grid>
+      </Grid>
+
+      {/* Operational Metrics Row */}
+      <Grid container spacing={3} sx={{ mb: 3 }}>
+        <Grid item xs={12} md={4}>
+          {renderMetricCard(
+            'Active Orders',
+            businessMetrics?.activeOrders || 0,
+            <ShoppingCart />,
+            'primary',
+            `${businessMetrics?.totalOrders || 0} total orders`
+          )}
+        </Grid>
+        <Grid item xs={12} md={4}>
+          {renderMetricCard(
+            'Pending Deliveries',
+            businessMetrics?.pendingDeliveries || 0,
+            <LocalShipping />,
+            'warning'
+          )}
+        </Grid>
+        <Grid item xs={12} md={4}>
+          {renderMetricCard(
+            'Production Ready',
+            businessMetrics?.productionItemsReady || 0,
+            <CheckCircle />,
+            'success'
+          )}
+        </Grid>
+      </Grid>
+
+      {/* Analytics Row */}
+      <Grid container spacing={3}>
+        <Grid item xs={12} md={6}>
+          {renderRevenueGrowth()}
+        </Grid>
+        <Grid item xs={12} md={6}>
+          {renderAlerts()}
+        </Grid>
+      </Grid>
+
+      {/* Production Efficiency Summary */}
+      {productionEfficiency.length > 0 && (
+        <Grid container spacing={3} sx={{ mt: 3 }}>
+          <Grid item xs={12}>
+            <Card elevation={2}>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  Production Efficiency Summary
+                </Typography>
+                <Grid container spacing={2}>
+                  {productionEfficiency.slice(0, 6).map((item, index) => (
+                    <Grid item xs={12} md={2} key={index}>
+                      <Box textAlign="center">
+                        <Typography variant="h6" color="primary">
+                          {item.efficiency_score}%
+                        </Typography>
+                        <Typography variant="body2" color="textSecondary">
+                          {item.material_type}
+                        </Typography>
+                        <Typography variant="caption" color="textSecondary">
+                          {item.total_items} items
+                        </Typography>
+                      </Box>
+                    </Grid>
+                  ))}
+                </Grid>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+      )}
+    </Box>
+  );
+};
+
+export default AdvancedDashboard;

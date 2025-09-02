@@ -63,15 +63,59 @@ export const API_ENDPOINTS = {
   CUSTOMERS: '/api/customers',
   CUSTOMER_BY_ID: (id: string) => `/api/customers/${id}`,
 
-  // Orders (to be implemented in backend)
+  // Orders
   ORDERS: '/api/orders',
   ORDER_BY_ID: (id: string) => `/api/orders/${id}`,
+  ORDER_WORKFLOW: '/api/orders/workflow',
 
-  // Production (to be implemented in backend)
+  // Production
   PRODUCTION_STATUS: '/api/production/status',
   UPDATE_PRODUCTION_STAGE: '/api/production/update-stage',
+  PRODUCTION_QUEUE: '/api/production/queue',
+  PRODUCTION_WORKLOAD: '/api/production/workload',
 
-  // Reports (to be implemented in backend)
+  // Material Stock
+  MATERIAL_STOCK: '/api/material-stock',
+  MATERIAL_RECEIVE: '/api/material-stock/receive',
+  MATERIAL_DELIVER: '/api/material-stock/deliver',
+  MATERIAL_TRANSFER: '/api/material-stock/transfer',
+  MATERIAL_RECONCILE: '/api/material-stock/reconcile',
+
+  // Delivery Management
+  DELIVERY_CHALLANS: '/api/delivery/challans',
+  DELIVERY_CREATE: '/api/delivery/create',
+  DELIVERY_TRACK: '/api/delivery/track',
+  DELIVERY_ROUTE_OPTIMIZATION: '/api/delivery/route-optimization',
+  ITEMS_READY_FOR_DELIVERY: '/api/delivery/items-ready',
+
+  // Invoice & Payments
+  GST_INVOICES: '/api/invoices/gst',
+  INVOICE_FROM_CHALLANS: '/api/invoices/from-challans',
+  PAYMENTS: '/api/payments',
+  PAYMENT_RECONCILIATION: '/api/payments/reconciliation',
+  OUTSTANDING_INVOICES: '/api/invoices/outstanding',
+  OVERDUE_INVOICES: '/api/invoices/overdue',
+
+  // Business Reports & Analytics
+  BUSINESS_DASHBOARD: '/api/reports/dashboard',
+  SALES_PERFORMANCE: '/api/reports/sales-performance',
+  CUSTOMER_ANALYSIS: '/api/reports/customer-analysis',
+  PRODUCTION_EFFICIENCY: '/api/reports/production-efficiency',
+  FINANCIAL_SUMMARY: '/api/reports/financial-summary',
+  
+  // Inventory Reports
+  STOCK_COMPREHENSIVE: '/api/reports/stock-comprehensive',
+  STOCK_MOVEMENT_ANALYSIS: '/api/reports/stock-movement',
+  STOCK_AGING: '/api/reports/stock-aging',
+  LOW_STOCK_ALERTS: '/api/reports/low-stock-alerts',
+
+  // Business Intelligence
+  CUSTOMER_PROFITABILITY: '/api/intelligence/customer-profitability',
+  PRODUCTION_BOTTLENECKS: '/api/intelligence/production-bottlenecks',
+  MATERIAL_WASTE_ANALYSIS: '/api/intelligence/material-waste',
+  SEASONAL_DEMAND: '/api/intelligence/seasonal-demand',
+
+  // Legacy Reports (maintained for backward compatibility)
   REPORTS_PENDING_ORDERS: '/api/reports/pending-orders',
   REPORTS_PRODUCTION_STATUS: '/api/reports/production-status',
 } as const; 

@@ -8,6 +8,9 @@ import Layout from './components/common/Layout';
 import ProtectedRoute from './components/common/ProtectedRoute';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import AdvancedDashboard from './pages/AdvancedDashboard';
+import BusinessIntelligence from './pages/BusinessIntelligence';
+import WorkflowManagement from './pages/WorkflowManagement';
 import Customers from './pages/Customers';
 import Orders from './pages/Orders';
 import Production from './pages/Production';
@@ -39,6 +42,36 @@ function App() {
                 <ProtectedRoute>
                   <Layout>
                     <Dashboard />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/advanced"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <AdvancedDashboard />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/business-intelligence"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <BusinessIntelligence />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/workflow"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <WorkflowManagement />
                   </Layout>
                 </ProtectedRoute>
               }
