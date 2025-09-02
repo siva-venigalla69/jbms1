@@ -21,6 +21,8 @@ import Materials from './pages/Materials';
 import DeliveryChallans from './pages/DeliveryChallans';
 import GSTInvoices from './pages/GSTInvoices';
 import CustomerStock from './pages/CustomerStock';
+import CustomerStockDemo from './components/CustomerStockDemo';
+import TextileStockTracker from './components/TextileStockTracker';
 import DebugPanel from './components/debug/DebugPanel';
 import './utils/debugDatabase'; // Import debug database helpers
 import './utils/loginDebugHelper'; // Import login debug helpers
@@ -154,6 +156,26 @@ function App() {
                 <ProtectedRoute>
                   <Layout>
                     <CustomerStock />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/customer-stock/demo"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <CustomerStockDemo />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/textile-stock-tracker"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <TextileStockTracker />
                   </Layout>
                 </ProtectedRoute>
               }
