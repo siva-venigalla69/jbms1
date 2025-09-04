@@ -1624,7 +1624,12 @@ export const deliveryChallanApi = {
             unit_price,
             design_url,
             design_notes,
-            design_ready,
+            design_status,
+            design_file_url,
+            production_status,
+            qc_pass_status,
+            quality_checked_by,
+            quality_check_date,
             total_delivered,
             remaining_quantity
           )
@@ -1939,6 +1944,76 @@ export const deliveryChallanApi = {
       if (error) throw new Error(error.message)
       return data || []
     }, { startDate, endDate })
+  },
+
+  // Get available challans for invoice generation
+  getAvailableChallansForInvoice: async (customerId?: string): Promise<any[]> => {
+    return withApiLogging('deliveryChallan.getAvailableChallansForInvoice', async () => {
+      // Try using the database function first
+      try {
+        const { data, error } = await supabase.rpc('get_available_challans_for_invoice', {
+          p_customer_id: customerId || null
+        });
+        
+        if (error) throw error;
+        return data || [];
+      } catch (rpcError) {
+        // Fallback to manual query if RPC function doesn't exist
+        console.warn('RPC function not available, using fallback query:', rpcError);
+        
+        let query = supabase
+          .from(TABLES.DELIVERY_CHALLANS)
+          .select(`
+            id,
+            challan_number,
+            customer_id,
+            challan_date,
+            delivery_status,
+            is_invoiced,
+            customer:customers(name, phone, email)
+          `)
+          .eq('delivery_status', 'delivered')
+          .eq('is_invoiced', false)
+          .eq('is_deleted', false)
+          .order('challan_date', { ascending: false });
+
+        if (customerId) {
+          query = query.eq('customer_id', customerId);
+        }
+
+        const { data, error } = await query;
+        
+        if (error) throw new Error(error.message);
+        
+        // Calculate totals for each challan
+        const challansWithTotals = await Promise.all((data || []).map(async (challan: any) => {
+          const { data: items, error: itemsError } = await supabase
+            .from(TABLES.DELIVERY_CHALLAN_ITEMS)
+            .select(`
+              quantity,
+              order_item:order_items(unit_price)
+            `)
+            .eq('challan_id', challan.id);
+          
+          if (itemsError) {
+            console.error('Error fetching challan items:', itemsError);
+            return { ...challan, total_value: 0, total_items: 0 };
+          }
+          
+          const totalValue = (items || []).reduce((sum: number, item: any) => {
+            return sum + (item.quantity * (item.order_item?.unit_price || 0));
+          }, 0);
+          
+          return {
+            ...challan,
+            total_value: totalValue,
+            total_items: items?.length || 0
+          };
+        }));
+        
+        return challansWithTotals;
+      }
+    }, { customerId })
   }
 }
 
@@ -2035,6 +2110,111 @@ export const gstInvoiceApi = {
       
       return data
     }, invoiceData)
+  },
+
+  // Generate invoice from delivery challans
+  generateInvoiceFromChallans: async (challanIds: string[], notes?: string): Promise<GST_Invoice> => {
+    return withApiLogging('gstInvoice.generateInvoiceFromChallans', async () => {
+      // Get current user (you may need to adapt this based on your auth system)
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      try {
+        // Try using the database function first
+        const { data, error } = await supabase.rpc('generate_invoice_from_challans', {
+          p_challan_ids: challanIds,
+          p_created_by: user.id,
+          p_invoice_notes: notes || 'Generated from delivery challans'
+        });
+        
+        if (error) throw error;
+        return data;
+      } catch (rpcError) {
+        console.warn('RPC function not available, using fallback:', rpcError);
+        
+        // Fallback implementation
+        // First get challan details to calculate totals
+        const { data: challans, error: challansError } = await supabase
+          .from(TABLES.DELIVERY_CHALLANS)
+          .select(`
+            id,
+            customer_id,
+            challan_number,
+            customer:customers(*)
+          `)
+          .in('id', challanIds)
+          .eq('is_invoiced', false);
+        
+        if (challansError) throw new Error(challansError.message);
+        if (!challans || challans.length === 0) throw new Error('No valid challans found');
+        
+        // Check all challans are for same customer
+        const customerId = challans[0].customer_id;
+        if (!challans.every(c => c.customer_id === customerId)) {
+          throw new Error('Cannot create invoice for challans from different customers');
+        }
+        
+        // Calculate invoice totals
+        const { data: items, error: itemsError } = await supabase
+          .from(TABLES.DELIVERY_CHALLAN_ITEMS)
+          .select(`
+            quantity,
+            order_item:order_items(unit_price)
+          `)
+          .in('challan_id', challanIds);
+        
+        if (itemsError) throw new Error(itemsError.message);
+        
+        const subtotal = (items || []).reduce((sum, item) => {
+          return sum + (item.quantity * (item.order_item?.unit_price || 0));
+        }, 0);
+        
+        const taxAmount = subtotal * 0.18; // 18% GST
+        const totalAmount = subtotal + taxAmount;
+        
+        // Generate invoice
+        const invoiceData = {
+          customer_id: customerId,
+          subtotal,
+          tax_amount: taxAmount,
+          total_amount: totalAmount,
+          invoice_status: 'draft',
+          notes: notes || `Generated from delivery challans: ${challans.map(c => c.challan_number).join(', ')}`
+        };
+        
+        const invoice = await gstInvoiceApi.createGSTInvoice(invoiceData);
+        
+        // Link challans to invoice
+        if (challans.length > 0) {
+          const { error: linkError } = await supabase
+            .from(TABLES.INVOICE_CHALLANS)
+            .insert(challanIds.map(challanId => ({
+              invoice_id: invoice.id,
+              challan_id: challanId
+            })));
+          
+          if (linkError) {
+            console.error('Failed to link challans to invoice:', linkError);
+          }
+        }
+        
+        // Mark challans as invoiced
+        const { error: updateError } = await supabase
+          .from(TABLES.DELIVERY_CHALLANS)
+          .update({ 
+            is_invoiced: true, 
+            invoiced_date: new Date().toISOString(),
+            invoice_id: invoice.id
+          })
+          .in('id', challanIds);
+        
+        if (updateError) {
+          console.error('Failed to mark challans as invoiced:', updateError);
+        }
+        
+        return invoice;
+      }
+    }, { challanIds, notes })
   },
 
   updateGSTInvoice: async (id: string, updateData: Partial<GST_InvoiceCreate>): Promise<GST_Invoice> => {
