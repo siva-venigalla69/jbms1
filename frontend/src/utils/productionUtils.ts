@@ -192,7 +192,7 @@ export const groupItemsByStageAndDesignStatus = (items: OrderItem[]): StageStock
 
   // Sort by design status order, then by production status
   const designOrder: DesignStatus[] = ['pending_from_customer', 'design_received_from_customer', 'design_ready']
-  const productionOrder: ProductionStatus[] = ['pending', 'printing', 'post_process']
+  const productionOrder: ProductionStatus[] = ['pending', 'pre_treatment', 'printing', 'post_process']
   
   return result.sort((a, b) => {
     const designComparison = designOrder.indexOf(a.designStatus) - designOrder.indexOf(b.designStatus)
@@ -335,7 +335,8 @@ export const canProgressToNextStage = (item: OrderItem): boolean => {
  */
 export const getNextProductionStatus = (currentStatus: ProductionStatus): ProductionStatus | null => {
   const statusFlow: Record<ProductionStatus, ProductionStatus | null> = {
-    'pending': 'printing',
+    'pending': 'pre_treatment',
+    'pre_treatment': 'printing',
     'printing': 'post_process',
     'post_process': null
   }

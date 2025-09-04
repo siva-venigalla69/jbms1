@@ -86,7 +86,7 @@ export const orderWorkflowApi = {
   // Update production status for order item
   updateProductionStatus: async (
     orderItemId: string, 
-    productionStatus: 'pending' | 'printing' | 'post_process',
+    productionStatus: 'pending' | 'pre_treatment' | 'printing' | 'post_process',
     productionData?: {
       production_notes?: string;
       quality_check_passed?: boolean;

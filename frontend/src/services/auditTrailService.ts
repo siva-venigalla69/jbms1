@@ -251,17 +251,19 @@ class AuditTrailService {
       entity_type: 'order_item',
       entity_id: orderItemId,
       customer_id: customerId,
-      description: `Production ${eventType}: ${productionData.material_type} - ${productionData.current_stage}`,
+      description: `Production ${eventType}: ${productionData.material_type} - ${productionData.design_status || productionData.production_status || 'unknown'}`,
       previous_values: previousData,
       new_values: productionData,
       reference_number: `PROD-${orderItemId.slice(-6)}`,
-      status: productionData.current_stage,
+      status: productionData.design_status || productionData.production_status || 'unknown',
       impact_type: 'production',
       business_context: {
         material_type: productionData.material_type,
         quantity: productionData.quantity,
-        current_stage: productionData.current_stage,
-        previous_stage: previousData?.current_stage,
+        current_design_status: productionData.design_status,
+        current_production_status: productionData.production_status,
+        previous_design_status: previousData?.design_status,
+        previous_production_status: previousData?.production_status,
         design_status: {
           received: productionData.design_received,
           ready: productionData.design_ready

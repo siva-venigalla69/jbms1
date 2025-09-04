@@ -47,7 +47,7 @@ export interface CustomerUpdate extends Partial<CustomerCreate> { }
 export type MaterialType = 'saree' | 'dupatta' | 'voni' | 'running_material' | 'blouse_material';
 export type OrderStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
 export type DesignStatus = 'pending_from_customer' | 'design_received_from_customer' | 'design_ready';
-export type ProductionStatus = 'pending' | 'printing' | 'post_process';
+export type ProductionStatus = 'pending' | 'pre_treatment' | 'printing' | 'post_process';
 // @deprecated - Use DesignStatus and ProductionStatus instead
 export type ProductionStage = 'design_pending' | 'design_ready' | 'pre_treatment' | 'printing' | 'post_process';
 

@@ -8,9 +8,9 @@ import Layout from './components/common/Layout';
 import ProtectedRoute from './components/common/ProtectedRoute';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
-import AdvancedDashboard from './pages/AdvancedDashboard';
-import BusinessIntelligence from './pages/BusinessIntelligence';
-import WorkflowManagement from './pages/WorkflowManagement';
+// import AdvancedDashboard from './pages/AdvancedDashboard';
+// import BusinessIntelligence from './pages/BusinessIntelligence';
+// import WorkflowManagement from './pages/WorkflowManagement';
 import Customers from './pages/Customers';
 import Orders from './pages/Orders';
 import Production from './pages/Production';
@@ -23,6 +23,7 @@ import GSTInvoices from './pages/GSTInvoices';
 import CustomerStock from './pages/CustomerStock';
 import CustomerStockDemo from './components/CustomerStockDemo';
 import TextileStockTracker from './components/TextileStockTracker';
+import BusinessFlowTester from './components/BusinessFlowTester';
 import DebugPanel from './components/debug/DebugPanel';
 import './utils/debugDatabase'; // Import debug database helpers
 import './utils/loginDebugHelper'; // Import login debug helpers
@@ -48,7 +49,7 @@ function App() {
                 </ProtectedRoute>
               }
             />
-            <Route
+            {/* <Route
               path="/dashboard/advanced"
               element={
                 <ProtectedRoute>
@@ -57,8 +58,8 @@ function App() {
                   </Layout>
                 </ProtectedRoute>
               }
-            />
-            <Route
+            /> */}
+            {/* <Route
               path="/business-intelligence"
               element={
                 <ProtectedRoute>
@@ -67,8 +68,8 @@ function App() {
                   </Layout>
                 </ProtectedRoute>
               }
-            />
-            <Route
+            /> */}
+            {/* <Route
               path="/workflow"
               element={
                 <ProtectedRoute>
@@ -77,7 +78,7 @@ function App() {
                   </Layout>
                 </ProtectedRoute>
               }
-            />
+            /> */}
             <Route
               path="/customers"
               element={
@@ -176,6 +177,16 @@ function App() {
                 <ProtectedRoute>
                   <Layout>
                     <TextileStockTracker />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/business-flow-tester"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <BusinessFlowTester />
                   </Layout>
                 </ProtectedRoute>
               }

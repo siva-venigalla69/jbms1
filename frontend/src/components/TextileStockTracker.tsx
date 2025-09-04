@@ -1,56 +1,38 @@
 // Textile Stock Tracker - Real-world textile business stock management
 // Handles multiple material types with complex receipt/delivery patterns
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Card,
   CardContent,
   Typography,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
   Button,
   Alert,
   CircularProgress,
   Chip,
   Divider,
-  Grid,
+  Tabs,
+  Tab,
+} from '@mui/material';
+import {
   Timeline,
   TimelineItem,
   TimelineSeparator,
   TimelineConnector,
   TimelineContent,
   TimelineDot,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Tabs,
-  Tab,
-} from '@mui/material';
+} from '@mui/lab';
 import {
   Inventory,
   Add,
   Remove,
   Refresh,
-  Info,
   Timeline as TimelineIcon,
-  LocalShipping,
-  Receipt as ReceiptIcon,
   TrendingUp,
   TrendingDown,
 } from '@mui/icons-material';
-import { materialStockApi, materialInApi, deliveryChallanApi } from '../services/supabaseApi';
+import { materialStockApi } from '../services/supabaseApi';
 
 interface MaterialMovement {
   date: string;
@@ -79,7 +61,7 @@ const TextileStockTracker: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedTab, setSelectedTab] = useState(0);
   const [stockSnapshots, setStockSnapshots] = useState<CustomerStockSnapshot[]>([]);
-  const [selectedCustomer, setSelectedCustomer] = useState<CustomerStockSnapshot | null>(null);
+  // const [selectedCustomer, setSelectedCustomer] = useState<CustomerStockSnapshot | null>(null);
   const [demoMode, setDemoMode] = useState(true);
 
   // Demo data based on your example
@@ -121,7 +103,7 @@ const TextileStockTracker: React.FC = () => {
     }
   });
 
-  const loadStockData = async () => {
+  const loadStockData = useCallback(async () => {
     if (demoMode) {
       setStockSnapshots([getDemoData()]);
       return;
@@ -143,7 +125,7 @@ const TextileStockTracker: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [demoMode]);
 
   const processStockData = (rawData: any[]): CustomerStockSnapshot[] => {
     // Group by customer and process into snapshot format
@@ -172,7 +154,7 @@ const TextileStockTracker: React.FC = () => {
 
   useEffect(() => {
     loadStockData();
-  }, [demoMode]);
+  }, [loadStockData]);
 
   const getStockStatusColor = (stock: number) => {
     if (stock < 0) return 'error';
@@ -226,9 +208,9 @@ const TextileStockTracker: React.FC = () => {
         {snapshot.customer_name} - Current Stock Snapshot
       </Typography>
       
-      <Grid container spacing={3}>
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
         {Object.entries(snapshot.stock_summary).map(([materialType, data]) => (
-          <Grid item xs={12} md={4} key={materialType}>
+          <Box key={materialType} sx={{ flex: { xs: '1 1 100%', md: '1 1 300px' }, minWidth: 300 }}>
             <Card elevation={3}>
               <CardContent>
                 <Typography variant="h6" gutterBottom>
@@ -263,9 +245,9 @@ const TextileStockTracker: React.FC = () => {
                 </Box>
               </CardContent>
             </Card>
-          </Grid>
+          </Box>
         ))}
-      </Grid>
+      </Box>
     </Box>
   );
 
@@ -366,8 +348,8 @@ const TextileStockTracker: React.FC = () => {
                     Stock Analysis & Insights
                   </Typography>
                   
-                  <Grid container spacing={3}>
-                    <Grid item xs={12} md={6}>
+                  <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 3 }}>
+                    <Box sx={{ flex: 1 }}>
                       <Card variant="outlined">
                         <CardContent>
                           <Typography variant="subtitle1" gutterBottom>
@@ -384,9 +366,9 @@ const TextileStockTracker: React.FC = () => {
                           ))}
                         </CardContent>
                       </Card>
-                    </Grid>
+                    </Box>
                     
-                    <Grid item xs={12} md={6}>
+                    <Box sx={{ flex: 1 }}>
                       <Card variant="outlined">
                         <CardContent>
                           <Typography variant="subtitle1" gutterBottom>
@@ -409,8 +391,8 @@ const TextileStockTracker: React.FC = () => {
                           </Typography>
                         </CardContent>
                       </Card>
-                    </Grid>
-                  </Grid>
+                    </Box>
+                  </Box>
                 </Box>
               )}
             </CardContent>

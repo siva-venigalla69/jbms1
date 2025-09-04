@@ -197,8 +197,8 @@ const AdvancedDashboard: React.FC = () => {
               </Typography>
             )}
           </Box>
-          <Box sx={{ color: `${color}.main` }}>
-            {React.cloneElement(icon, { fontSize: 'large' })}
+          <Box sx={{ color: `${color}.main`, '& > svg': { fontSize: 40 } }}>
+            {icon}
           </Box>
         </Box>
         {trend && (

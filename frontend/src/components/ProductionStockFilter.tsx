@@ -22,7 +22,7 @@ import {
 } from '@mui/material';
 import { orderItemApi } from '../services/supabaseApi';
 import { getStageDisplayName } from '../utils/productionUtils';
-import type { OrderItem, ProductionStage, MaterialType, StageStockFilter } from '../types';
+import type { OrderItem, ProductionStage, MaterialType, StageStockFilter, StageStockSummary } from '../types';
 
 interface ProductionStockFilterProps {
   customerId?: string;
@@ -31,17 +31,11 @@ interface ProductionStockFilterProps {
 export const ProductionStockFilter: React.FC<ProductionStockFilterProps> = ({ customerId }) => {
   const [loading, setLoading] = useState(false);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
-  const [stageCombinations, setStageCombinations] = useState<Array<{
-    stage: string;
-    designStatus: string;
-    count: number;
-    items: OrderItem[];
-  }>>([]);
+  const [stageCombinations, setStageCombinations] = useState<StageStockSummary[]>([]);
   
   const [filters, setFilters] = useState<StageStockFilter>({
-    stage: 'all',
-    designReady: undefined,
-    designReceived: undefined,
+    designStatus: 'all',
+    productionStatus: 'all',
     customerId,
     materialType: 'all'
   });
@@ -121,9 +115,9 @@ export const ProductionStockFilter: React.FC<ProductionStockFilterProps> = ({ cu
             <FormControl fullWidth size="small">
               <InputLabel>Production Stage</InputLabel>
               <Select
-                value={filters.stage || 'all'}
+                value={filters.productionStatus || 'all'}
                 label="Production Stage"
-                onChange={(e) => handleFilterChange('stage', e.target.value)}
+                onChange={(e) => handleFilterChange('productionStatus', e.target.value)}
               >
                 <MenuItem value="all">All Stages</MenuItem>
                 <MenuItem value="design_pending">Design Pending</MenuItem>
@@ -156,12 +150,11 @@ export const ProductionStockFilter: React.FC<ProductionStockFilterProps> = ({ cu
           <FormControlLabel
             control={
               <Checkbox
-                checked={filters.designReceived === true}
-                indeterminate={filters.designReceived === undefined}
+                checked={filters.designStatus === 'design_received_from_customer'}
                 onChange={(e) => 
                   handleFilterChange(
-                    'designReceived', 
-                    e.target.checked ? true : filters.designReceived === true ? undefined : false
+                    'designStatus', 
+                    e.target.checked ? 'design_received_from_customer' : 'all'
                   )
                 }
               />
@@ -172,12 +165,11 @@ export const ProductionStockFilter: React.FC<ProductionStockFilterProps> = ({ cu
           <FormControlLabel
             control={
               <Checkbox
-                checked={filters.designReady === true}
-                indeterminate={filters.designReady === undefined}
+                checked={filters.designStatus === 'design_ready'}
                 onChange={(e) => 
                   handleFilterChange(
-                    'designReady', 
-                    e.target.checked ? true : filters.designReady === true ? undefined : false
+                    'designStatus', 
+                    e.target.checked ? 'design_ready' : 'all'
                   )
                 }
               />
@@ -211,7 +203,7 @@ export const ProductionStockFilter: React.FC<ProductionStockFilterProps> = ({ cu
               }}
             >
               <Typography variant="subtitle1" sx={{ mb: 1 }}>
-                {getStageDisplayName(combo.stage as ProductionStage)}
+                {getStageDisplayName(combo.productionStatus as ProductionStage)}
               </Typography>
               <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>
                 {combo.designStatus}

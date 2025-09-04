@@ -2,7 +2,8 @@
 // Integrates with comprehensive business logic SQLs
 
 import { supabase } from '../lib/supabase';
-import { apiLogger, withApiLogging } from './supabaseApi';
+import { withApiLogging } from './supabaseApi';
+import { apiLogger } from '../utils/debug';
 
 // Business Dashboard APIs
 export const businessDashboardApi = {
@@ -15,7 +16,7 @@ export const businessDashboardApi = {
           p_to_date: toDate || new Date().toISOString().split('T')[0]
         });
       
-      if (error) throw new Error(error.message);
+      if (error) throw new Error(error instanceof Error ? error.message : 'Unknown error occurred');
       return data;
     }, { fromDate, toDate });
   },
@@ -30,7 +31,7 @@ export const businessDashboardApi = {
           p_group_by: groupBy
         });
       
-      if (error) throw new Error(error.message);
+      if (error) throw new Error(error instanceof Error ? error.message : 'Unknown error occurred');
       return data;
     }, { fromDate, toDate, groupBy });
   },
@@ -39,7 +40,7 @@ export const businessDashboardApi = {
   getCustomerAnalysis: async () => {
     return withApiLogging('businessDashboard.getCustomerAnalysis', async () => {
       const { data, error } = await supabase.rpc('get_customer_analysis');
-      if (error) throw new Error(error.message);
+      if (error) throw new Error(error instanceof Error ? error.message : 'Unknown error occurred');
       return data;
     });
   },
@@ -53,7 +54,7 @@ export const businessDashboardApi = {
           p_to_date: toDate || new Date().toISOString().split('T')[0]
         });
       
-      if (error) throw new Error(error.message);
+      if (error) throw new Error(error instanceof Error ? error.message : 'Unknown error occurred');
       return data;
     }, { fromDate, toDate });
   },
@@ -67,7 +68,7 @@ export const businessDashboardApi = {
           p_to_date: toDate || new Date().toISOString().split('T')[0]
         });
       
-      if (error) throw new Error(error.message);
+      if (error) throw new Error(error instanceof Error ? error.message : 'Unknown error occurred');
       return data && data.length > 0 ? data[0] : null;
     }, { fromDate, toDate });
   }
@@ -84,7 +85,7 @@ export const inventoryReportsApi = {
           p_material_type: materialType
         });
       
-      if (error) throw new Error(error.message);
+      if (error) throw new Error(error instanceof Error ? error.message : 'Unknown error occurred');
       return data;
     }, { customerId, materialType });
   },
@@ -105,7 +106,7 @@ export const inventoryReportsApi = {
           p_to_date: toDate || new Date().toISOString().split('T')[0]
         });
       
-      if (error) throw new Error(error.message);
+      if (error) throw new Error(error instanceof Error ? error.message : 'Unknown error occurred');
       return data;
     }, { customerId, materialType, fromDate, toDate });
   },
@@ -118,7 +119,7 @@ export const inventoryReportsApi = {
           p_customer_id: customerId
         });
       
-      if (error) throw new Error(error.message);
+      if (error) throw new Error(error instanceof Error ? error.message : 'Unknown error occurred');
       return data;
     }, { customerId });
   },
@@ -131,7 +132,7 @@ export const inventoryReportsApi = {
           p_threshold_days: thresholdDays
         });
       
-      if (error) throw new Error(error.message);
+      if (error) throw new Error(error instanceof Error ? error.message : 'Unknown error occurred');
       return data;
     }, { thresholdDays });
   }
@@ -188,7 +189,7 @@ export const businessIntelligenceApi = {
           `
         });
       
-      if (error) throw new Error(error.message);
+      if (error) throw new Error(error instanceof Error ? error.message : 'Unknown error occurred');
       return data;
     });
   },
@@ -215,19 +216,19 @@ export const businessIntelligenceApi = {
         .neq('production_status', 'post_process')
         .order('created_at', { ascending: false });
 
-      if (error) throw new Error(error.message);
+      if (error) throw new Error(error instanceof Error ? error.message : 'Unknown error occurred');
 
       // Process data to identify bottlenecks
       const bottlenecks = data?.map(item => ({
         design_status: item.design_status,
         production_status: item.production_status,
         material_type: item.material_type,
-        customer_name: item.orders.customers.name,
+        customer_name: (item.orders as any)?.customers?.name || 'Unknown Customer',
         quantity: item.quantity,
         value: item.quantity * item.unit_price,
-        days_in_status: Math.floor((Date.now() - new Date(item.orders.order_date).getTime()) / (1000 * 60 * 60 * 24)),
+        days_in_status: Math.floor((Date.now() - new Date((item.orders as any)?.order_date || Date.now()).getTime()) / (1000 * 60 * 60 * 24)),
         bottleneck_severity: (() => {
-          const days = Math.floor((Date.now() - new Date(item.orders.order_date).getTime()) / (1000 * 60 * 60 * 24));
+          const days = Math.floor((Date.now() - new Date((item.orders as any)?.order_date || Date.now()).getTime()) / (1000 * 60 * 60 * 24));
           if (days > 30) return 'CRITICAL';
           if (days > 14) return 'HIGH';  
           if (days > 7) return 'MEDIUM';
@@ -251,7 +252,7 @@ export const businessIntelligenceApi = {
         `)
         .gt('total_received', 0);
 
-      if (error) throw new Error(error.message);
+      if (error) throw new Error(error instanceof Error ? error.message : 'Unknown error occurred');
 
       // Process data to calculate waste risk
       const wasteAnalysis = data?.map(stock => {
@@ -292,7 +293,7 @@ export const businessIntelligenceApi = {
       // Sort by risk and estimated waste value
       return wasteAnalysis.sort((a, b) => {
         const riskOrder = { HIGH_WASTE_RISK: 1, OVER_STOCKED: 2, MEDIUM_WASTE_RISK: 3, STAGNANT_STOCK: 4, HEALTHY: 5 };
-        return riskOrder[a.waste_risk_category] - riskOrder[b.waste_risk_category] ||
+        return riskOrder[a.waste_risk_category as keyof typeof riskOrder] - riskOrder[b.waste_risk_category as keyof typeof riskOrder] ||
                b.estimated_waste_value - a.estimated_waste_value;
       });
     });
@@ -318,11 +319,11 @@ export const businessIntelligenceApi = {
         .gte('orders.order_date', twoYearsAgo.toISOString().split('T')[0])
         .eq('orders.is_deleted', false);
 
-      if (error) throw new Error(error.message);
+      if (error) throw new Error(error instanceof Error ? error.message : 'Unknown error occurred');
 
       // Process seasonal data
       const seasonalData = data?.map(item => {
-        const orderDate = new Date(item.orders.order_date);
+        const orderDate = new Date((item.orders as any)?.order_date || Date.now());
         const month = orderDate.getMonth() + 1;
         const quarter = Math.ceil(month / 3);
         
@@ -344,7 +345,7 @@ export const businessIntelligenceApi = {
       }) || [];
 
       // Group and aggregate by season and material type
-      const aggregated = seasonalData.reduce((acc, item) => {
+      const aggregated = seasonalData.reduce((acc: any, item) => {
         const key = `${item.season}-${item.material_type}`;
         if (!acc[key]) {
           acc[key] = {

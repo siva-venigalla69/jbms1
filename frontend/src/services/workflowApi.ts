@@ -45,7 +45,7 @@ export const workflowApi = {
           alerts: lowStockAlerts.status === 'fulfilled' ? lowStockAlerts.value : []
         };
       } catch (error) {
-        throw new Error(`Failed to get dashboard overview: ${error.message}`);
+        throw new Error(`Failed to get dashboard overview: ${error instanceof Error ? error.message : 'Unknown error occurred'}`);
       }
     },
 
@@ -75,7 +75,7 @@ export const workflowApi = {
           stockSummary: stock.status === 'fulfilled' ? stock.value : []
         };
       } catch (error) {
-        throw new Error(`Failed to get customer status: ${error.message}`);
+        throw new Error(`Failed to get customer status: ${error instanceof Error ? error.message : 'Unknown error occurred'}`);
       }
     }
   },
@@ -91,7 +91,7 @@ export const workflowApi = {
 
         // Get items ready for delivery
         const readyItems = await deliveryWorkflowApi.getItemsReadyForDelivery(order.customer_id);
-        const orderReadyItems = readyItems.filter(item => item.order_id === orderId);
+        const orderReadyItems = readyItems.filter((item: any) => item.order_id === orderId);
 
         if (orderReadyItems.length === 0) {
           throw new Error('No items ready for delivery in this order');
@@ -103,7 +103,7 @@ export const workflowApi = {
           canCreateDelivery: orderReadyItems.length > 0
         };
       } catch (error) {
-        throw new Error(`Failed to process order to delivery: ${error.message}`);
+        throw new Error(`Failed to process order to delivery: ${error instanceof Error ? error.message : 'Unknown error occurred'}`);
       }
     },
 
@@ -126,7 +126,7 @@ export const workflowApi = {
           success: true
         };
       } catch (error) {
-        throw new Error(`Failed to process delivery to invoice: ${error.message}`);
+        throw new Error(`Failed to process delivery to invoice: ${error instanceof Error ? error.message : 'Unknown error occurred'}`);
       }
     },
 
@@ -179,7 +179,7 @@ export const workflowApi = {
           success: true
         };
       } catch (error) {
-        throw new Error(`Failed to process payment allocation: ${error.message}`);
+        throw new Error(`Failed to process payment allocation: ${error instanceof Error ? error.message : 'Unknown error occurred'}`);
       }
     }
   }

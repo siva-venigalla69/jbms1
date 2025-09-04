@@ -17,7 +17,6 @@ import {
   CircularProgress,
   Chip,
   Divider,
-  Grid,
 } from '@mui/material';
 import {
   Inventory,
@@ -97,43 +96,37 @@ const CustomerStockDemo: React.FC = () => {
             How Customer Stock Logic Works
           </Typography>
           
-          <Grid container spacing={3}>
-            <Grid item xs={12} md={4}>
-              <Box>
-                <Typography variant="subtitle1" color="success.main" fontWeight="bold">
-                  📦 Material Received
-                </Typography>
-                <Typography variant="body2" color="textSecondary">
-                  When materials are received from customers, they are added to <code>material_in</code> table.
-                  The <code>total_received</code> increases.
-                </Typography>
-              </Box>
-            </Grid>
+          <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 3 }}>
+            <Box sx={{ flex: 1 }}>
+              <Typography variant="subtitle1" color="success.main" fontWeight="bold">
+                📦 Material Received
+              </Typography>
+              <Typography variant="body2" color="textSecondary">
+                When materials are received from customers, they are added to <code>material_in</code> table.
+                The <code>total_received</code> increases.
+              </Typography>
+            </Box>
             
-            <Grid item xs={12} md={4}>
-              <Box>
-                <Typography variant="subtitle1" color="primary.main" fontWeight="bold">
-                  🚚 Material Delivered
-                </Typography>
-                <Typography variant="body2" color="textSecondary">
-                  When delivery challans are created, materials are deducted from stock.
-                  The <code>total_delivered</code> increases.
-                </Typography>
-              </Box>
-            </Grid>
+            <Box sx={{ flex: 1 }}>
+              <Typography variant="subtitle1" color="primary.main" fontWeight="bold">
+                🚚 Material Delivered
+              </Typography>
+              <Typography variant="body2" color="textSecondary">
+                When delivery challans are created, materials are deducted from stock.
+                The <code>total_delivered</code> increases.
+              </Typography>
+            </Box>
             
-            <Grid item xs={12} md={4}>
-              <Box>
-                <Typography variant="subtitle1" color="info.main" fontWeight="bold">
-                  📊 Current Stock
-                </Typography>
-                <Typography variant="body2" color="textSecondary">
-                  <code>current_stock = total_received - total_delivered</code><br />
-                  Negative values indicate over-delivery.
-                </Typography>
-              </Box>
-            </Grid>
-          </Grid>
+            <Box sx={{ flex: 1 }}>
+              <Typography variant="subtitle1" color="info.main" fontWeight="bold">
+                📊 Current Stock
+              </Typography>
+              <Typography variant="body2" color="textSecondary">
+                <code>current_stock = total_received - total_delivered</code><br />
+                Negative values indicate over-delivery.
+              </Typography>
+            </Box>
+          </Box>
 
           <Divider sx={{ my: 2 }} />
 

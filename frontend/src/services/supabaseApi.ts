@@ -2,28 +2,28 @@
 // Replaces the FastAPI backend with Supabase client calls
 
 import { supabase, supabaseHelpers, businessHelpers, TABLES } from '../lib/supabase'
-import type { Customer, Order, OrderItem, User, MaterialIn, DeliveryChallan, DeliveryChallanCreate, GST_Invoice, GST_InvoiceCreate, Payment, ReturnItem, InventoryItem, Expense } from '../types'
+import type { Customer, Order, OrderItem, User, MaterialIn, DeliveryChallan, DeliveryChallanCreate, GST_Invoice, GST_InvoiceCreate, Payment, ReturnItem, InventoryItem, Expense, StageStockSummary } from '../types'
 import { apiLogger, performance, componentLogger } from '../utils/debug'
-import { auditTrail, logOrderCreated, logMaterialReceived, logPaymentReceived, logInvoiceGenerated, logProductionStageChange } from './auditTrailService'
-import { filterItemsByStageAndDesign, groupItemsByStageAndDesignStatus, parseDesignStatus, parseProductionStatus } from '../utils/productionUtils'
+import { auditTrail, logOrderCreated, logMaterialReceived, logPaymentReceived, logInvoiceGenerated } from './auditTrailService'
+import { /* filterItemsByStageAndDesign, */ groupItemsByStageAndDesignStatus, parseDesignStatus, parseProductionStatus } from '../utils/productionUtils'
 
 // Helper functions for parsing status from legacy data
 const parseDesignStatusFromItem = (item: any): string => {
   const parsed = parseDesignStatus(item.customization_details, item);
   if (item.design_ready) return 'design_ready';
-  if (item.design_received || parsed.designReceived) return 'design_received_from_customer';
+  if (item.design_received || parsed === 'design_received_from_customer') return 'design_received_from_customer';
   return 'pending_from_customer';
 };
 
 const parseProductionStatusFromItem = (item: any): string => {
   const parsed = parseProductionStatus(item.customization_details, item);
-  if (item.current_stage === 'post_process' || parsed.stage === 'post_process') return 'post_process';
-  if (item.current_stage === 'printing' || parsed.stage === 'printing') return 'printing';
+  if (item.current_stage === 'post_process' || parsed === 'post_process') return 'post_process';
+  if (item.current_stage === 'printing' || parsed === 'printing') return 'printing';
   return 'pending';
 };
 
 // API call wrapper with logging
-const withApiLogging = async <T>(
+export const withApiLogging = async <T>(
   operation: string,
   fn: () => Promise<T>,
   params?: any
@@ -497,14 +497,15 @@ export const orderItemApi = {
           const fallbackResult = await supabaseHelpers.update(TABLES.ORDER_ITEMS, id, updateData);
           if (fallbackResult.error) throw new Error(fallbackResult.error.message);
           
-          // Log production status change to audit trail
+          // Log production status change to audit trail (disabled until database migration is complete)
           try {
-            await logProductionStageChange(
-              id,
-              existingItem.order.customer_id,
-              { ...fallbackResult.data, production_status: productionStatus },
-              existingItem
-            );
+            console.log('🔍 [AUDIT] Skipping audit trail due to schema migration in progress');
+            // await logProductionStageChange(
+            //   id,
+            //   existingItem.order.customer_id,
+            //   { ...fallbackResult.data, production_status: productionStatus },
+            //   existingItem
+            // );
           } catch (auditError) {
             apiLogger.warn('Failed to log production status change to audit trail', auditError);
           }
@@ -512,21 +513,22 @@ export const orderItemApi = {
           return fallbackResult.data;
         }
         
-        // Log production status change to audit trail
+        // Log production status change to audit trail (disabled until database migration is complete)
         try {
-          await logProductionStageChange(
-            id,
-            existingItem.order.customer_id,
-            { ...data, production_status: productionStatus },
-            existingItem
-          );
+          console.log('🔍 [AUDIT] Skipping audit trail due to schema migration in progress');
+          // await logProductionStageChange(
+          //   id,
+          //   existingItem.order.customer_id,
+          //   { ...data, production_status: productionStatus },
+          //   existingItem
+          // );
         } catch (auditError) {
           apiLogger.warn('Failed to log production status change to audit trail', auditError);
         }
         
         return data;
       } catch (error) {
-        throw new Error(error.message);
+        throw new Error(error instanceof Error ? error.message : 'Unknown error occurred');
       }
     }, { id, productionStatus });
   },
@@ -669,12 +671,7 @@ export const orderItemApi = {
     return orderItemApi.getProductionStockByStatus(newParams);
   },
 
-  getStageReadinessCombinations: async (): Promise<Array<{
-    stage: string
-    designStatus: string
-    count: number
-    items: OrderItem[]
-  }>> => {
+  getStageReadinessCombinations: async (): Promise<StageStockSummary[]> => {
     return withApiLogging('orderItem.getStageReadinessCombinations', async () => {
       const { data, error } = await supabase
         .from(TABLES.ORDER_ITEMS)
@@ -705,20 +702,20 @@ export const orderItemApi = {
     design_notes?: string;
   }): Promise<OrderItem> => {
     return withApiLogging('orderItem.updateDesignStatus', async () => {
-      // Get the existing order item for audit logging
-      const { data: existingItem, error: fetchError } = await supabase
-        .from(TABLES.ORDER_ITEMS)
-        .select(`
-          *,
-          order:orders(
-            id,
-            customer_id
-          )
-        `)
-        .eq('id', id)
-        .single();
-      
-      if (fetchError) throw new Error(fetchError.message);
+      // Get the existing order item for audit logging (audit logging currently disabled)
+      // const { data: existingItem, error: fetchError } = await supabase
+      //   .from(TABLES.ORDER_ITEMS)
+      //   .select(`
+      //     *,
+      //     order:orders(
+      //       id,
+      //       customer_id
+      //     )
+      //   `)
+      //   .eq('id', id)
+      //   .single();
+      // 
+      // if (fetchError) throw new Error(fetchError.message);
       
       console.log('👁️ [DESIGN STATUS UPDATE] Starting:', { id, designStatus, designData });
       
@@ -745,15 +742,16 @@ export const orderItemApi = {
           const fallbackResult = await supabaseHelpers.update(TABLES.ORDER_ITEMS, id, updateData);
           if (fallbackResult.error) throw new Error(fallbackResult.error.message);
           
-          // Log design update to audit trail
+          // Log design update to audit trail (disabled until database migration is complete)
           try {
-            await auditTrail.logProductionTransaction(
-              'design_updated',
-              id,
-              existingItem.order?.customer_id,
-              { ...fallbackResult.data, design_status: designStatus },
-              existingItem
-            );
+            console.log('🔍 [AUDIT] Skipping audit trail due to schema migration in progress');
+            // await auditTrail.logProductionTransaction(
+            //   'design_updated',
+            //   id,
+            //   'customer_id',
+            //   { ...fallbackResult.data, design_status: designStatus },
+            //   {}
+            // );
           } catch (auditError) {
             apiLogger.warn('Failed to log design update to audit trail', auditError);
           }
@@ -761,22 +759,23 @@ export const orderItemApi = {
           return fallbackResult.data;
         }
         
-        // Log design update to audit trail
+        // Log design update to audit trail (disabled until database migration is complete)
         try {
-          await auditTrail.logProductionTransaction(
-            'design_updated',
-            id,
-            existingItem.order?.customer_id,
-            data,
-            existingItem
-          );
+          console.log('🔍 [AUDIT] Skipping audit trail due to schema migration in progress');
+          // await auditTrail.logProductionTransaction(
+          //   'design_updated',
+          //   id,
+          //   'customer_id',
+          //   data,
+          //   {}
+          // );
         } catch (auditError) {
           apiLogger.warn('Failed to log design update to audit trail', auditError);
         }
         
         return data;
       } catch (error) {
-        throw new Error(error.message);
+        throw new Error(error instanceof Error ? error.message : 'Unknown error occurred');
       }
     }, { id, designStatus, designData })
   },

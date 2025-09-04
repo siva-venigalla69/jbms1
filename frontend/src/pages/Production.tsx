@@ -81,7 +81,7 @@ const Production: React.FC = () => {
   const [designDialogOpen, setDesignDialogOpen] = useState(false);
   const [selectedOrderItem, setSelectedOrderItem] = useState<OrderItem | null>(null);
 
-  const { control, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm({
+  const { /* control, handleSubmit, reset, formState: { errors, isSubmitting } */ } = useForm({
     resolver: yupResolver(productionUpdateSchema),
     defaultValues: {
       stage: 'design_pending' as ProductionStage,
@@ -157,14 +157,14 @@ const Production: React.FC = () => {
     }
   }, [error, success]);
 
-  const handleUpdateFabricStage = (orderItem: OrderItem) => {
-    setSelectedOrderItem(orderItem);
-    reset({
-      stage: orderItem.current_stage || 'design_pending',
-      notes: '',
-    });
-    setFabricStageDialogOpen(true);
-  };
+  // const handleUpdateFabricStage = (orderItem: OrderItem) => {
+  //   setSelectedOrderItem(orderItem);
+  //   reset({
+  //     stage: orderItem.current_stage || 'design_pending',
+  //     notes: '',
+  //   });
+  //   setFabricStageDialogOpen(true);
+  // };
 
   const handleDesignUpdate = (orderItem: OrderItem) => {
     setSelectedOrderItem(orderItem);
@@ -226,7 +226,7 @@ const Production: React.FC = () => {
   };
 
   // @deprecated - Use onProductionSubmit instead
-  const onFabricStageSubmit = onProductionSubmit;
+  // const onFabricStageSubmit = onProductionSubmit;
 
   const getStageProgress = (stage: ProductionStage): number => {
     switch (stage) {
@@ -550,7 +550,7 @@ const Production: React.FC = () => {
               Design Pending + Pre-treatment Done
             </Typography>
             <Typography variant="h4" fontWeight="bold" color="info.main">
-              {stats.designPendingAndPretreatmentCompleted}
+              {stats.designPendingButProductionStarted}
             </Typography>
             <Typography variant="body2" color="info.main">
               Fabric Ready, Design Pending (Click to Filter)
@@ -575,7 +575,7 @@ const Production: React.FC = () => {
               Design Received Not Ready + Pre-treatment Done
             </Typography>
             <Typography variant="h4" fontWeight="bold" color="secondary.main">
-              {stats.designReceivedNotReadyAndPretreatmentCompleted}
+              {stats.designReceivedNotReadyAndProductionStarted}
             </Typography>
             <Typography variant="body2" color="secondary.main">
               Waiting for Design Approval (Click to Filter)
@@ -742,7 +742,7 @@ const Production: React.FC = () => {
                   {filteredOrderItems.map((item) => {
                     const order = getOrderByItemId(item.id);
                     const progress = getStageProgress(item.current_stage || 'design_pending');
-                    const { designReceived, designReady } = parseDesignStatus(item.customization_details, item);
+                    const { designReceived, designReady } = parseDesignStatusLegacy(item.customization_details, item);
                     
                     const getDesignChip = () => {
                       if (designReady) {
