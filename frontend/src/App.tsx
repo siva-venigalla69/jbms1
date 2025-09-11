@@ -25,6 +25,10 @@ import CustomerStockDemo from './components/CustomerStockDemo';
 import TextileStockTracker from './components/TextileStockTracker';
 import BusinessFlowTester from './components/BusinessFlowTester';
 import DebugPanel from './components/debug/DebugPanel';
+import DesignerDashboard from './pages/DesignerDashboard';
+import DesignerWorkload from './pages/DesignerWorkload';
+import DesignLibrary from './pages/DesignLibrary';
+// import SchemaAnalysis from './pages/SchemaAnalysis'; // Commented out - not required for business operations
 import './utils/debugDatabase'; // Import debug database helpers
 import './utils/loginDebugHelper'; // Import login debug helpers
 
@@ -109,6 +113,50 @@ function App() {
                 </ProtectedRoute>
               }
             />
+
+            {/* Designer Management Routes */}
+            <Route
+              path="/designer-dashboard"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <DesignerDashboard />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/designer-workload"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <DesignerWorkload />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/design-library"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <DesignLibrary />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            {/* Schema Analysis - Commented out as not required for business operations
+            <Route
+              path="/schema-analysis"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <SchemaAnalysis />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            */}
 
             {/* Functional routes */}
             <Route

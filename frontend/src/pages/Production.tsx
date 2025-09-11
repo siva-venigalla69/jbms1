@@ -81,13 +81,13 @@ const Production: React.FC = () => {
   const [designDialogOpen, setDesignDialogOpen] = useState(false);
   const [selectedOrderItem, setSelectedOrderItem] = useState<OrderItem | null>(null);
 
-  const { /* control, handleSubmit, reset, formState: { errors, isSubmitting } */ } = useForm({
-    resolver: yupResolver(productionUpdateSchema),
-    defaultValues: {
-      stage: 'design_pending' as ProductionStage,
-      notes: '',
-    },
-  });
+  // const form = useForm({
+  //   resolver: yupResolver(productionUpdateSchema),
+  //   defaultValues: {
+  //     stage: 'design_pending' as ProductionStage,
+  //     notes: '',
+  //   },
+  // });
 
   // Design update form
   // Design update form with new structure

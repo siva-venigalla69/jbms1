@@ -6,6 +6,7 @@ import type { Customer, Order, OrderItem, User, MaterialIn, DeliveryChallan, Del
 import { apiLogger, performance, componentLogger } from '../utils/debug'
 import { auditTrail, logOrderCreated, logMaterialReceived, logPaymentReceived, logInvoiceGenerated } from './auditTrailService'
 import { /* filterItemsByStageAndDesign, */ groupItemsByStageAndDesignStatus, parseDesignStatus, parseProductionStatus } from '../utils/productionUtils'
+import { designerApi } from './designerApi'
 
 // Helper functions for parsing status from legacy data
 const parseDesignStatusFromItem = (item: any): string => {
@@ -310,7 +311,84 @@ export const orderApi = {
       }
 
       apiLogger.info('Order items created successfully', { itemsCreated: items?.length });
-    
+      
+      // Auto-assign designers to order items (non-blocking)
+      if (items && items.length > 0) {
+        apiLogger.info('Auto-assigning designers to order items...');
+        
+        const assignmentPromises = items.map(async (item) => {
+          try {
+            // Check if design exists in library for this material type
+            let designExists = false;
+            let designId = null;
+            
+            // Simple design code check from customization details
+            const designCode = item.customization_details?.match(/design[:\s]*([A-Z0-9_]+)/i)?.[1];
+            if (designCode) {
+              designExists = await designerApi.checkDesignAvailability(designCode, item.material_type);
+            }
+            
+            // Determine priority based on order total and material type
+            let priority: 'urgent' | 'high' | 'normal' | 'low' = 'normal';
+            if (totalAmount > 10000) priority = 'high';
+            if (totalAmount > 20000) priority = 'urgent';
+            if (['wedding', 'bridal'].some(keyword => 
+                item.customization_details?.toLowerCase().includes(keyword))) {
+              priority = 'urgent';
+            }
+            
+            // Calculate estimated hours based on material type and quantity
+            const baseHours = {
+              'saree': 3.0,
+              'dupatta': 2.0,
+              'voni': 4.0,
+              'blouse': 2.5,
+              'lehenga': 6.0
+            };
+            const estimatedHours = (baseHours[item.material_type as keyof typeof baseHours] || 2.0) * item.quantity;
+            
+            // Set expected delivery date (3 days for normal, 2 days for high, 1 day for urgent)
+            const deliveryDays = priority === 'urgent' ? 1 : priority === 'high' ? 2 : 3;
+            const expectedDate = new Date();
+            expectedDate.setDate(expectedDate.getDate() + deliveryDays);
+            
+            // Auto-assign designer using the built-in workload balancing function
+            await designerApi.autoAssignDesigner(
+              item.id,
+              priority,
+              estimatedHours
+            );
+            
+            apiLogger.info('Designer auto-assigned', { 
+              orderItemId: item.id, 
+              priority, 
+              estimatedHours,
+              designExists 
+            });
+          } catch (assignmentError) {
+            apiLogger.warn('Failed to auto-assign designer', { 
+              orderItemId: item.id, 
+              error: assignmentError 
+            });
+            // Continue with other assignments even if one fails
+          }
+        });
+        
+        // Execute all assignments in parallel but don't wait for completion
+        Promise.allSettled(assignmentPromises)
+          .then(results => {
+            const successful = results.filter(r => r.status === 'fulfilled').length;
+            const failed = results.filter(r => r.status === 'rejected').length;
+            apiLogger.info('Designer auto-assignment completed', { 
+              successful, 
+              failed, 
+              total: items.length 
+            });
+          })
+          .catch(error => {
+            apiLogger.warn('Designer auto-assignment batch failed', error);
+          });
+      }
 
       const completeOrder = {
         ...order,
@@ -2154,31 +2232,39 @@ export const gstInvoiceApi = {
           throw new Error('Cannot create invoice for challans from different customers');
         }
         
-        // Calculate invoice totals
+        // Calculate invoice totals and get order_id from challan items
         const { data: items, error: itemsError } = await supabase
           .from(TABLES.DELIVERY_CHALLAN_ITEMS)
           .select(`
             quantity,
-            order_item:order_items(unit_price)
+            order_item:order_items(unit_price, order_id)
           `)
           .in('challan_id', challanIds);
         
         if (itemsError) throw new Error(itemsError.message);
         
         const subtotal = (items || []).reduce((sum, item) => {
-          return sum + (item.quantity * (item.order_item?.unit_price || 0));
+          const orderItem = Array.isArray(item.order_item) ? item.order_item[0] : item.order_item;
+          return sum + (item.quantity * (orderItem?.unit_price || 0));
         }, 0);
         
         const taxAmount = subtotal * 0.18; // 18% GST
         const totalAmount = subtotal + taxAmount;
         
+        // Get order_id from the first item (all items should be from same order typically)
+        const firstOrderItem = Array.isArray(items?.[0]?.order_item) ? items[0].order_item[0] : items?.[0]?.order_item;
+        const orderId = firstOrderItem?.order_id || '';
+
         // Generate invoice
         const invoiceData = {
+          invoice_number: `INV-${Date.now()}`, // Generate unique invoice number
           customer_id: customerId,
+          order_id: orderId,
+          invoice_date: new Date().toISOString().split('T')[0], // Current date in YYYY-MM-DD format
           subtotal,
           tax_amount: taxAmount,
           total_amount: totalAmount,
-          invoice_status: 'draft',
+          status: 'draft' as const,
           notes: notes || `Generated from delivery challans: ${challans.map(c => c.challan_number).join(', ')}`
         };
         
@@ -2254,3 +2340,6 @@ export const gstInvoiceApi = {
     }, { startDate, endDate })
   }
 }
+
+// Export designer API for use in components
+export { designerApi }

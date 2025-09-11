@@ -1,0 +1,291 @@
+{
+  "analysis_metadata": {
+    "timestamp": "2025-09-11T17:28:44.374990",
+    "method": "supabase_rest_api",
+    "total_tables": 21,
+    "total_columns": 25,
+    "total_relationships": 0,
+    "total_estimated_rows": 0
+  },
+  "tables": [
+    {
+      "table_name": "customers",
+      "columns": [],
+      "sample_count": 0,
+      "estimated_rows": 0,
+      "analysis_timestamp": "2025-09-11T17:28:35.808697"
+    },
+    {
+      "table_name": "orders",
+      "columns": [],
+      "sample_count": 0,
+      "estimated_rows": 0,
+      "analysis_timestamp": "2025-09-11T17:28:36.193015"
+    },
+    {
+      "table_name": "order_items",
+      "columns": [],
+      "sample_count": 0,
+      "estimated_rows": 0,
+      "analysis_timestamp": "2025-09-11T17:28:36.533956"
+    },
+    {
+      "table_name": "material_in",
+      "columns": [],
+      "sample_count": 0,
+      "estimated_rows": 0,
+      "analysis_timestamp": "2025-09-11T17:28:36.891290"
+    },
+    {
+      "table_name": "material_out",
+      "columns": [],
+      "sample_count": 0,
+      "estimated_rows": 0,
+      "analysis_timestamp": "2025-09-11T17:28:37.233672"
+    },
+    {
+      "table_name": "delivery_challans",
+      "columns": [],
+      "sample_count": 0,
+      "estimated_rows": 0,
+      "analysis_timestamp": "2025-09-11T17:28:37.604683"
+    },
+    {
+      "table_name": "challan_items",
+      "columns": [],
+      "sample_count": 0,
+      "estimated_rows": 0,
+      "analysis_timestamp": "2025-09-11T17:28:37.981252"
+    },
+    {
+      "table_name": "gst_invoices",
+      "columns": [],
+      "sample_count": 0,
+      "estimated_rows": 0,
+      "analysis_timestamp": "2025-09-11T17:28:38.405559"
+    },
+    {
+      "table_name": "invoice_challans",
+      "columns": [],
+      "sample_count": 0,
+      "estimated_rows": 0,
+      "analysis_timestamp": "2025-09-11T17:28:38.760218"
+    },
+    {
+      "table_name": "payments",
+      "columns": [],
+      "sample_count": 0,
+      "estimated_rows": 0,
+      "analysis_timestamp": "2025-09-11T17:28:39.235984"
+    },
+    {
+      "table_name": "inventory",
+      "columns": [],
+      "sample_count": 0,
+      "estimated_rows": 0,
+      "analysis_timestamp": "2025-09-11T17:28:39.576512"
+    },
+    {
+      "table_name": "expenses",
+      "columns": [],
+      "sample_count": 0,
+      "estimated_rows": 0,
+      "analysis_timestamp": "2025-09-11T17:28:41.144820"
+    },
+    {
+      "table_name": "returns",
+      "columns": [],
+      "sample_count": 0,
+      "estimated_rows": 0,
+      "analysis_timestamp": "2025-09-11T17:28:41.492015"
+    },
+    {
+      "table_name": "user_profiles",
+      "columns": [],
+      "sample_count": 0,
+      "estimated_rows": 0,
+      "analysis_timestamp": "2025-09-11T17:28:41.864260"
+    },
+    {
+      "table_name": "material_stock",
+      "columns": [],
+      "sample_count": 0,
+      "estimated_rows": 0,
+      "analysis_timestamp": "2025-09-11T17:28:42.222257"
+    },
+    {
+      "table_name": "user_roles",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "sample_value": "admin"
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "sample_value": "Administrator"
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "sample_value": "Full system access"
+        },
+        {
+          "name": "is_active",
+          "type": "integer",
+          "sample_value": "True"
+        }
+      ],
+      "sample_count": 3,
+      "estimated_rows": 0,
+      "analysis_timestamp": "2025-09-11T17:28:42.601916"
+    },
+    {
+      "table_name": "order_statuses",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "sample_value": "pending"
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "sample_value": "Pending"
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "sample_value": "Order created, not started"
+        },
+        {
+          "name": "is_active",
+          "type": "integer",
+          "sample_value": "True"
+        }
+      ],
+      "sample_count": 4,
+      "estimated_rows": 0,
+      "analysis_timestamp": "2025-09-11T17:28:42.920412"
+    },
+    {
+      "table_name": "material_types",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "sample_value": "saree"
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "sample_value": "Saree"
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "sample_value": "Traditional saree material"
+        },
+        {
+          "name": "is_active",
+          "type": "integer",
+          "sample_value": "True"
+        }
+      ],
+      "sample_count": 5,
+      "estimated_rows": 0,
+      "analysis_timestamp": "2025-09-11T17:28:43.286741"
+    },
+    {
+      "table_name": "production_stages",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "sample_value": "pre_treatment"
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "sample_value": "Pre-treatment"
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "sample_value": "Material preparation"
+        },
+        {
+          "name": "sequence_order",
+          "type": "integer",
+          "sample_value": "1"
+        },
+        {
+          "name": "is_active",
+          "type": "integer",
+          "sample_value": "True"
+        }
+      ],
+      "sample_count": 3,
+      "estimated_rows": 0,
+      "analysis_timestamp": "2025-09-11T17:28:43.630026"
+    },
+    {
+      "table_name": "payment_methods",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "sample_value": "cash"
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "sample_value": "Cash"
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "sample_value": "Cash payment"
+        },
+        {
+          "name": "is_active",
+          "type": "integer",
+          "sample_value": "True"
+        }
+      ],
+      "sample_count": 4,
+      "estimated_rows": 0,
+      "analysis_timestamp": "2025-09-11T17:28:44.021612"
+    },
+    {
+      "table_name": "return_reasons",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "sample_value": "damaged"
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "sample_value": "Damaged"
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "sample_value": "Material damaged"
+        },
+        {
+          "name": "is_active",
+          "type": "integer",
+          "sample_value": "True"
+        }
+      ],
+      "sample_count": 4,
+      "estimated_rows": 0,
+      "analysis_timestamp": "2025-09-11T17:28:44.372398"
+    }
+  ],
+  "relationships": []
+}

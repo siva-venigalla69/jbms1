@@ -1,0 +1,633 @@
+import React, { useState, useEffect } from 'react';
+import {
+  Box,
+  Card,
+  CardContent,
+  Typography,
+  Button,  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Chip,
+  CircularProgress,
+  Alert,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemIcon,
+  Paper,
+  Divider,
+  LinearProgress,
+} from '@mui/material';
+import {
+  Schema,
+  ExpandMore,
+  Storage,
+  AccountTree,
+  Warning,
+  CheckCircle,
+  Build,
+  Assessment,
+  TableChart,
+  Visibility,
+  Code,
+  Refresh,
+  Info,
+} from '@mui/icons-material';
+import schemaAnalysisApi from '../services/schemaAnalysisApi';
+import { componentLogger } from '../utils/debug';
+
+interface SchemaAnalysisResult {
+  tables: any[];
+  constraints: any[];
+  views: any[];
+  enums: any[];
+  notices: string[];
+  analysis: {
+    tableCount: number;
+    viewCount: number;
+    enumCount: number;
+    relationships: number;
+    complexityScore: number;
+    tablesByFunction?: {
+      core: string[];
+      auxiliary: string[];
+      system: string[];
+    };
+    columnAnalysis?: {
+      totalColumns: number;
+      uuidColumns: number;
+      timestampColumns: number;
+      jsonColumns: number;
+      textColumns: number;
+      numericColumns: number;
+    };
+    orphanTables?: string[];
+    relationshipDensity?: number;
+  };
+}
+
+interface StructureAnalysis {
+  analysis: any;
+  recommendations: string[];
+  overEngineered: string[];
+  goodPractices: string[];
+  restructureNeeded: string[];
+}
+
+const SchemaAnalysis: React.FC = () => {
+  const [schemaData, setSchemaData] = useState<SchemaAnalysisResult | null>(null);
+  const [structureAnalysis, setStructureAnalysis] = useState<StructureAnalysis | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [expandedPanel, setExpandedPanel] = useState<string | false>('overview');
+
+  // Load schema analysis
+  const loadSchemaAnalysis = async () => {
+    componentLogger.info('Loading schema analysis...');
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Run structure analysis which includes full schema data
+      const structureResult = await schemaAnalysisApi.analyzeSchemaStructure();
+      setStructureAnalysis(structureResult);
+      
+      // Try to get full schema data as well
+      try {
+        const schemaResult = await schemaAnalysisApi.runDirectSQLAnalysis();
+        setSchemaData(schemaResult as SchemaAnalysisResult);
+      } catch (schemaError) {
+        componentLogger.warn('Could not load full schema data', schemaError);
+        // Use structure analysis data as fallback
+        setSchemaData({
+          tables: [],
+          constraints: [],
+          views: [],
+          enums: [],
+          notices: ['Schema loaded via structure analysis'],
+          analysis: structureResult.analysis
+        });
+      }
+      
+      componentLogger.info('Schema analysis loaded successfully');
+    } catch (error: any) {
+      componentLogger.error('Failed to load schema analysis', error);
+      setError(`Failed to load schema analysis: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadSchemaAnalysis();
+  }, []);
+
+  const handlePanelChange = (panel: string) => (event: React.SyntheticEvent, isExpanded: boolean) => {
+    setExpandedPanel(isExpanded ? panel : false);
+  };
+
+  const getComplexityLevel = (score: number) => {
+    if (score > 800) return { level: 'Very High', color: 'error' };
+    if (score > 500) return { level: 'High', color: 'warning' };
+    if (score > 200) return { level: 'Medium', color: 'info' };
+    return { level: 'Low', color: 'success' };
+  };
+
+  const getTablesBySchema = (tables: any[]): Record<string, string[]> => {
+    return tables.reduce((acc: Record<string, string[]>, table) => {
+      if (!acc[table.table_schema]) {
+        acc[table.table_schema] = [];
+      }
+      if (!acc[table.table_schema].includes(table.table_name)) {
+        acc[table.table_schema].push(table.table_name);
+      }
+      return acc;
+    }, {} as Record<string, string[]>);
+  };
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
+        <CircularProgress size={60} />
+        <Box sx={{ ml: 2 }}>
+          <Typography variant="h6">Analyzing Database Schema...</Typography>
+          <Typography variant="body2" color="text.secondary">
+            This may take a few moments
+          </Typography>
+        </Box>
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box>
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+        <Button variant="contained" onClick={loadSchemaAnalysis} startIcon={<Refresh />}>
+          Retry Analysis
+        </Button>
+      </Box>
+    );
+  }
+
+  const complexity = schemaData?.analysis.complexityScore 
+    ? getComplexityLevel(schemaData.analysis.complexityScore)
+    : { level: 'Unknown', color: 'default' };
+
+  return (
+    <Box>
+      {/* Header */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Typography variant="h4" fontWeight="bold" sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Schema />
+          Database Schema Analysis
+        </Typography>
+        <Button 
+          variant="outlined" 
+          onClick={loadSchemaAnalysis}
+          disabled={loading}
+          startIcon={<Refresh />}
+        >
+          Refresh Analysis
+        </Button>
+      </Box>
+
+      {/* Overview Cards */}
+      {schemaData && (
+        <Box sx={{  display: "flex", gap: 3, flexWrap: "wrap" ,  mb: 3  }}>
+          <Box sx={{ flex: "1 1 200px" }}>
+            <Card>
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Box>
+                    <Typography variant="h4" fontWeight="bold" color="primary.main">
+                      {schemaData.analysis.tableCount}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Tables
+                    </Typography>
+                  </Box>
+                  <TableChart sx={{ fontSize: 40, color: 'primary.main' }} />
+                </Box>
+              </CardContent>
+            </Card>
+          </Box>
+          
+          <Box sx={{ flex: "1 1 200px" }}>
+            <Card>
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Box>
+                    <Typography variant="h4" fontWeight="bold" color="info.main">
+                      {schemaData.analysis.viewCount}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Views
+                    </Typography>
+                  </Box>
+                  <Visibility sx={{ fontSize: 40, color: 'info.main' }} />
+                </Box>
+              </CardContent>
+            </Card>
+          </Box>
+          
+          <Box sx={{ flex: "1 1 200px" }}>
+            <Card>
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Box>
+                    <Typography variant="h4" fontWeight="bold" color="success.main">
+                      {schemaData.analysis.relationships}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Relationships
+                    </Typography>
+                  </Box>
+                  <AccountTree sx={{ fontSize: 40, color: 'success.main' }} />
+                </Box>
+              </CardContent>
+            </Card>
+          </Box>
+          
+          <Box sx={{ flex: "1 1 200px" }}>
+            <Card>
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Box>
+                    <Typography variant="h4" fontWeight="bold" color="secondary.main">
+                      {schemaData.analysis.enumCount}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Enums
+                    </Typography>
+                  </Box>
+                  <Code sx={{ fontSize: 40, color: 'secondary.main' }} />
+                </Box>
+              </CardContent>
+            </Card>
+          </Box>
+          
+          <Box sx={{ flex: "1 1 200px" }}>
+            <Card>
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Box>
+                    <Typography variant="h4" fontWeight="bold" color={complexity.color + '.main'}>
+                      {schemaData.analysis.complexityScore}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Complexity
+                    </Typography>
+                    <Chip 
+                      label={complexity.level} 
+                      color={complexity.color as any} 
+                      size="small" 
+                      sx={{ mt: 0.5 }}
+                    />
+                  </Box>
+                  <Assessment sx={{ fontSize: 40, color: complexity.color + '.main' }} />
+                </Box>
+              </CardContent>
+            </Card>
+          </Box>
+        </Box>
+      )}
+
+      {/* Analysis Sections */}
+      <Box>
+        {/* Overview */}
+        <Accordion expanded={expandedPanel === 'overview'} onChange={handlePanelChange('overview')}>
+          <AccordionSummary expandIcon={<ExpandMore />}>
+            <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Info />
+              Schema Overview
+            </Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+            {schemaData && (
+              <Box sx={{ display: "flex", gap: 3, flexWrap: "wrap" }}>
+                {/* Tables by Schema */}
+                <Box sx={{ flex: "1 1 400px" }}>
+                  <Paper sx={{ p: 2 }}>
+                    <Typography variant="h6" gutterBottom>Tables by Schema</Typography>
+                    {Object.entries(getTablesBySchema(schemaData.tables)).map(([schema, tables]) => (
+                      <Box key={schema} sx={{ mb: 2 }}>
+                        <Typography variant="subtitle1" fontWeight="bold">{schema}</Typography>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 1 }}>
+                          {(tables as string[]).map(table => (
+                            <Chip key={table} label={table} size="small" variant="outlined" />
+                          ))}
+                        </Box>
+                      </Box>
+                    ))}
+                  </Paper>
+                </Box>
+
+                {/* Column Analysis */}
+                {structureAnalysis?.analysis.columnAnalysis && (
+                  <Box sx={{ flex: "1 1 400px" }}>
+                    <Paper sx={{ p: 2 }}>
+                      <Typography variant="h6" gutterBottom>Column Distribution</Typography>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <Box>
+                          <Typography variant="body2">UUID Columns</Typography>
+                          <LinearProgress 
+                            variant="determinate" 
+                            value={(structureAnalysis.analysis.columnAnalysis.uuidColumns / structureAnalysis.analysis.columnAnalysis.totalColumns) * 100}
+                            sx={{ mt: 1 }}
+                          />
+                          <Typography variant="caption">
+                            {structureAnalysis.analysis.columnAnalysis.uuidColumns} / {structureAnalysis.analysis.columnAnalysis.totalColumns}
+                          </Typography>
+                        </Box>
+                        
+                        <Box>
+                          <Typography variant="body2">Timestamp Columns</Typography>
+                          <LinearProgress 
+                            variant="determinate" 
+                            value={(structureAnalysis.analysis.columnAnalysis.timestampColumns / structureAnalysis.analysis.columnAnalysis.totalColumns) * 100}
+                            color="success"
+                            sx={{ mt: 1 }}
+                          />
+                          <Typography variant="caption">
+                            {structureAnalysis.analysis.columnAnalysis.timestampColumns} / {structureAnalysis.analysis.columnAnalysis.totalColumns}
+                          </Typography>
+                        </Box>
+                        
+                        <Box>
+                          <Typography variant="body2">JSON Columns</Typography>
+                          <LinearProgress 
+                            variant="determinate" 
+                            value={(structureAnalysis.analysis.columnAnalysis.jsonColumns / structureAnalysis.analysis.columnAnalysis.totalColumns) * 100}
+                            color="warning"
+                            sx={{ mt: 1 }}
+                          />
+                          <Typography variant="caption">
+                            {structureAnalysis.analysis.columnAnalysis.jsonColumns} / {structureAnalysis.analysis.columnAnalysis.totalColumns}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </Paper>
+                  </Box>
+                )}
+              </Box>
+            )}
+          </AccordionDetails>
+        </Accordion>
+
+        {/* Recommendations */}
+        {structureAnalysis && (
+          <Accordion expanded={expandedPanel === 'recommendations'} onChange={handlePanelChange('recommendations')}>
+            <AccordionSummary expandIcon={<ExpandMore />}>
+              <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Build />
+                Recommendations & Analysis
+              </Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <Box sx={{ display: "flex", gap: 3, flexWrap: "wrap" }}>
+                {/* Good Practices */}
+                {structureAnalysis.goodPractices.length > 0 && (
+                  <Box sx={{ flex: "1 1 400px" }}>
+                    <Alert severity="success" sx={{ mb: 2 }}>
+                      <Typography variant="h6" gutterBottom>✅ Good Practices Found</Typography>
+                      <List dense>
+                        {structureAnalysis.goodPractices.map((practice, index) => (
+                          <ListItem key={index}>
+                            <ListItemIcon>
+                              <CheckCircle color="success" />
+                            </ListItemIcon>
+                            <ListItemText primary={practice} />
+                          </ListItem>
+                        ))}
+                      </List>
+                    </Alert>
+                  </Box>
+                )}
+
+                {/* Over Engineered */}
+                {structureAnalysis.overEngineered.length > 0 && (
+                  <Box sx={{ flex: "1 1 400px" }}>
+                    <Alert severity="warning" sx={{ mb: 2 }}>
+                      <Typography variant="h6" gutterBottom>⚠️ Over-Engineered Areas</Typography>
+                      <List dense>
+                        {structureAnalysis.overEngineered.map((issue, index) => (
+                          <ListItem key={index}>
+                            <ListItemIcon>
+                              <Warning color="warning" />
+                            </ListItemIcon>
+                            <ListItemText primary={issue} />
+                          </ListItem>
+                        ))}
+                      </List>
+                    </Alert>
+                  </Box>
+                )}
+
+                {/* Restructure Needed */}
+                {structureAnalysis.restructureNeeded.length > 0 && (
+                  <Box sx={{ flex: "1 1 400px" }}>
+                    <Alert severity="error" sx={{ mb: 2 }}>
+                      <Typography variant="h6" gutterBottom>🔧 Restructuring Needed</Typography>
+                      <List dense>
+                        {structureAnalysis.restructureNeeded.map((issue, index) => (
+                          <ListItem key={index}>
+                            <ListItemIcon>
+                              <Build color="error" />
+                            </ListItemIcon>
+                            <ListItemText primary={issue} />
+                          </ListItem>
+                        ))}
+                      </List>
+                    </Alert>
+                  </Box>
+                )}
+
+                {/* General Recommendations */}
+                {structureAnalysis.recommendations.length > 0 && (
+                  <Box sx={{ flex: "1 1 400px" }}>
+                    <Alert severity="info" sx={{ mb: 2 }}>
+                      <Typography variant="h6" gutterBottom>💡 General Recommendations</Typography>
+                      <List dense>
+                        {structureAnalysis.recommendations.map((recommendation, index) => (
+                          <ListItem key={index}>
+                            <ListItemIcon>
+                              <Info color="info" />
+                            </ListItemIcon>
+                            <ListItemText primary={recommendation} />
+                          </ListItem>
+                        ))}
+                      </List>
+                    </Alert>
+                  </Box>
+                )}
+              </Box>
+            </AccordionDetails>
+          </Accordion>
+        )}
+
+        {/* Tables Detail */}
+        {schemaData && (
+          <Accordion expanded={expandedPanel === 'tables'} onChange={handlePanelChange('tables')}>
+            <AccordionSummary expandIcon={<ExpandMore />}>
+              <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <TableChart />
+                Tables & Columns ({schemaData.analysis.tableCount} tables)
+              </Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Schema</TableCell>
+                      <TableCell>Table</TableCell>
+                      <TableCell>Column</TableCell>
+                      <TableCell>Type</TableCell>
+                      <TableCell>Nullable</TableCell>
+                      <TableCell>Default</TableCell>
+                      <TableCell>Key</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {schemaData.tables.slice(0, 100).map((row, index) => (
+                      <TableRow key={index}>
+                        <TableCell>{row.table_schema}</TableCell>
+                        <TableCell>{row.table_name}</TableCell>
+                        <TableCell>{row.column_name}</TableCell>
+                        <TableCell>
+                          <Chip 
+                            label={row.data_type} 
+                            size="small"
+                            color={row.data_type === 'uuid' ? 'primary' : row.data_type.includes('timestamp') ? 'success' : 'default'}
+                          />
+                        </TableCell>
+                        <TableCell>{row.is_nullable}</TableCell>
+                        <TableCell>
+                          <Typography variant="caption" sx={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {row.column_default || '-'}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          {row.is_primary_key === 'YES' && <Chip label="PK" color="primary" size="small" />}
+                          {row.is_foreign_key === 'YES' && <Chip label="FK" color="secondary" size="small" />}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {schemaData.tables.length > 100 && (
+                      <TableRow>
+                        <TableCell colSpan={7} align="center">
+                          <Typography variant="body2" color="text.secondary">
+                            Showing first 100 columns. Total: {schemaData.tables.length}
+                          </Typography>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </AccordionDetails>
+          </Accordion>
+        )}
+
+        {/* Relationships */}
+        {schemaData && (
+          <Accordion expanded={expandedPanel === 'relationships'} onChange={handlePanelChange('relationships')}>
+            <AccordionSummary expandIcon={<ExpandMore />}>
+              <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <AccountTree />
+                Relationships ({schemaData.analysis.relationships} foreign keys)
+              </Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Table</TableCell>
+                      <TableCell>Column</TableCell>
+                      <TableCell>References</TableCell>
+                      <TableCell>On Update</TableCell>
+                      <TableCell>On Delete</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {schemaData.constraints.filter(c => c.constraint_type === 'FOREIGN KEY').map((rel, index) => (
+                      <TableRow key={index}>
+                        <TableCell>{rel.table_name}</TableCell>
+                        <TableCell>{rel.column_name}</TableCell>
+                        <TableCell>
+                          <Typography variant="body2">
+                            {rel.references_table}.{rel.references_column}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>{rel.update_rule || '-'}</TableCell>
+                        <TableCell>{rel.delete_rule || '-'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </AccordionDetails>
+          </Accordion>
+        )}
+
+        {/* Views */}
+        {schemaData && schemaData.views.length > 0 && (
+          <Accordion expanded={expandedPanel === 'views'} onChange={handlePanelChange('views')}>
+            <AccordionSummary expandIcon={<ExpandMore />}>
+              <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Visibility />
+                Views ({schemaData.analysis.viewCount} views)
+              </Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Schema</TableCell>
+                      <TableCell>View Name</TableCell>
+                      <TableCell>Updatable</TableCell>
+                      <TableCell>Definition Preview</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {schemaData.views.map((view, index) => (
+                      <TableRow key={index}>
+                        <TableCell>{view.table_schema}</TableCell>
+                        <TableCell>{view.view_name}</TableCell>
+                        <TableCell>
+                          <Chip 
+                            label={view.is_updatable} 
+                            color={view.is_updatable === 'YES' ? 'success' : 'default'} 
+                            size="small" 
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="caption" sx={{ maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {view.view_definition?.substring(0, 100)}...
+                          </Typography>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </AccordionDetails>
+          </Accordion>
+        )}
+      </Box>
+    </Box>
+  );
+};
+
+export default SchemaAnalysis;

@@ -1,0 +1,173 @@
+{
+  "test_metadata": {
+    "timestamp": "2025-09-11T18:04:42.957940",
+    "total_tests": 16
+  },
+  "results": [
+    {
+      "status": "success",
+      "table": "customers",
+      "accessible": true,
+      "sample_count": 0,
+      "columns": []
+    },
+    {
+      "status": "success",
+      "table": "orders",
+      "accessible": true,
+      "sample_count": 0,
+      "columns": []
+    },
+    {
+      "status": "success",
+      "table": "order_items",
+      "accessible": true,
+      "sample_count": 0,
+      "columns": []
+    },
+    {
+      "status": "success",
+      "table": "user_profiles",
+      "accessible": true,
+      "sample_count": 0,
+      "columns": []
+    },
+    {
+      "status": "success",
+      "table": "delivery_challans",
+      "accessible": true,
+      "sample_count": 0,
+      "columns": []
+    },
+    {
+      "status": "success",
+      "table": "gst_invoices",
+      "accessible": true,
+      "sample_count": 0,
+      "columns": []
+    },
+    {
+      "status": "success",
+      "table": "payments",
+      "accessible": true,
+      "sample_count": 0,
+      "columns": []
+    },
+    {
+      "status": "success",
+      "table": "design_library",
+      "accessible": true,
+      "sample_count": 1,
+      "columns": [
+        "id",
+        "design_name",
+        "design_category",
+        "design_code",
+        "design_file_url",
+        "design_thumbnail_url",
+        "design_description",
+        "material_compatibility",
+        "complexity_level",
+        "estimated_hours",
+        "is_active",
+        "created_by",
+        "created_at",
+        "updated_at"
+      ]
+    },
+    {
+      "status": "success",
+      "table": "designer_assignments",
+      "accessible": true,
+      "sample_count": 0,
+      "columns": []
+    },
+    {
+      "status": "success",
+      "table": "assignment_history",
+      "accessible": true,
+      "sample_count": 0,
+      "columns": []
+    },
+    {
+      "status": "success",
+      "table": "user_roles",
+      "accessible": true,
+      "sample_count": 1,
+      "columns": [
+        "id",
+        "name",
+        "description",
+        "is_active"
+      ]
+    },
+    {
+      "status": "success",
+      "table": "order_statuses",
+      "accessible": true,
+      "sample_count": 1,
+      "columns": [
+        "id",
+        "name",
+        "description",
+        "is_active"
+      ]
+    },
+    {
+      "status": "success",
+      "table": "material_types",
+      "accessible": true,
+      "sample_count": 1,
+      "columns": [
+        "id",
+        "name",
+        "description",
+        "is_active"
+      ]
+    },
+    {
+      "status": "success",
+      "table": "production_stages",
+      "accessible": true,
+      "sample_count": 1,
+      "columns": [
+        "id",
+        "name",
+        "description",
+        "sequence_order",
+        "is_active"
+      ]
+    },
+    {
+      "status": "success",
+      "table": "payment_methods",
+      "accessible": true,
+      "sample_count": 1,
+      "columns": [
+        "id",
+        "name",
+        "description",
+        "is_active"
+      ]
+    },
+    {
+      "status": "success",
+      "table": "return_reasons",
+      "accessible": true,
+      "sample_count": 1,
+      "columns": [
+        "id",
+        "name",
+        "description",
+        "is_active"
+      ]
+    }
+  ],
+  "summary": {
+    "total_tables": 16,
+    "accessible_tables": 16,
+    "core_ready": true,
+    "designer_ready": true,
+    "overall_status": "\ud83d\udfe2 EXCELLENT"
+  }
+}

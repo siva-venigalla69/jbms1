@@ -35,6 +35,10 @@ import {
     Analytics,
     AccountTree,
     TrendingUp,
+    Assignment,
+    Person,
+    PaletteOutlined,
+    // Schema, // Removed - not needed for business operations
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -53,6 +57,12 @@ const menuItems = [
     { text: 'Customers', icon: <People />, path: '/customers' },
     { text: 'Orders', icon: <ShoppingCart />, path: '/orders' },
     { text: 'Production', icon: <Factory />, path: '/production' },
+    // Designer Management Section
+    { text: 'Designer Dashboard', icon: <Assignment />, path: '/designer-dashboard' },
+    { text: 'Designer Workload', icon: <Person />, path: '/designer-workload' },
+    { text: 'Design Library', icon: <PaletteOutlined />, path: '/design-library' },
+    // End Designer Section
+    // { text: 'Schema Analysis', icon: <Schema />, path: '/schema-analysis' }, // Commented out - not needed for business operations
     { text: 'Materials', icon: <Palette />, path: '/materials' },
     { text: 'Customer Stock', icon: <Inventory2 />, path: '/customer-stock' },
     { text: 'Inventory', icon: <Inventory />, path: '/inventory' },

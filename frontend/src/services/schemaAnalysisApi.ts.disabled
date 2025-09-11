@@ -1,0 +1,533 @@
+import { supabase } from '../lib/supabase';
+import { componentLogger } from '../utils/debug';
+
+// Types for schema analysis results
+interface TableInfo {
+  schema_name: string;
+  table_name: string;
+  table_owner: string;
+  has_indexes: boolean;
+  has_rules: boolean;
+  has_triggers: boolean;
+  row_security: boolean;
+}
+
+interface ColumnInfo {
+  table_schema: string;
+  table_name: string;
+  table_type: string;
+  column_name: string;
+  ordinal_position: number;
+  column_default: string | null;
+  is_nullable: string;
+  data_type: string;
+  character_maximum_length: number | null;
+  numeric_precision: number | null;
+  numeric_scale: number | null;
+  datetime_precision: number | null;
+  udt_name: string;
+  is_primary_key: string;
+  is_foreign_key: string;
+  foreign_table_schema: string | null;
+  foreign_table_name: string | null;
+  foreign_column_name: string | null;
+}
+
+interface ConstraintInfo {
+  table_schema: string;
+  table_name: string;
+  constraint_name: string;
+  constraint_type: string;
+  column_name: string;
+  references_table: string | null;
+  references_column: string | null;
+  update_rule: string | null;
+  delete_rule: string | null;
+  check_clause: string | null;
+}
+
+interface ViewInfo {
+  table_schema: string;
+  view_name: string;
+  view_definition: string;
+  check_option: string | null;
+  is_updatable: string;
+  is_insertable_into: string;
+  is_trigger_updatable: string;
+  is_trigger_deletable: string;
+  is_trigger_insertable_into: string;
+}
+
+interface EnumInfo {
+  schema_name: string;
+  enum_name: string;
+  enum_value: string;
+  enum_sort_order: number;
+}
+
+interface SchemaAnalysisResult {
+  tables: ColumnInfo[];
+  constraints: ConstraintInfo[];
+  views: ViewInfo[];
+  enums: EnumInfo[];
+  notices: string[];
+  analysis: {
+    tableCount: number;
+    viewCount: number;
+    enumCount: number;
+    relationships: number;
+    complexityScore: number;
+  };
+}
+
+export const schemaAnalysisApi = {
+  // Execute all schema analysis queries
+  async runFullSchemaAnalysis(): Promise<SchemaAnalysisResult> {
+    componentLogger.info('Starting full schema analysis...');
+    
+    try {
+      const notices: string[] = [];
+      
+      // 1. Get all tables with basic info (using DO block)
+      const tablesNoticesResult = await supabase.rpc('get_table_overview');
+      if (tablesNoticesResult.data) {
+        notices.push('=== DATABASE TABLES OVERVIEW ===');
+        notices.push(...tablesNoticesResult.data);
+      }
+
+      // 2. Get detailed table and column information
+      const { data: tables, error: tablesError } = await supabase.rpc('get_detailed_table_info');
+      if (tablesError) throw tablesError;
+
+      // 3. Get all constraints
+      const { data: constraints, error: constraintsError } = await supabase.rpc('get_all_constraints');
+      if (constraintsError) throw constraintsError;
+
+      // 4. Get indexes analysis (using DO block)
+      const indexNoticesResult = await supabase.rpc('get_indexes_analysis');
+      if (indexNoticesResult.data) {
+        notices.push('=== DATABASE INDEXES ===');
+        notices.push(...indexNoticesResult.data);
+      }
+
+      // 5. Get functions analysis (using DO block)
+      const functionsNoticesResult = await supabase.rpc('get_functions_analysis');
+      if (functionsNoticesResult.data) {
+        notices.push('=== DATABASE FUNCTIONS ===');
+        notices.push(...functionsNoticesResult.data);
+      }
+
+      // 6. Get triggers analysis (using DO block)
+      const triggersNoticesResult = await supabase.rpc('get_triggers_analysis');
+      if (triggersNoticesResult.data) {
+        notices.push('=== DATABASE TRIGGERS ===');
+        notices.push(...triggersNoticesResult.data);
+      }
+
+      // 7. Get views information
+      const { data: views, error: viewsError } = await supabase.rpc('get_views_info');
+      if (viewsError) throw viewsError;
+
+      // 8. Get sequences information (if any)
+      const sequencesResult = await supabase.rpc('get_sequences_info');
+      if (sequencesResult.data) {
+        notices.push('=== SEQUENCES ===');
+        notices.push(...sequencesResult.data);
+      }
+
+      // 9. Get table relationships (using DO block)
+      const relationshipsResult = await supabase.rpc('get_table_relationships');
+      if (relationshipsResult.data) {
+        notices.push('=== TABLE RELATIONSHIPS ===');
+        notices.push(...relationshipsResult.data);
+      }
+
+      // 10. Get schema statistics (using DO block)
+      const statsResult = await supabase.rpc('get_schema_statistics');
+      if (statsResult.data) {
+        notices.push('=== SCHEMA STATISTICS ===');
+        notices.push(...statsResult.data);
+      }
+
+      // 11. Get enum types
+      const { data: enums, error: enumsError } = await supabase.rpc('get_enum_types');
+      if (enumsError) throw enumsError;
+
+      // 12. Get table sizes and row counts (using DO block)
+      const sizesResult = await supabase.rpc('get_table_sizes');
+      if (sizesResult.data) {
+        notices.push('=== TABLE SIZES AND ROW COUNTS ===');
+        notices.push(...sizesResult.data);
+      }
+
+      // Calculate analysis metrics
+      const analysis = {
+        tableCount: Array.from(new Set(tables?.map(t => `${t.table_schema}.${t.table_name}`) || [])).length || 0,
+        viewCount: views?.length || 0,
+        enumCount: Array.from(new Set(enums?.map(e => `${e.schema_name}.${e.enum_name}`) || [])).length || 0,
+        relationships: constraints?.filter(c => c.constraint_type === 'FOREIGN KEY').length || 0,
+        complexityScore: this.calculateComplexityScore(tables || [], constraints || [], views || [])
+      };
+
+      const result: SchemaAnalysisResult = {
+        tables: tables || [],
+        constraints: constraints || [],
+        views: views || [],
+        enums: enums || [],
+        notices,
+        analysis
+      };
+
+      componentLogger.info('Schema analysis completed successfully', analysis);
+      return result;
+
+    } catch (error: any) {
+      componentLogger.error('Failed to run schema analysis', error);
+      throw new Error(`Schema analysis failed: ${error.message}`);
+    }
+  },
+
+  // Alternative method using direct SQL queries (fallback if RPC functions don't exist)
+  async runDirectSQLAnalysis(): Promise<Partial<SchemaAnalysisResult>> {
+    componentLogger.info('Running direct SQL schema analysis...');
+    
+    try {
+      // 2. Get detailed table and column information
+      const { data: tables, error: tablesError } = await supabase.rpc('sql', { 
+        query: `
+          SELECT 
+            t.table_schema,
+            t.table_name,
+            t.table_type,
+            c.column_name,
+            c.ordinal_position,
+            c.column_default,
+            c.is_nullable,
+            c.data_type,
+            c.character_maximum_length,
+            c.numeric_precision,
+            c.numeric_scale,
+            c.datetime_precision,
+            c.udt_name,
+            CASE 
+                WHEN pk.column_name IS NOT NULL THEN 'YES'
+                ELSE 'NO'
+            END AS is_primary_key,
+            CASE 
+                WHEN fk.column_name IS NOT NULL THEN 'YES'
+                ELSE 'NO'
+            END AS is_foreign_key,
+            fk.foreign_table_schema,
+            fk.foreign_table_name,
+            fk.foreign_column_name
+          FROM information_schema.tables t
+          LEFT JOIN information_schema.columns c ON t.table_name = c.table_name AND t.table_schema = c.table_schema
+          LEFT JOIN (
+              SELECT ku.table_schema, ku.table_name, ku.column_name
+              FROM information_schema.table_constraints tc
+              JOIN information_schema.key_column_usage ku ON tc.constraint_name = ku.constraint_name
+              WHERE tc.constraint_type = 'PRIMARY KEY'
+          ) pk ON c.table_schema = pk.table_schema AND c.table_name = pk.table_name AND c.column_name = pk.column_name
+          LEFT JOIN (
+              SELECT 
+                  ku.table_schema,
+                  ku.table_name,
+                  ku.column_name,
+                  ccu.table_schema AS foreign_table_schema,
+                  ccu.table_name AS foreign_table_name,
+                  ccu.column_name AS foreign_column_name
+              FROM information_schema.table_constraints tc
+              JOIN information_schema.key_column_usage ku ON tc.constraint_name = ku.constraint_name
+              JOIN information_schema.constraint_column_usage ccu ON tc.constraint_name = ccu.constraint_name
+              WHERE tc.constraint_type = 'FOREIGN KEY'
+          ) fk ON c.table_schema = fk.table_schema AND c.table_name = fk.table_name AND c.column_name = fk.column_name
+          WHERE t.table_schema NOT IN ('information_schema', 'pg_catalog')
+          ORDER BY t.table_schema, t.table_name, c.ordinal_position
+        `
+      });
+      
+      if (tablesError) throw tablesError;
+
+      // 3. Get constraints
+      const { data: constraints, error: constraintsError } = await supabase.rpc('sql', {
+        query: `
+          SELECT 
+              tc.table_schema,
+              tc.table_name,
+              tc.constraint_name,
+              tc.constraint_type,
+              ku.column_name,
+              CASE 
+                  WHEN tc.constraint_type = 'FOREIGN KEY' THEN ccu.table_name
+                  ELSE NULL
+              END AS references_table,
+              CASE 
+                  WHEN tc.constraint_type = 'FOREIGN KEY' THEN ccu.column_name
+                  ELSE NULL
+              END AS references_column,
+              rc.update_rule,
+              rc.delete_rule,
+              cc.check_clause
+          FROM information_schema.table_constraints tc
+          LEFT JOIN information_schema.key_column_usage ku ON tc.constraint_name = ku.constraint_name
+          LEFT JOIN information_schema.constraint_column_usage ccu ON tc.constraint_name = ccu.constraint_name
+          LEFT JOIN information_schema.referential_constraints rc ON tc.constraint_name = rc.constraint_name
+          LEFT JOIN information_schema.check_constraints cc ON tc.constraint_name = cc.constraint_name
+          WHERE tc.table_schema NOT IN ('information_schema', 'pg_catalog')
+          ORDER BY tc.table_schema, tc.table_name, tc.constraint_type, tc.constraint_name
+        `
+      });
+
+      if (constraintsError) throw constraintsError;
+
+      // 7. Get views
+      const { data: views, error: viewsError } = await supabase.rpc('sql', {
+        query: `
+          SELECT 
+              table_schema,
+              table_name as view_name,
+              view_definition,
+              check_option,
+              is_updatable,
+              is_insertable_into,
+              is_trigger_updatable,
+              is_trigger_deletable,
+              is_trigger_insertable_into
+          FROM information_schema.views
+          WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
+          ORDER BY table_schema, table_name
+        `
+      });
+
+      if (viewsError) throw viewsError;
+
+      // 11. Get enums
+      const { data: enums, error: enumsError } = await supabase.rpc('sql', {
+        query: `
+          SELECT 
+              n.nspname as schema_name,
+              t.typname as enum_name,
+              e.enumlabel as enum_value,
+              e.enumsortorder as enum_sort_order
+          FROM pg_type t 
+          JOIN pg_namespace n ON t.typnamespace = n.oid 
+          JOIN pg_enum e ON t.oid = e.enumtypid  
+          WHERE n.nspname NOT IN ('information_schema', 'pg_catalog', 'pg_toast')
+          ORDER BY n.nspname, t.typname, e.enumsortorder
+        `
+      });
+
+      if (enumsError) throw enumsError;
+
+      const analysis = {
+        tableCount: [...new Set(tables?.map((t: any) => `${t.table_schema}.${t.table_name}`))].length || 0,
+        viewCount: views?.length || 0,
+        enumCount: [...new Set(enums?.map((e: any) => `${e.schema_name}.${e.enum_name}`))].length || 0,
+        relationships: constraints?.filter((c: any) => c.constraint_type === 'FOREIGN KEY').length || 0,
+        complexityScore: this.calculateComplexityScore(tables || [], constraints || [], views || [])
+      };
+
+      return {
+        tables: tables || [],
+        constraints: constraints || [],
+        views: views || [],
+        enums: enums || [],
+        notices: ['Schema analysis completed using direct SQL queries'],
+        analysis
+      };
+
+    } catch (error: any) {
+      componentLogger.error('Failed to run direct SQL analysis', error);
+      throw new Error(`Direct SQL analysis failed: ${error.message}`);
+    }
+  },
+
+  // Calculate schema complexity score
+  calculateComplexityScore(tables: any[], constraints: any[], views: any[]): number {
+    const tableCount = [...new Set(tables.map(t => `${t.table_schema}.${t.table_name}`))].length;
+    const columnCount = tables.length;
+    const relationshipCount = constraints.filter(c => c.constraint_type === 'FOREIGN KEY').length;
+    const viewCount = views.length;
+    const constraintCount = constraints.length;
+
+    // Weighted complexity calculation
+    const score = (
+      (tableCount * 10) +           // Each table adds 10 points
+      (columnCount * 1) +           // Each column adds 1 point
+      (relationshipCount * 5) +     // Each relationship adds 5 points
+      (viewCount * 8) +             // Each view adds 8 points
+      (constraintCount * 2)         // Each constraint adds 2 points
+    );
+
+    return score;
+  },
+
+  // Analyze schema structure and provide recommendations
+  async analyzeSchemaStructure(): Promise<{
+    analysis: any;
+    recommendations: string[];
+    overEngineered: string[];
+    goodPractices: string[];
+    restructureNeeded: string[];
+  }> {
+    componentLogger.info('Analyzing schema structure...');
+    
+    try {
+      // First try full analysis, fall back to direct SQL if needed
+      let schemaData: Partial<SchemaAnalysisResult>;
+      try {
+        schemaData = await this.runFullSchemaAnalysis();
+      } catch (error) {
+        componentLogger.warn('Full analysis failed, falling back to direct SQL', error);
+        schemaData = await this.runDirectSQLAnalysis();
+      }
+
+      const { tables = [], constraints = [], views = [], analysis } = schemaData;
+
+      // Group tables by functionality
+      const tablesByFunction = this.categorizeTables(tables);
+      
+      // Analyze relationships
+      const relationships = constraints.filter(c => c.constraint_type === 'FOREIGN KEY');
+      const orphanTables = this.findOrphanTables(tables, relationships);
+      
+      // Analyze column patterns
+      const columnAnalysis = this.analyzeColumns(tables);
+      
+      // Generate recommendations
+      const recommendations: string[] = [];
+      const overEngineered: string[] = [];
+      const goodPractices: string[] = [];
+      const restructureNeeded: string[] = [];
+
+      // Check for over-engineering
+      if (views.length > tables.length * 0.3) {
+        overEngineered.push(`Too many views (${views.length}) compared to tables. Consider simplifying.`);
+      }
+
+      if (columnAnalysis.jsonColumns > tables.length * 0.2) {
+        overEngineered.push(`Heavy use of JSON columns (${columnAnalysis.jsonColumns}). Consider normalizing.`);
+      }
+
+      // Check for good practices
+      if (columnAnalysis.timestampColumns / tables.length >= 0.8) {
+        goodPractices.push('Good use of timestamp columns for audit trails');
+      }
+
+      if (columnAnalysis.uuidColumns / tables.length >= 0.6) {
+        goodPractices.push('Good use of UUID primary keys for scalability');
+      }
+
+      // Check for restructuring needs
+      if (orphanTables.length > 0) {
+        restructureNeeded.push(`Orphan tables found: ${orphanTables.join(', ')}`);
+      }
+
+      if (relationships.length < tables.length * 0.3) {
+        restructureNeeded.push('Low relationship density - consider adding more foreign keys');
+      }
+
+      // General recommendations
+      if (analysis?.complexityScore && analysis.complexityScore > 500) {
+        recommendations.push('High complexity schema - consider breaking into microservices');
+      }
+
+      if (tablesByFunction.core.length < tablesByFunction.auxiliary.length) {
+        recommendations.push('More auxiliary tables than core business tables - review necessity');
+      }
+
+      return {
+        analysis: {
+          ...analysis,
+          tablesByFunction,
+          columnAnalysis,
+          orphanTables,
+          relationshipDensity: relationships.length / tables.length
+        },
+        recommendations,
+        overEngineered,
+        goodPractices,
+        restructureNeeded
+      };
+
+    } catch (error: any) {
+      componentLogger.error('Failed to analyze schema structure', error);
+      throw new Error(`Schema structure analysis failed: ${error.message}`);
+    }
+  },
+
+  // Helper methods
+  categorizeTables(tables: any[]): { core: string[], auxiliary: string[], system: string[] } {
+    const uniqueTables = [...new Set(tables.map(t => t.table_name))];
+    
+    const core = uniqueTables.filter(name => 
+      ['customers', 'orders', 'order_items', 'users', 'products', 'invoices', 'payments'].includes(name)
+    );
+    
+    const auxiliary = uniqueTables.filter(name => 
+      ['logs', 'audit', 'settings', 'templates', 'notifications', 'reports'].some(keyword => 
+        name.includes(keyword)
+      )
+    );
+    
+    const system = uniqueTables.filter(name => 
+      !core.includes(name) && !auxiliary.includes(name)
+    );
+
+    return { core, auxiliary, system };
+  },
+
+  findOrphanTables(tables: any[], relationships: any[]): string[] {
+    const tablesWithRelationships = new Set([
+      ...relationships.map(r => r.table_name),
+      ...relationships.map(r => r.references_table).filter(Boolean)
+    ]);
+    
+    const allTables = [...new Set(tables.map(t => t.table_name))];
+    return allTables.filter(table => !tablesWithRelationships.has(table));
+  },
+
+  analyzeColumns(tables: any[]): {
+    totalColumns: number;
+    uuidColumns: number;
+    timestampColumns: number;
+    jsonColumns: number;
+    textColumns: number;
+    numericColumns: number;
+  } {
+    return tables.reduce((acc, table) => {
+      acc.totalColumns++;
+      
+      if (table.data_type === 'uuid' || table.udt_name === 'uuid') {
+        acc.uuidColumns++;
+      }
+      
+      if (table.data_type.includes('timestamp') || table.column_name.includes('_at')) {
+        acc.timestampColumns++;
+      }
+      
+      if (table.data_type === 'json' || table.data_type === 'jsonb') {
+        acc.jsonColumns++;
+      }
+      
+      if (table.data_type === 'text' || table.data_type === 'varchar') {
+        acc.textColumns++;
+      }
+      
+      if (['integer', 'bigint', 'decimal', 'numeric', 'real', 'double precision'].includes(table.data_type)) {
+        acc.numericColumns++;
+      }
+      
+      return acc;
+    }, {
+      totalColumns: 0,
+      uuidColumns: 0,
+      timestampColumns: 0,
+      jsonColumns: 0,
+      textColumns: 0,
+      numericColumns: 0
+    });
+  }
+};
+
+export default schemaAnalysisApi;
