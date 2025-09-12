@@ -723,64 +723,66 @@ const Production: React.FC = () => {
               )}
             </Box>
           ) : (
-            <TableContainer>
-              <Table>
+            <TableContainer sx={{ maxHeight: '70vh', overflowX: 'auto' }}>
+              <Table stickyHeader>
                 <TableHead>
                   <TableRow>
-                    <TableCell>Order Number</TableCell>
-                    <TableCell>Customer</TableCell>
-                    <TableCell>Material Type</TableCell>
-                    <TableCell>Quantity</TableCell>
-                    <TableCell>Design Status</TableCell>
-                    <TableCell>Fabric Stage</TableCell>
-                    <TableCell>Progress</TableCell>
-                    <TableCell>Customization</TableCell>
-                    <TableCell>Actions</TableCell>
+                    <TableCell sx={{ minWidth: 120, position: 'sticky', left: 0, bgcolor: 'background.paper', zIndex: 2 }}>Order Number</TableCell>
+                    <TableCell sx={{ minWidth: 150 }}>Customer</TableCell>
+                    <TableCell sx={{ minWidth: 100 }}>Material</TableCell>
+                    <TableCell sx={{ minWidth: 60 }}>Qty</TableCell>
+                    <TableCell sx={{ minWidth: 120 }}>Design Status</TableCell>
+                    <TableCell sx={{ minWidth: 120 }}>Production Status</TableCell>
+                    <TableCell sx={{ minWidth: 100 }}>Progress</TableCell>
+                    <TableCell sx={{ minWidth: 200, display: { xs: 'none', md: 'table-cell' } }}>Customization</TableCell>
+                    <TableCell sx={{ minWidth: 100, position: 'sticky', right: 0, bgcolor: 'background.paper', zIndex: 2 }}>Actions</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {filteredOrderItems.map((item) => {
                     const order = getOrderByItemId(item.id);
                     const progress = getStageProgress(item.current_stage || 'design_pending');
-                    const { designReceived, designReady } = parseDesignStatusLegacy(item.customization_details, item);
+                    
+                    // FIX: Use consistent parsing methods - same as dialogs
+                    const designStatus = parseDesignStatus(item.customization_details, item);
+                    const productionStatus = parseProductionStatus(item.customization_details, item);
                     
                     const getDesignChip = () => {
-                      if (designReady) {
-                        return <Chip label="Ready" color="success" size="small" icon={<CheckCircle />} />;
-                      } else if (designReceived) {
-                        return <Chip label="Received" color="warning" size="small" icon={<Assignment />} />;
-                      } else {
-                        return <Chip label="Pending" color="error" size="small" icon={<Pending />} />;
+                      // FIX: Use new consistent status values instead of legacy boolean logic
+                      switch (designStatus) {
+                        case 'design_ready':
+                          return <Chip label="Ready" color="success" size="small" icon={<CheckCircle />} />;
+                        case 'design_received_from_customer':
+                          return <Chip label="Received" color="warning" size="small" icon={<Assignment />} />;
+                        case 'pending_from_customer':
+                        default:
+                          return <Chip label="Pending" color="error" size="small" icon={<Pending />} />;
                       }
                     };
                     
-                    const getFabricStageChip = () => {
-                      const stage = item.current_stage || 'design_pending';
-                      const fabricStageMap: Record<string, string> = {
-                        'design_pending': 'Not Started',
-                        'design_ready': 'Not Started', 
-                        'pre_treatment': 'Pre-treatment',
-                        'printing': 'Printing',
-                        'post_process': 'Post Process'
-                      };
-                      
-                      return (
-                        <Chip
-                          label={fabricStageMap[stage] || stage}
-                          color={getStageColor(stage) as any}
-                          variant="outlined"
-                          size="small"
-                          icon={getStageIcon(stage)}
-                        />
-                      );
+                    const getProductionChip = () => {
+                      // FIX: Use production status instead of current_stage mapping
+                      switch (productionStatus) {
+                        case 'post_process':
+                          return <Chip label="Post Process" color="success" size="small" icon={<CheckCircle />} />;
+                        case 'printing':
+                          return <Chip label="Printing" color="primary" size="small" icon={<Factory />} />;
+                        case 'pre_treatment':
+                          return <Chip label="Pre-treatment" color="info" size="small" icon={<Assignment />} />;
+                        case 'pending':
+                        default:
+                          return <Chip label="Pending" color="warning" size="small" icon={<Pending />} />;
+                      }
                     };
                     
                     return (
                       <TableRow key={item.id} hover>
-                        <TableCell>
+                        <TableCell sx={{ position: 'sticky', left: 0, bgcolor: 'background.paper', zIndex: 1 }}>
                           <Box sx={{ display: 'flex', alignItems: 'center' }}>
                             <Assignment sx={{ mr: 1, color: 'text.secondary' }} />
-                            {order?.order_number || 'Unknown'}
+                            <Typography variant="body2" fontWeight="medium">
+                              {order?.order_number || 'Unknown'}
+                            </Typography>
                           </Box>
                         </TableCell>
                         <TableCell>
@@ -811,9 +813,9 @@ const Production: React.FC = () => {
                           {getDesignChip()}
                         </TableCell>
                         
-                        {/* Fabric Processing Stage Column */}
+                        {/* Production Status Column - FIXED to use consistent parsing */}
                         <TableCell>
-                          {getFabricStageChip()}
+                          {getProductionChip()}
                         </TableCell>
                         
                         <TableCell>
@@ -827,25 +829,25 @@ const Production: React.FC = () => {
                             <Typography variant="caption">{progress}%</Typography>
                           </Box>
                         </TableCell>
-                        <TableCell>
-                          <Typography variant="body2" color="text.secondary">
+                        <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>
+                          <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {item.customization_details || 'None'}
                           </Typography>
                         </TableCell>
-                        <TableCell>
-                          <Box sx={{ display: 'flex', gap: 1 }}>
+                        <TableCell sx={{ position: 'sticky', right: 0, bgcolor: 'background.paper', zIndex: 1 }}>
+                          <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
                             <IconButton 
                               size="small" 
                               onClick={() => handleDesignUpdate(item)}
                               title="Update Design Status"
-                              color={designReady ? 'success' : 'warning'}
+                              color={designStatus === 'design_ready' ? 'success' : 'warning'}
                             >
                               <Visibility />
                             </IconButton>
                             <IconButton 
                               size="small" 
                               onClick={() => handleProductionUpdate(item)}
-                              title="Update Fabric Processing Stage"
+                              title="Update Production Status"
                               color="primary"
                             >
                               <Factory />

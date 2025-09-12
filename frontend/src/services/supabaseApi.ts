@@ -507,8 +507,7 @@ export const orderApi = {
         orders(
           order_number,
           customer:customers(name)
-        ),
-        production_stages(name)
+        )
       `)
       .eq('orders.is_deleted', false)
       .order('created_at', { ascending: false })
