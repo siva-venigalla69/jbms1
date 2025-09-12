@@ -37,6 +37,7 @@ import {
   Delete,
   Edit,
   Visibility,
+  DateRange,
 } from '@mui/icons-material';
 import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -95,6 +96,8 @@ const Orders: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [customerSearch, setCustomerSearch] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -275,7 +278,11 @@ const Orders: React.FC = () => {
     
     const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
     
-    return matchesSearch && matchesStatus;
+    const orderDate = new Date(order.created_at);
+    const matchesFromDate = !fromDate || orderDate >= new Date(fromDate);
+    const matchesToDate = !toDate || orderDate <= new Date(toDate + 'T23:59:59');
+    
+    return matchesSearch && matchesStatus && matchesFromDate && matchesToDate;
   });
 
   const addOrderItem = () => {
@@ -622,9 +629,9 @@ const Orders: React.FC = () => {
       {/* Search and Filters */}
       <Card sx={{ mb: 3 }}>
         <CardContent>
-          <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', md: 'row' } }}>
+          <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', lg: 'row' }, flexWrap: 'wrap' }}>
             {/* Search Field */}
-            <Box sx={{ flex: 2 }}>
+            <Box sx={{ flex: 2, minWidth: 250 }}>
               <TextField
                 fullWidth
                 placeholder="Search orders by order number or customer name..."
@@ -657,15 +664,54 @@ const Orders: React.FC = () => {
                 </Select>
               </FormControl>
             </Box>
+
+            {/* Date Range Filters */}
+            <Box sx={{ flex: 1, minWidth: 150 }}>
+              <TextField
+                fullWidth
+                type="date"
+                label="From Date"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <DateRange />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Box>
+            
+            <Box sx={{ flex: 1, minWidth: 150 }}>
+              <TextField
+                fullWidth
+                type="date"
+                label="To Date"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <DateRange />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Box>
             
             {/* Clear Filters Button */}
-            {(searchTerm || statusFilter !== 'all') && (
+            {(searchTerm || statusFilter !== 'all' || fromDate || toDate) && (
               <Box sx={{ display: 'flex', alignItems: 'center' }}>
                 <Button
                   variant="outlined"
                   onClick={() => {
                     setSearchTerm('');
                     setStatusFilter('all');
+                    setFromDate('');
+                    setToDate('');
                   }}
                   sx={{ height: 'fit-content', alignSelf: 'center' }}
                 >

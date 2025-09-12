@@ -38,6 +38,7 @@ import {
     Delete,
     AddCircle,
     RemoveCircle,
+    DateRange,
 } from '@mui/icons-material';
 import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -80,6 +81,8 @@ const Materials: React.FC = () => {
     const [customers, setCustomers] = useState<Customer[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [fromDate, setFromDate] = useState('');
+    const [toDate, setToDate] = useState('');
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
     const [dialogOpen, setDialogOpen] = useState(false);
@@ -256,11 +259,17 @@ const Materials: React.FC = () => {
         }
     };
 
-    const filteredMaterials = materials.filter((material) =>
-        material.material_type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        material.customer?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        material.notes?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredMaterials = materials.filter((material) => {
+        const matchesSearch = material.material_type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            material.customer?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            material.notes?.toLowerCase().includes(searchTerm.toLowerCase());
+        
+        const materialDate = new Date(material.received_date);
+        const matchesFromDate = !fromDate || materialDate >= new Date(fromDate);
+        const matchesToDate = !toDate || materialDate <= new Date(toDate + 'T23:59:59');
+        
+        return matchesSearch && matchesFromDate && matchesToDate;
+    });
 
     const handleViewMaterial = (material: MaterialIn) => {
         componentLogger.info('Viewing material details', { materialId: material.id });
@@ -300,8 +309,13 @@ const Materials: React.FC = () => {
                             TOTAL MATERIALS
                         </Typography>
                         <Typography variant="h4" fontWeight="bold">
-                            {materials.length}
+                            {filteredMaterials.length}
                         </Typography>
+                        {fromDate || toDate ? (
+                            <Typography variant="caption" color="text.secondary">
+                                of {materials.length} total
+                            </Typography>
+                        ) : null}
                     </CardContent>
                 </Card>
                 <Card>
@@ -310,8 +324,13 @@ const Materials: React.FC = () => {
                             TOTAL QUANTITY
                         </Typography>
                         <Typography variant="h4" fontWeight="bold">
-                            {materials.reduce((total, material) => total + (material.quantity || 0), 0)}
+                            {filteredMaterials.reduce((total, material) => total + (material.quantity || 0), 0)}
                         </Typography>
+                        {fromDate || toDate ? (
+                            <Typography variant="caption" color="text.secondary">
+                                of {materials.reduce((total, material) => total + (material.quantity || 0), 0)} total
+                            </Typography>
+                        ) : null}
                     </CardContent>
                 </Card>
                 <Card>
@@ -320,8 +339,13 @@ const Materials: React.FC = () => {
                             UNIQUE CUSTOMERS
                         </Typography>
                         <Typography variant="h4" fontWeight="bold">
-                            {new Set(materials.map(m => m.customer_id)).size}
+                            {new Set(filteredMaterials.map(m => m.customer_id)).size}
                         </Typography>
+                        {fromDate || toDate ? (
+                            <Typography variant="caption" color="text.secondary">
+                                of {new Set(materials.map(m => m.customer_id)).size} total
+                            </Typography>
+                        ) : null}
                     </CardContent>
                 </Card>
                 <Card>
@@ -330,28 +354,86 @@ const Materials: React.FC = () => {
                             MATERIAL TYPES
                         </Typography>
                         <Typography variant="h4" fontWeight="bold">
-                            {new Set(materials.map(m => m.material_type)).size}
+                            {new Set(filteredMaterials.map(m => m.material_type)).size}
                         </Typography>
+                        {fromDate || toDate ? (
+                            <Typography variant="caption" color="text.secondary">
+                                of {new Set(materials.map(m => m.material_type)).size} total
+                            </Typography>
+                        ) : null}
                     </CardContent>
                 </Card>
             </Box>
 
-            {/* Search */}
+            {/* Search and Filters */}
             <Card sx={{ mb: 3 }}>
                 <CardContent>
-                    <TextField
-                        fullWidth
-                        placeholder="Search materials by type, customer, or notes..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        InputProps={{
-                            startAdornment: (
-                                <InputAdornment position="start">
-                                    <Search />
-                                </InputAdornment>
-                            ),
-                        }}
-                    />
+                    <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', md: 'row' } }}>
+                        <Box sx={{ flex: 2 }}>
+                            <TextField
+                                fullWidth
+                                placeholder="Search materials by type, customer, or notes..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                InputProps={{
+                                    startAdornment: (
+                                        <InputAdornment position="start">
+                                            <Search />
+                                        </InputAdornment>
+                                    ),
+                                }}
+                            />
+                        </Box>
+                        <Box sx={{ flex: 1 }}>
+                            <TextField
+                                fullWidth
+                                type="date"
+                                label="From Date"
+                                value={fromDate}
+                                onChange={(e) => setFromDate(e.target.value)}
+                                InputLabelProps={{ shrink: true }}
+                                InputProps={{
+                                    startAdornment: (
+                                        <InputAdornment position="start">
+                                            <DateRange />
+                                        </InputAdornment>
+                                    ),
+                                }}
+                            />
+                        </Box>
+                        <Box sx={{ flex: 1 }}>
+                            <TextField
+                                fullWidth
+                                type="date"
+                                label="To Date"
+                                value={toDate}
+                                onChange={(e) => setToDate(e.target.value)}
+                                InputLabelProps={{ shrink: true }}
+                                InputProps={{
+                                    startAdornment: (
+                                        <InputAdornment position="start">
+                                            <DateRange />
+                                        </InputAdornment>
+                                    ),
+                                }}
+                            />
+                        </Box>
+                        {(fromDate || toDate || searchTerm) && (
+                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                <Button 
+                                    variant="outlined" 
+                                    onClick={() => {
+                                        setSearchTerm('');
+                                        setFromDate('');
+                                        setToDate('');
+                                    }}
+                                    size="small"
+                                >
+                                    Clear Filters
+                                </Button>
+                            </Box>
+                        )}
+                    </Box>
                 </CardContent>
             </Card>
 

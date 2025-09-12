@@ -40,6 +40,7 @@ import {
   AddCircle,
   RemoveCircle,
   Receipt,
+  DateRange,
 } from '@mui/icons-material';
 import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -79,6 +80,8 @@ const DeliveryChallans: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -436,7 +439,12 @@ const DeliveryChallans: React.FC = () => {
       challan.customer?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       challan.order?.order_number?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = !statusFilter || challan.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    
+    const challanDate = new Date(challan.delivery_date);
+    const matchesFromDate = !fromDate || challanDate >= new Date(fromDate);
+    const matchesToDate = !toDate || challanDate <= new Date(toDate + 'T23:59:59');
+    
+    return matchesSearch && matchesStatus && matchesFromDate && matchesToDate;
   });
 
   const statusOptions = ['pending', 'delivered', 'returned'];
@@ -524,8 +532,8 @@ const DeliveryChallans: React.FC = () => {
       {/* Search and Filters */}
       <Card sx={{ mb: 3 }}>
         <CardContent>
-          <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', md: 'row' } }}>
-            <Box sx={{ flex: 2 }}>
+          <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', lg: 'row' }, flexWrap: 'wrap' }}>
+            <Box sx={{ flex: 2, minWidth: 250 }}>
               <TextField
                 fullWidth
                 placeholder="Search by challan number, customer, or order..."
@@ -540,7 +548,7 @@ const DeliveryChallans: React.FC = () => {
                 }}
               />
             </Box>
-            <Box sx={{ flex: 1 }}>
+            <Box sx={{ flex: 1, minWidth: 150 }}>
               <FormControl fullWidth>
                 <InputLabel>Status</InputLabel>
                 <Select
@@ -557,6 +565,61 @@ const DeliveryChallans: React.FC = () => {
                 </Select>
               </FormControl>
             </Box>
+
+            {/* Date Range Filters */}
+            <Box sx={{ flex: 1, minWidth: 150 }}>
+              <TextField
+                fullWidth
+                type="date"
+                label="From Date"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <DateRange />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Box>
+            
+            <Box sx={{ flex: 1, minWidth: 150 }}>
+              <TextField
+                fullWidth
+                type="date"
+                label="To Date"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <DateRange />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Box>
+
+            {/* Clear Filters Button */}
+            {(searchTerm || statusFilter || fromDate || toDate) && (
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                <Button
+                  variant="outlined"
+                  onClick={() => {
+                    setSearchTerm('');
+                    setStatusFilter('');
+                    setFromDate('');
+                    setToDate('');
+                  }}
+                  size="small"
+                >
+                  Clear Filters
+                </Button>
+              </Box>
+            )}
           </Box>
         </CardContent>
       </Card>
