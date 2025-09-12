@@ -39,8 +39,8 @@ import {
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
-import { OrderItem, Order, ProductionStage, DesignStatus, ProductionStatus } from '../types';
-import { orderItemApi, orderApi } from '../services/supabaseApi';
+import { OrderItem, Order, ProductionStage, DesignStatus, ProductionStatus, MaterialIn } from '../types';
+import { orderItemApi, orderApi, materialInApi } from '../services/supabaseApi';
 import { componentLogger } from '../utils/debug';
 import { parseDesignStatus, parseDesignStatusLegacy, parseProductionStatus, getDesignStatusLabel, getProductionStatusLabel } from '../utils/productionUtils';
 
@@ -65,6 +65,7 @@ const productionStatusUpdateSchema = yup.object({
 const Production: React.FC = () => {
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [materialStock, setMaterialStock] = useState<MaterialIn[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   // Clean 2-column filters
@@ -131,9 +132,14 @@ const Production: React.FC = () => {
       const ordersData = await orderApi.getOrders();
       setOrders(ordersData);
       
+      // Load material stock for design requirement analysis
+      const materialStockData = await materialInApi.getMaterialIn();
+      setMaterialStock(materialStockData);
+      
       componentLogger.info('Production data loaded successfully', { 
         orderItems: orderItemsData.length,
-        orders: ordersData.length 
+        orders: ordersData.length,
+        materialStock: materialStockData.length 
       });
     } catch (error: any) {
       componentLogger.error('Failed to load production data', error);
@@ -394,8 +400,108 @@ const Production: React.FC = () => {
     
     return stats;
   };
-  
+
+  // Design Requirement Analytics - NEW FEATURE
+  const getDesignRequirementStats = () => {
+    const designStats = {
+      // Overall totals
+      totalCustomers: 0,
+      totalOrderItems: orderItems.length,
+      totalMaterialStock: 0,
+      
+      // Design coverage
+      orderItemsWithDesignReady: 0,
+      designCoverageForOrders: 0,
+      designShortageForOrders: 0,
+      
+      // Material vs Design analysis
+      totalStockNeedingDesigns: 0,
+      designCoverageForStock: 0,
+      designShortageForStock: 0,
+      
+      // Customer-wise breakdown
+      customerBreakdown: new Map<string, any>()
+    };
+
+    // Get unique customers
+    const customerIds = new Set(orders.map(order => order.customer_id));
+    designStats.totalCustomers = customerIds.size;
+
+    // Calculate total material stock
+    designStats.totalMaterialStock = materialStock.reduce((sum, material) => sum + material.quantity, 0);
+
+    // Calculate design coverage for orders
+    designStats.orderItemsWithDesignReady = orderItems.filter(item => {
+      const designStatus = parseDesignStatus(item.customization_details, item);
+      return designStatus === 'design_ready';
+    }).reduce((sum, item) => sum + item.quantity, 0);
+
+    const totalOrderQuantity = orderItems.reduce((sum, item) => sum + item.quantity, 0);
+    designStats.designCoverageForOrders = totalOrderQuantity > 0 ? 
+      (designStats.orderItemsWithDesignReady / totalOrderQuantity) * 100 : 0;
+    designStats.designShortageForOrders = totalOrderQuantity - designStats.orderItemsWithDesignReady;
+
+    // Calculate design coverage for stock
+    designStats.totalStockNeedingDesigns = designStats.totalMaterialStock;
+    designStats.designCoverageForStock = designStats.totalMaterialStock > 0 ? 
+      (designStats.orderItemsWithDesignReady / designStats.totalMaterialStock) * 100 : 0;
+    designStats.designShortageForStock = designStats.totalMaterialStock - designStats.orderItemsWithDesignReady;
+
+    // Customer-wise analysis
+    customerIds.forEach(customerId => {
+      const customer = orders.find(o => o.customer_id === customerId)?.customer;
+      if (!customer) return;
+
+      const customerOrders = orders.filter(o => o.customer_id === customerId);
+      const customerOrderItems = orderItems.filter(item => 
+        customerOrders.some(order => order.id === item.order_id)
+      );
+      const customerMaterials = materialStock.filter(m => m.customer_id === customerId);
+
+      // Calculate per material type
+      const materialTypes = ['saree', 'dupatta', 'voni', 'running_material', 'blouse_material'];
+      const customerStats: any = {
+        customerName: customer.name,
+        materialBreakdown: {}
+      };
+
+      materialTypes.forEach(materialType => {
+        const orderQty = customerOrderItems
+          .filter(item => item.material_type === materialType)
+          .reduce((sum, item) => sum + item.quantity, 0);
+        
+        const stockQty = customerMaterials
+          .filter(m => m.material_type === materialType)
+          .reduce((sum, m) => sum + m.quantity, 0);
+        
+        const designReadyQty = customerOrderItems
+          .filter(item => {
+            const designStatus = parseDesignStatus(item.customization_details, item);
+            return item.material_type === materialType && designStatus === 'design_ready';
+          })
+          .reduce((sum, item) => sum + item.quantity, 0);
+
+        if (orderQty > 0 || stockQty > 0) {
+          customerStats.materialBreakdown[materialType] = {
+            orderQty,
+            stockQty,
+            designReadyQty,
+            designShortageForOrders: Math.max(0, orderQty - designReadyQty),
+            designShortageForStock: Math.max(0, stockQty - designReadyQty),
+            designCoverageOrders: orderQty > 0 ? (designReadyQty / orderQty) * 100 : 0,
+            designCoverageStock: stockQty > 0 ? (designReadyQty / stockQty) * 100 : 0
+          };
+        }
+      });
+
+      designStats.customerBreakdown.set(customerId, customerStats);
+    });
+
+    return designStats;
+  };
+
   const stats = getItemStats();
+  const designRequirementStats = getDesignRequirementStats();
 
   return (
     <Box>
@@ -425,7 +531,183 @@ const Production: React.FC = () => {
         </Alert>
       )}
 
-      {/* Clickable Summary Cards - Your Requested Combinations */}
+      {/* Design Requirement Analytics - NEW FEATURE */}
+      <Typography variant="h5" sx={{ mb: 2 }}>📊 Design Requirement Analytics</Typography>
+      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 2, mb: 4 }}>
+        {/* Design Coverage for Orders */}
+        <Card 
+          sx={{ 
+            bgcolor: designRequirementStats.designCoverageForOrders >= 80 ? 'success.50' : 
+                    designRequirementStats.designCoverageForOrders >= 50 ? 'warning.50' : 'error.50',
+            cursor: 'pointer', 
+            '&:hover': { elevation: 4 } 
+          }}
+          onClick={() => {
+            setDesignStatusFilter('design_ready');
+            setProductionStatusFilter('all');
+          }}
+        >
+          <CardContent>
+            <Typography variant="h6" color="text.secondary" gutterBottom>
+              Design Coverage - Orders
+            </Typography>
+            <Typography variant="h4" fontWeight="bold" 
+              color={designRequirementStats.designCoverageForOrders >= 80 ? 'success.main' : 
+                    designRequirementStats.designCoverageForOrders >= 50 ? 'warning.main' : 'error.main'}>
+              {designRequirementStats.designCoverageForOrders.toFixed(1)}%
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {designRequirementStats.orderItemsWithDesignReady} designs ready of {orderItems.reduce((sum, item) => sum + item.quantity, 0)} ordered items
+            </Typography>
+            {designRequirementStats.designShortageForOrders > 0 && (
+              <Typography variant="body2" color="error.main" sx={{ mt: 1 }}>
+                ⚠️ {designRequirementStats.designShortageForOrders} designs needed
+              </Typography>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Design Coverage for Stock */}
+        <Card 
+          sx={{ 
+            bgcolor: designRequirementStats.designCoverageForStock >= 50 ? 'success.50' : 
+                    designRequirementStats.designCoverageForStock >= 20 ? 'warning.50' : 'error.50',
+            cursor: 'pointer', 
+            '&:hover': { elevation: 4 } 
+          }}
+          onClick={() => {
+            // Show all material stock vs design status
+            setDesignStatusFilter('all');
+            setProductionStatusFilter('all');
+          }}
+        >
+          <CardContent>
+            <Typography variant="h6" color="text.secondary" gutterBottom>
+              Design Coverage - Total Stock
+            </Typography>
+            <Typography variant="h4" fontWeight="bold" 
+              color={designRequirementStats.designCoverageForStock >= 50 ? 'success.main' : 
+                    designRequirementStats.designCoverageForStock >= 20 ? 'warning.main' : 'error.main'}>
+              {designRequirementStats.designCoverageForStock.toFixed(1)}%
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {designRequirementStats.orderItemsWithDesignReady} designs ready of {designRequirementStats.totalMaterialStock} total stock
+            </Typography>
+            {designRequirementStats.designShortageForStock > 0 && (
+              <Typography variant="body2" color="warning.main" sx={{ mt: 1 }}>
+                📋 {designRequirementStats.designShortageForStock} more designs possible
+              </Typography>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Design Shortage Alert */}
+        <Card 
+          sx={{ 
+            bgcolor: designRequirementStats.designShortageForOrders > 0 ? 'error.50' : 'success.50',
+            cursor: 'pointer', 
+            '&:hover': { elevation: 4 } 
+          }}
+          onClick={() => {
+            setDesignStatusFilter('pending_from_customer');
+            setProductionStatusFilter('all');
+          }}
+        >
+          <CardContent>
+            <Typography variant="h6" color="text.secondary" gutterBottom>
+              Priority Design Shortage
+            </Typography>
+            <Typography variant="h4" fontWeight="bold" 
+              color={designRequirementStats.designShortageForOrders > 0 ? 'error.main' : 'success.main'}>
+              {designRequirementStats.designShortageForOrders}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {designRequirementStats.designShortageForOrders > 0 ? 
+                'Designs urgently needed for current orders' : 
+                'All current orders have designs ready!'}
+            </Typography>
+            {designRequirementStats.designShortageForOrders > 0 && (
+              <Typography variant="body2" color="error.main" sx={{ mt: 1 }}>
+                🚨 Action Required
+              </Typography>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Customer Summary */}
+        <Card 
+          sx={{ 
+            bgcolor: 'info.50',
+            cursor: 'pointer', 
+            '&:hover': { elevation: 4 } 
+          }}
+        >
+          <CardContent>
+            <Typography variant="h6" color="text.secondary" gutterBottom>
+              Customer Overview
+            </Typography>
+            <Typography variant="h4" fontWeight="bold" color="info.main">
+              {designRequirementStats.totalCustomers}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Active customers with material/orders
+            </Typography>
+            <Typography variant="body2" color="info.main" sx={{ mt: 1 }}>
+              📈 Click individual cards to filter
+            </Typography>
+          </CardContent>
+        </Card>
+      </Box>
+
+      {/* Customer-wise Design Breakdown */}
+      {designRequirementStats.customerBreakdown.size > 0 && (
+        <>
+          <Typography variant="h6" sx={{ mb: 2 }}>🏢 Customer Design Status Breakdown</Typography>
+          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 2, mb: 4 }}>
+            {Array.from(designRequirementStats.customerBreakdown.entries()).map(([customerId, customerStats]) => (
+              <Card key={customerId} variant="outlined">
+                <CardContent>
+                  <Typography variant="h6" color="primary" gutterBottom>
+                    {customerStats.customerName}
+                  </Typography>
+                  {Object.entries(customerStats.materialBreakdown).map(([materialType, breakdown]: [string, any]) => (
+                    <Box key={materialType} sx={{ mb: 2, p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
+                      <Typography variant="subtitle2" fontWeight="bold" sx={{ textTransform: 'capitalize' }}>
+                        {materialType.replace('_', ' ')}
+                      </Typography>
+                      <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
+                        <Typography variant="body2">
+                          Orders: <strong>{breakdown.orderQty}</strong>
+                        </Typography>
+                        <Typography variant="body2">
+                          Stock: <strong>{breakdown.stockQty}</strong>
+                        </Typography>
+                        <Typography variant="body2">
+                          Designs: <strong>{breakdown.designReadyQty}</strong>
+                        </Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
+                        <Typography variant="body2" 
+                          color={breakdown.designCoverageOrders >= 80 ? 'success.main' : 
+                                breakdown.designCoverageOrders >= 50 ? 'warning.main' : 'error.main'}>
+                          Order Coverage: {breakdown.designCoverageOrders.toFixed(0)}%
+                        </Typography>
+                        {breakdown.designShortageForOrders > 0 && (
+                          <Typography variant="body2" color="error.main">
+                            Need: {breakdown.designShortageForOrders}
+                          </Typography>
+                        )}
+                      </Box>
+                    </Box>
+                  ))}
+                </CardContent>
+              </Card>
+            ))}
+          </Box>
+        </>
+      )}
+
+      {/* Existing Summary Cards - Your Requested Combinations */}
       <Typography variant="h5" sx={{ mb: 2 }}>Design + Fabric Processing Combinations (Click to Filter)</Typography>
       <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 2, mb: 3 }}>
         <Card 
