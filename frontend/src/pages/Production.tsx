@@ -39,8 +39,8 @@ import {
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
-import { OrderItem, Order, ProductionStage, DesignStatus, ProductionStatus, MaterialIn } from '../types';
-import { orderItemApi, orderApi, materialInApi } from '../services/supabaseApi';
+import { OrderItem, Order, ProductionStage, DesignStatus, ProductionStatus, MaterialIn, CustomerDesignSummary } from '../types';
+import { orderItemApi, orderApi, materialInApi, customerDesignApi } from '../services/supabaseApi';
 import { componentLogger } from '../utils/debug';
 import { parseDesignStatus, parseDesignStatusLegacy, parseProductionStatus, getDesignStatusLabel, getProductionStatusLabel } from '../utils/productionUtils';
 
@@ -55,6 +55,8 @@ const designUpdateSchema = yup.object({
   design_status: yup.string().required('Design status is required'),
   design_file_url: yup.string().url('Must be a valid URL'),
   design_notes: yup.string(),
+  designs_provided_quantity: yup.number().min(0, 'Must be 0 or greater').nullable(),
+  designs_approved_quantity: yup.number().min(0, 'Must be 0 or greater').nullable(),
 });
 
 // Form validation schema for production updates
@@ -66,6 +68,7 @@ const Production: React.FC = () => {
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [materialStock, setMaterialStock] = useState<MaterialIn[]>([]);
+  const [customerDesignSummaries, setCustomerDesignSummaries] = useState<CustomerDesignSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   // Clean 2-column filters
@@ -103,6 +106,8 @@ const Production: React.FC = () => {
       design_status: 'pending_from_customer' as DesignStatus,
       design_file_url: '',
       design_notes: '',
+      designs_provided_quantity: 0,
+      designs_approved_quantity: 0,
     },
   });
 
@@ -136,10 +141,15 @@ const Production: React.FC = () => {
       const materialStockData = await materialInApi.getMaterialIn();
       setMaterialStock(materialStockData);
       
+      // Load customer design summaries for stock-wide tracking
+      const customerDesignData = await customerDesignApi.getCustomerDesignSummaries();
+      setCustomerDesignSummaries(customerDesignData);
+      
       componentLogger.info('Production data loaded successfully', { 
         orderItems: orderItemsData.length,
         orders: ordersData.length,
-        materialStock: materialStockData.length 
+        materialStock: materialStockData.length,
+        customerDesignSummaries: customerDesignData.length
       });
     } catch (error: any) {
       componentLogger.error('Failed to load production data', error);
@@ -179,6 +189,8 @@ const Production: React.FC = () => {
       design_status: currentDesignStatus,
       design_file_url: orderItem.design_file_url || '',
       design_notes: orderItem.design_notes || '',
+      designs_provided_quantity: orderItem.designs_provided_quantity || 0,
+      designs_approved_quantity: orderItem.designs_approved_quantity || 0,
     });
     setDesignDialogOpen(true);
   };
@@ -203,6 +215,8 @@ const Production: React.FC = () => {
         {
           design_file_url: data.design_file_url,
           design_notes: data.design_notes,
+          designs_provided_quantity: data.designs_provided_quantity,
+          designs_approved_quantity: data.designs_approved_quantity,
         }
       );
       
@@ -401,7 +415,7 @@ const Production: React.FC = () => {
     return stats;
   };
 
-  // Design Requirement Analytics - NEW FEATURE
+  // Design Requirement Analytics - ENHANCED with actual quantities
   const getDesignRequirementStats = () => {
     const designStats = {
       // Overall totals
@@ -409,8 +423,10 @@ const Production: React.FC = () => {
       totalOrderItems: orderItems.length,
       totalMaterialStock: 0,
       
-      // Design coverage
-      orderItemsWithDesignReady: 0,
+      // Design coverage (using actual quantities now)
+      totalDesignsProvided: 0,
+      totalDesignsApproved: 0,
+      totalOrderQuantity: 0,
       designCoverageForOrders: 0,
       designShortageForOrders: 0,
       
@@ -430,22 +446,20 @@ const Production: React.FC = () => {
     // Calculate total material stock
     designStats.totalMaterialStock = materialStock.reduce((sum, material) => sum + material.quantity, 0);
 
-    // Calculate design coverage for orders
-    designStats.orderItemsWithDesignReady = orderItems.filter(item => {
-      const designStatus = parseDesignStatus(item.customization_details, item);
-      return designStatus === 'design_ready';
-    }).reduce((sum, item) => sum + item.quantity, 0);
-
-    const totalOrderQuantity = orderItems.reduce((sum, item) => sum + item.quantity, 0);
-    designStats.designCoverageForOrders = totalOrderQuantity > 0 ? 
-      (designStats.orderItemsWithDesignReady / totalOrderQuantity) * 100 : 0;
-    designStats.designShortageForOrders = totalOrderQuantity - designStats.orderItemsWithDesignReady;
+    // Calculate design coverage for orders using ACTUAL quantities
+    designStats.totalOrderQuantity = orderItems.reduce((sum, item) => sum + item.quantity, 0);
+    designStats.totalDesignsProvided = orderItems.reduce((sum, item) => sum + (item.designs_provided_quantity || 0), 0);
+    designStats.totalDesignsApproved = orderItems.reduce((sum, item) => sum + (item.designs_approved_quantity || 0), 0);
+    
+    designStats.designCoverageForOrders = designStats.totalOrderQuantity > 0 ? 
+      (designStats.totalDesignsApproved / designStats.totalOrderQuantity) * 100 : 0;
+    designStats.designShortageForOrders = Math.max(0, designStats.totalOrderQuantity - designStats.totalDesignsApproved);
 
     // Calculate design coverage for stock
     designStats.totalStockNeedingDesigns = designStats.totalMaterialStock;
     designStats.designCoverageForStock = designStats.totalMaterialStock > 0 ? 
-      (designStats.orderItemsWithDesignReady / designStats.totalMaterialStock) * 100 : 0;
-    designStats.designShortageForStock = designStats.totalMaterialStock - designStats.orderItemsWithDesignReady;
+      (designStats.totalDesignsApproved / designStats.totalMaterialStock) * 100 : 0;
+    designStats.designShortageForStock = Math.max(0, designStats.totalMaterialStock - designStats.totalDesignsApproved);
 
     // Customer-wise analysis
     customerIds.forEach(customerId => {
@@ -474,22 +488,25 @@ const Production: React.FC = () => {
           .filter(m => m.material_type === materialType)
           .reduce((sum, m) => sum + m.quantity, 0);
         
-        const designReadyQty = customerOrderItems
-          .filter(item => {
-            const designStatus = parseDesignStatus(item.customization_details, item);
-            return item.material_type === materialType && designStatus === 'design_ready';
-          })
-          .reduce((sum, item) => sum + item.quantity, 0);
+        // Use actual design quantities instead of just status
+        const designsProvidedQty = customerOrderItems
+          .filter(item => item.material_type === materialType)
+          .reduce((sum, item) => sum + (item.designs_provided_quantity || 0), 0);
+          
+        const designsApprovedQty = customerOrderItems
+          .filter(item => item.material_type === materialType)
+          .reduce((sum, item) => sum + (item.designs_approved_quantity || 0), 0);
 
         if (orderQty > 0 || stockQty > 0) {
           customerStats.materialBreakdown[materialType] = {
             orderQty,
             stockQty,
-            designReadyQty,
-            designShortageForOrders: Math.max(0, orderQty - designReadyQty),
-            designShortageForStock: Math.max(0, stockQty - designReadyQty),
-            designCoverageOrders: orderQty > 0 ? (designReadyQty / orderQty) * 100 : 0,
-            designCoverageStock: stockQty > 0 ? (designReadyQty / stockQty) * 100 : 0
+            designsProvidedQty,
+            designsApprovedQty,
+            designShortageForOrders: Math.max(0, orderQty - designsApprovedQty),
+            designShortageForStock: Math.max(0, stockQty - designsApprovedQty),
+            designCoverageOrders: orderQty > 0 ? (designsApprovedQty / orderQty) * 100 : 0,
+            designCoverageStock: stockQty > 0 ? (designsApprovedQty / stockQty) * 100 : 0
           };
         }
       });
@@ -557,7 +574,10 @@ const Production: React.FC = () => {
               {designRequirementStats.designCoverageForOrders.toFixed(1)}%
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              {designRequirementStats.orderItemsWithDesignReady} designs ready of {orderItems.reduce((sum, item) => sum + item.quantity, 0)} ordered items
+              {designRequirementStats.totalDesignsApproved} designs approved of {designRequirementStats.totalOrderQuantity} ordered items
+            </Typography>
+            <Typography variant="body2" color="info.main" sx={{ mt: 0.5 }}>
+              📋 {designRequirementStats.totalDesignsProvided} total designs provided by customers
             </Typography>
             {designRequirementStats.designShortageForOrders > 0 && (
               <Typography variant="body2" color="error.main" sx={{ mt: 1 }}>
@@ -591,7 +611,7 @@ const Production: React.FC = () => {
               {designRequirementStats.designCoverageForStock.toFixed(1)}%
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              {designRequirementStats.orderItemsWithDesignReady} designs ready of {designRequirementStats.totalMaterialStock} total stock
+              {designRequirementStats.totalDesignsApproved} designs approved of {designRequirementStats.totalMaterialStock} total stock
             </Typography>
             {designRequirementStats.designShortageForStock > 0 && (
               <Typography variant="body2" color="warning.main" sx={{ mt: 1 }}>
@@ -682,8 +702,11 @@ const Production: React.FC = () => {
                         <Typography variant="body2">
                           Stock: <strong>{breakdown.stockQty}</strong>
                         </Typography>
-                        <Typography variant="body2">
-                          Designs: <strong>{breakdown.designReadyQty}</strong>
+                        <Typography variant="body2" color="info.main">
+                          Provided: <strong>{breakdown.designsProvidedQty}</strong>
+                        </Typography>
+                        <Typography variant="body2" color="success.main">
+                          Approved: <strong>{breakdown.designsApprovedQty}</strong>
                         </Typography>
                       </Box>
                       <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
@@ -694,7 +717,7 @@ const Production: React.FC = () => {
                         </Typography>
                         {breakdown.designShortageForOrders > 0 && (
                           <Typography variant="body2" color="error.main">
-                            Need: {breakdown.designShortageForOrders}
+                            Need: {breakdown.designShortageForOrders} more
                           </Typography>
                         )}
                       </Box>
@@ -1013,6 +1036,7 @@ const Production: React.FC = () => {
                     <TableCell sx={{ minWidth: 150 }}>Customer</TableCell>
                     <TableCell sx={{ minWidth: 100 }}>Material</TableCell>
                     <TableCell sx={{ minWidth: 60 }}>Qty</TableCell>
+                    <TableCell sx={{ minWidth: 100 }}>Design Qty</TableCell>
                     <TableCell sx={{ minWidth: 120 }}>Design Status</TableCell>
                     <TableCell sx={{ minWidth: 120 }}>Production Status</TableCell>
                     <TableCell sx={{ minWidth: 100 }}>Progress</TableCell>
@@ -1089,6 +1113,26 @@ const Production: React.FC = () => {
                           </Typography>
                         </TableCell>
                         <TableCell>{item.quantity}</TableCell>
+                        
+                        {/* Design Quantity Column - NEW FEATURE */}
+                        <TableCell>
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                            <Typography variant="caption" color="text.secondary">
+                              Provided: <strong>{item.designs_provided_quantity || 0}</strong>
+                            </Typography>
+                            <Typography variant="caption" color="success.main">
+                              Approved: <strong>{item.designs_approved_quantity || 0}</strong>
+                            </Typography>
+                            {item.quantity > 0 && (
+                              <Typography 
+                                variant="caption" 
+                                color={(item.designs_approved_quantity || 0) >= item.quantity ? 'success.main' : 
+                                      (item.designs_approved_quantity || 0) >= item.quantity * 0.8 ? 'warning.main' : 'error.main'}>
+                                {Math.round(((item.designs_approved_quantity || 0) / item.quantity) * 100)}% ready
+                              </Typography>
+                            )}
+                          </Box>
+                        </TableCell>
                         
                         {/* Design Status Column */}
                         <TableCell>
@@ -1307,6 +1351,85 @@ const Production: React.FC = () => {
                     </CardContent>
                   </Card>
                 </Box>
+
+                {/* NEW: Design Quantity Tracking Section */}
+                <Card variant="outlined" sx={{ bgcolor: 'info.50', mb: 3 }}>
+                  <CardContent>
+                    <Typography variant="h6" gutterBottom color="primary">
+                      📊 Design Quantity Tracking (NEW FEATURE)
+                    </Typography>
+                    
+                    <Alert severity="info" sx={{ mb: 2 }}>
+                      Track exactly how many designs provided vs needed for <strong>{selectedOrderItem.material_type}</strong> (Order Qty: <strong>{selectedOrderItem.quantity}</strong>)
+                    </Alert>
+                    
+                    <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', sm: 'row' } }}>
+                      <Controller
+                        name="designs_provided_quantity"
+                        control={designControl}
+                        render={({ field }) => (
+                          <TextField
+                            {...field}
+                            type="number"
+                            fullWidth
+                            label="Designs Provided by Customer"
+                            placeholder="0"
+                            inputProps={{ min: 0, max: selectedOrderItem.quantity }}
+                            error={!!designErrors.designs_provided_quantity}
+                            helperText={designErrors.designs_provided_quantity?.message || `How many designs customer provided for this order`}
+                            sx={{ flex: 1 }}
+                          />
+                        )}
+                      />
+                      
+                      <Controller
+                        name="designs_approved_quantity"
+                        control={designControl}
+                        render={({ field }) => (
+                          <TextField
+                            {...field}
+                            type="number"
+                            fullWidth
+                            label="Designs Approved for Production"
+                            placeholder="0"
+                            inputProps={{ min: 0, max: selectedOrderItem.quantity }}
+                            error={!!designErrors.designs_approved_quantity}
+                            helperText={designErrors.designs_approved_quantity?.message || `How many designs approved and ready`}
+                            sx={{ flex: 1 }}
+                          />
+                        )}
+                      />
+                    </Box>
+                    
+                    {/* Design Quantity Analysis */}
+                    <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>
+                      <Typography variant="body2" fontWeight="medium" gutterBottom>
+                        📈 Analysis for this Order:
+                      </Typography>
+                      <Typography variant="body2">
+                        • Ordered Quantity: <strong>{selectedOrderItem.quantity} {selectedOrderItem.material_type}s</strong>
+                      </Typography>
+                      <Typography variant="body2">
+                        • Current Designs Provided: <strong>{selectedOrderItem.designs_provided_quantity || 0}</strong>
+                      </Typography>
+                      <Typography variant="body2">
+                        • Current Designs Approved: <strong>{selectedOrderItem.designs_approved_quantity || 0}</strong>
+                      </Typography>
+                      <Typography variant="body2" color={
+                        (selectedOrderItem.designs_approved_quantity || 0) >= selectedOrderItem.quantity ? 'success.main' : 
+                        (selectedOrderItem.designs_approved_quantity || 0) >= selectedOrderItem.quantity * 0.8 ? 'warning.main' : 'error.main'
+                      }>
+                        • Coverage: <strong>
+                          {selectedOrderItem.quantity > 0 ? 
+                            Math.round(((selectedOrderItem.designs_approved_quantity || 0) / selectedOrderItem.quantity) * 100) : 0
+                          }% 
+                        </strong>
+                        ({(selectedOrderItem.designs_approved_quantity || 0) >= selectedOrderItem.quantity ? '✅ Complete' : 
+                          `⚠️ Need ${selectedOrderItem.quantity - (selectedOrderItem.designs_approved_quantity || 0)} more`})
+                      </Typography>
+                    </Box>
+                  </CardContent>
+                </Card>
 
                 <Controller
                   name="design_file_url"

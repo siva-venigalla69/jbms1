@@ -2,7 +2,7 @@
 // Replaces the FastAPI backend with Supabase client calls
 
 import { supabase, supabaseHelpers, businessHelpers, TABLES } from '../lib/supabase'
-import type { Customer, Order, OrderItem, User, MaterialIn, DeliveryChallan, DeliveryChallanCreate, GST_Invoice, GST_InvoiceCreate, Payment, ReturnItem, InventoryItem, Expense, StageStockSummary } from '../types'
+import type { Customer, Order, OrderItem, User, MaterialIn, DeliveryChallan, DeliveryChallanCreate, GST_Invoice, GST_InvoiceCreate, Payment, ReturnItem, InventoryItem, Expense, StageStockSummary, CustomerDesignSummary } from '../types'
 import { apiLogger, performance, componentLogger } from '../utils/debug'
 import { auditTrail, logOrderCreated, logMaterialReceived, logPaymentReceived, logInvoiceGenerated } from './auditTrailService'
 import { /* filterItemsByStageAndDesign, */ groupItemsByStageAndDesignStatus, parseDesignStatus, parseProductionStatus } from '../utils/productionUtils'
@@ -777,6 +777,8 @@ export const orderItemApi = {
   updateDesignStatus: async (id: string, designStatus: string, designData?: {
     design_file_url?: string;
     design_notes?: string;
+    designs_provided_quantity?: number;
+    designs_approved_quantity?: number;
   }): Promise<OrderItem> => {
     return withApiLogging('orderItem.updateDesignStatus', async () => {
       // Get the existing order item for audit logging (audit logging currently disabled)
@@ -804,6 +806,11 @@ export const orderItemApi = {
         updateData.design_status = designStatus;
         if (designData?.design_file_url) updateData.design_file_url = designData.design_file_url;
         if (designData?.design_notes) updateData.design_notes = designData.design_notes;
+        if (designData?.designs_provided_quantity !== undefined) updateData.designs_provided_quantity = designData.designs_provided_quantity;
+        if (designData?.designs_approved_quantity !== undefined) updateData.designs_approved_quantity = designData.designs_approved_quantity;
+        if (designData?.designs_provided_quantity !== undefined || designData?.designs_approved_quantity !== undefined) {
+          updateData.design_last_updated = new Date().toISOString();
+        }
         
         const { data, error } = await supabaseHelpers.update(TABLES.ORDER_ITEMS, id, updateData);
         
@@ -860,6 +867,101 @@ export const orderItemApi = {
   // Keep the old function for backward compatibility
   updateDesignInfo: async (id: string, designData: any): Promise<OrderItem> => {
     return orderItemApi.updateDesignStatus(id, designData);
+  }
+}
+
+// Customer Design Summary API - NEW FEATURE
+export const customerDesignApi = {
+  getCustomerDesignSummaries: async (customerId?: string): Promise<CustomerDesignSummary[]> => {
+    return withApiLogging('customerDesign.getCustomerDesignSummaries', async () => {
+      let query = supabase
+        .from('customer_design_summary')
+        .select(`
+          *,
+          customer:customers(id, name, phone, email)
+        `)
+        .order('last_updated', { ascending: false });
+
+      if (customerId) {
+        query = query.eq('customer_id', customerId);
+      }
+
+      const { data, error } = await query;
+      if (error) throw new Error(error.message);
+      
+      return data || [];
+    }, { customerId });
+  },
+
+  updateCustomerDesignSummary: async (
+    customerId: string, 
+    materialType: string, 
+    designData: {
+      total_designs_provided?: number;
+      total_designs_approved?: number;
+      total_material_received?: number;
+    }
+  ): Promise<CustomerDesignSummary> => {
+    return withApiLogging('customerDesign.updateCustomerDesignSummary', async () => {
+      const updateData: any = {
+        ...designData,
+        last_updated: new Date().toISOString()
+      };
+
+      const { data, error } = await supabase
+        .from('customer_design_summary')
+        .upsert({
+          customer_id: customerId,
+          material_type: materialType,
+          ...updateData
+        })
+        .select(`
+          *,
+          customer:customers(id, name, phone, email)
+        `)
+        .single();
+
+      if (error) throw new Error(error.message);
+      return data;
+    }, { customerId, materialType, designData });
+  },
+
+  getDesignRequirementAnalytics: async (): Promise<{
+    totalCustomers: number;
+    totalOrderItems: number;
+    totalMaterialStock: number;
+    designCoverageForOrders: number;
+    designCoverageForStock: number;
+    customerBreakdown: CustomerDesignSummary[];
+  }> => {
+    return withApiLogging('customerDesign.getDesignRequirementAnalytics', async () => {
+      // Get customer design summaries
+      const summaries = await customerDesignApi.getCustomerDesignSummaries();
+      
+      // Get order items for detailed analysis
+      const orderItems = await orderItemApi.getProductionStatus();
+      
+      const analytics = {
+        totalCustomers: new Set(summaries.map(s => s.customer_id)).size,
+        totalOrderItems: orderItems.length,
+        totalMaterialStock: summaries.reduce((sum, s) => sum + s.total_material_received, 0),
+        designCoverageForOrders: 0,
+        designCoverageForStock: 0,
+        customerBreakdown: summaries
+      };
+
+      // Calculate coverage percentages
+      const totalOrderQuantity = orderItems.reduce((sum, item) => sum + item.quantity, 0);
+      const totalDesignsApproved = orderItems.reduce((sum, item) => sum + (item.designs_approved_quantity || 0), 0);
+      
+      analytics.designCoverageForOrders = totalOrderQuantity > 0 ? 
+        (totalDesignsApproved / totalOrderQuantity) * 100 : 0;
+      
+      analytics.designCoverageForStock = analytics.totalMaterialStock > 0 ? 
+        (summaries.reduce((sum, s) => sum + s.total_designs_approved, 0) / analytics.totalMaterialStock) * 100 : 0;
+
+      return analytics;
+    });
   }
 }
 

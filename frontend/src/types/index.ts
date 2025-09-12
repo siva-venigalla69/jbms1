@@ -91,6 +91,11 @@ export interface OrderItem {
     design_notes?: string;
     created_at: string;
     
+    // NEW: Design quantity tracking
+    designs_provided_quantity?: number;  // How many designs customer provided for this order item
+    designs_approved_quantity?: number;  // How many designs approved for production
+    design_last_updated?: string;        // When design quantities were last updated
+    
     // @deprecated - Legacy columns for backward compatibility
     customization_details?: string;
     current_stage?: ProductionStage;
@@ -182,6 +187,28 @@ export interface MaterialOut {
     notes?: string;
     created_at: string;
     order?: Order;
+}
+
+// NEW: Customer-level design summary for stock-wide tracking
+export interface CustomerDesignSummary {
+    id: string;
+    customer_id: string;
+    material_type: MaterialType;
+    
+    // Material tracking
+    total_material_received: number;
+    total_material_allocated: number;
+    available_material: number;  // Computed field
+    
+    // Design tracking
+    total_designs_provided: number;
+    total_designs_approved: number;
+    total_designs_used: number;
+    available_designs: number;  // Computed field
+    design_shortage_for_stock: number;  // Computed field
+    
+    last_updated: string;
+    customer?: Customer;
 }
 
 
