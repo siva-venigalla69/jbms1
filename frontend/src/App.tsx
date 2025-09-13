@@ -29,6 +29,11 @@ import DesignerDashboard from './pages/DesignerDashboard';
 import DesignerWorkload from './pages/DesignerWorkload';
 import DesignLibrary from './pages/DesignLibrary';
 import MyAssignments from './pages/MyAssignments';
+import APITester from './pages/APITester';
+import Employees from './pages/Employees';
+import Payroll from './pages/Payroll';
+import Expenses from './pages/Expenses';
+import Purchases from './pages/Purchases';
 // import SchemaAnalysis from './pages/SchemaAnalysis'; // Commented out - not required for business operations
 import './utils/debugDatabase'; // Import debug database helpers
 import './utils/loginDebugHelper'; // Import login debug helpers
@@ -268,6 +273,70 @@ function App() {
                 <ProtectedRoute>
                   <Layout>
                     <GSTInvoices />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+
+            {/* API Testing Route */}
+            <Route
+              path="/api-tester"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <APITester />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+
+            {/* New Module Routes - Full UI Implementation */}
+            <Route
+              path="/employees"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Employees />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/payroll"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Payroll />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/expenses"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Expenses />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/purchases"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Purchases />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/payments"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <APITester />
                   </Layout>
                 </ProtectedRoute>
               }
