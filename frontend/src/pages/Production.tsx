@@ -71,6 +71,7 @@ const assignmentCreateSchema = yup.object({
   priority_level: yup.string().required('Priority level is required'),
   expected_delivery_date: yup.string().required('Expected delivery date is required'),
   estimated_hours: yup.number().min(0.5, 'Must be at least 0.5 hours').required('Estimated hours is required'),
+  assigned_design_quantity: yup.number().min(1, 'Must assign at least 1 design').required('Design quantity is required'),
   assignment_notes: yup.string(),
 });
 
@@ -96,6 +97,9 @@ const Production: React.FC = () => {
   const [assignmentDialogOpen, setAssignmentDialogOpen] = useState(false);
   const [selectedOrderItem, setSelectedOrderItem] = useState<OrderItem | null>(null);
   const [designerWorkloads, setDesignerWorkloads] = useState<any[]>([]);
+  const [designAssignmentSummary, setDesignAssignmentSummary] = useState<any>(null);
+  const [existingAssignments, setExistingAssignments] = useState<any[]>([]);
+  const [allAssignmentSummaries, setAllAssignmentSummaries] = useState<Map<string, any>>(new Map());
 
   // const form = useForm({
   //   resolver: yupResolver(productionUpdateSchema),
@@ -149,9 +153,43 @@ const Production: React.FC = () => {
       priority_level: 'normal',
       expected_delivery_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 days from now
       estimated_hours: 2.0,
+      assigned_design_quantity: 1,
       assignment_notes: '',
     },
   });
+
+  const loadAssignmentSummaries = async (orderItems: OrderItem[]) => {
+    try {
+      const summaries = await Promise.all(
+        orderItems.map(async (item) => {
+          try {
+            const summary = await designerApi.getDesignAssignmentSummary(item.id);
+            return { orderItemId: item.id, summary };
+          } catch (error) {
+            // Return default summary if API call fails
+            return {
+              orderItemId: item.id,
+              summary: {
+                order_item_id: item.id,
+                designs_approved_quantity: item.designs_approved_quantity || 0,
+                total_assigned_designs: 0,
+                unassigned_designs: item.designs_approved_quantity || 0,
+                number_of_designers: 0
+              }
+            };
+          }
+        })
+      );
+
+      const summaryMap = new Map();
+      summaries.forEach(({ orderItemId, summary }) => {
+        summaryMap.set(orderItemId, summary);
+      });
+      setAllAssignmentSummaries(summaryMap);
+    } catch (error) {
+      console.error('Failed to load assignment summaries:', error);
+    }
+  };
 
   const loadProductionData = useCallback(async () => {
     componentLogger.info('Loading production data...');
@@ -177,6 +215,9 @@ const Production: React.FC = () => {
       // Load designer workloads for assignment creation
       const designerWorkloadData = await designerApi.getDesignerWorkloads();
       setDesignerWorkloads(designerWorkloadData);
+      
+      // Load assignment summaries for all order items
+      await loadAssignmentSummaries(orderItemsData);
       
       componentLogger.info('Production data loaded successfully', { 
         orderItems: orderItemsData.length,
@@ -238,15 +279,52 @@ const Production: React.FC = () => {
     setFabricStageDialogOpen(true);
   };
 
-  const handleAssignmentCreate = (orderItem: OrderItem) => {
+  const handleAssignmentCreate = async (orderItem: OrderItem) => {
     setSelectedOrderItem(orderItem);
-    assignmentReset({
-      designer_id: '',
-      priority_level: 'normal',
-      expected_delivery_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      estimated_hours: 2.0,
-      assignment_notes: '',
-    });
+    
+    try {
+      // Load design assignment summary and existing assignments
+      const [summary, assignments] = await Promise.all([
+        designerApi.getDesignAssignmentSummary(orderItem.id).catch(() => ({
+          order_item_id: orderItem.id,
+          designs_approved_quantity: orderItem.designs_approved_quantity || 0,
+          total_assigned_designs: 0,
+          unassigned_designs: orderItem.designs_approved_quantity || 0,
+          number_of_designers: 0,
+          designer_assignments: []
+        })),
+        designerApi.getOrderItemAssignments(orderItem.id).catch(() => [])
+      ]);
+      
+      setDesignAssignmentSummary(summary);
+      setExistingAssignments(assignments);
+      
+      const maxAssignable = summary.unassigned_designs || (orderItem.designs_approved_quantity || 1);
+      
+      assignmentReset({
+        designer_id: '',
+        priority_level: 'normal',
+        expected_delivery_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        estimated_hours: 2.0,
+        assigned_design_quantity: Math.min(maxAssignable, 1),
+        assignment_notes: '',
+      });
+      
+    } catch (error) {
+      console.error('Failed to load assignment data:', error);
+      // Set defaults if loading fails
+      setDesignAssignmentSummary(null);
+      setExistingAssignments([]);
+      assignmentReset({
+        designer_id: '',
+        priority_level: 'normal',
+        expected_delivery_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        estimated_hours: 2.0,
+        assigned_design_quantity: 1,
+        assignment_notes: '',
+      });
+    }
+    
     setAssignmentDialogOpen(true);
   };
 
@@ -301,12 +379,15 @@ const Production: React.FC = () => {
         priority_level: data.priority_level,
         expected_delivery_date: data.expected_delivery_date,
         estimated_hours: data.estimated_hours,
+        assigned_design_quantity: data.assigned_design_quantity,
         assignment_notes: data.assignment_notes,
       });
       
-      setSuccess(`Design assignment created successfully (ID: ${assignmentId})`);
+      setSuccess(`Design assignment created successfully! Assigned ${data.assigned_design_quantity} design(s) to designer.`);
       setAssignmentDialogOpen(false);
       setSelectedOrderItem(null);
+      setDesignAssignmentSummary(null);
+      setExistingAssignments([]);
       loadProductionData();
     } catch (error: any) {
       setError('Failed to create assignment: ' + error.message);
@@ -1191,6 +1272,33 @@ const Production: React.FC = () => {
                             <Typography variant="caption" color="success.main">
                               Approved: <strong>{item.designs_approved_quantity || 0}</strong>
                             </Typography>
+                            {(() => {
+                              const assignmentSummary = allAssignmentSummaries.get(item.id);
+                              if (assignmentSummary && (item.designs_approved_quantity || 0) > 0) {
+                                const totalAssigned = assignmentSummary.total_assigned_designs || 0;
+                                const unassigned = assignmentSummary.unassigned_designs || 0;
+                                const designerCount = assignmentSummary.number_of_designers || 0;
+                                
+                                return (
+                                  <>
+                                    <Typography variant="caption" color="primary.main">
+                                      Assigned: <strong>{totalAssigned}</strong>
+                                    </Typography>
+                                    {unassigned > 0 && (
+                                      <Typography variant="caption" color="warning.main">
+                                        Unassigned: <strong>{unassigned}</strong>
+                                      </Typography>
+                                    )}
+                                    {designerCount > 0 && (
+                                      <Typography variant="caption" color="info.main">
+                                        {designerCount} designer{designerCount > 1 ? 's' : ''}
+                                      </Typography>
+                                    )}
+                                  </>
+                                );
+                              }
+                              return null;
+                            })()}
                             {item.quantity > 0 && (
                               <Typography 
                                 variant="caption" 
@@ -1560,11 +1668,63 @@ const Production: React.FC = () => {
           <DialogContent>
             {selectedOrderItem && (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                <Alert severity="info">
-                  Creating assignment for: {selectedOrderItem.material_type} (Qty: {selectedOrderItem.quantity})
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  Creating assignment for: <strong>{selectedOrderItem.material_type}</strong> (Order Qty: {selectedOrderItem.quantity})
                   <br />
                   Order: {orders.find(o => o.order_items?.some(oi => oi.id === selectedOrderItem.id))?.order_number || 'Unknown'}
                 </Alert>
+
+                {/* Design Allocation Summary */}
+                {designAssignmentSummary && (
+                  <Card variant="outlined" sx={{ bgcolor: 'primary.50', mb: 2 }}>
+                    <CardContent sx={{ py: 2 }}>
+                      <Typography variant="subtitle2" sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                        📊 Design Allocation Status
+                      </Typography>
+                      <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                        <Chip 
+                          label={`${designAssignmentSummary.designs_approved_quantity || 0} Designs Available`} 
+                          color="info" 
+                          variant="outlined" 
+                        />
+                        <Chip 
+                          label={`${designAssignmentSummary.total_assigned_designs || 0} Already Assigned`} 
+                          color="warning" 
+                          variant="outlined" 
+                        />
+                        <Chip 
+                          label={`${designAssignmentSummary.unassigned_designs || 0} Unassigned`} 
+                          color={designAssignmentSummary.unassigned_designs > 0 ? 'success' : 'error'} 
+                          variant="filled" 
+                        />
+                        <Chip 
+                          label={`${designAssignmentSummary.number_of_designers || 0} Designer(s)`} 
+                          color="default" 
+                          variant="outlined" 
+                        />
+                      </Box>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Existing Assignments Display */}
+                {existingAssignments.length > 0 && (
+                  <Card variant="outlined" sx={{ bgcolor: 'grey.50', mb: 2 }}>
+                    <CardContent sx={{ py: 2 }}>
+                      <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                        👥 Existing Assignments ({existingAssignments.length})
+                      </Typography>
+                      {existingAssignments.map((assignment, index) => (
+                        <Box key={assignment.id} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5 }}>
+                          <Typography variant="body2">
+                            Designer {index + 1}: {assignment.assigned_design_quantity} design(s)
+                          </Typography>
+                          <Chip label={assignment.status} size="small" variant="outlined" />
+                        </Box>
+                      ))}
+                    </CardContent>
+                  </Card>
+                )}
 
                 <Controller
                   name="designer_id"
@@ -1665,6 +1825,40 @@ const Production: React.FC = () => {
                       helperText={assignmentErrors.estimated_hours?.message || "Hours needed to complete this design work"}
                     />
                   )}
+                />
+
+                <Controller
+                  name="assigned_design_quantity"
+                  control={assignmentControl}
+                  render={({ field }) => {
+                    const maxAvailable = designAssignmentSummary?.unassigned_designs || 1;
+                    const isOverMax = field.value && field.value > maxAvailable;
+                    
+                    return (
+                      <TextField
+                        {...field}
+                        fullWidth
+                        type="number"
+                        label="Design Quantity"
+                        inputProps={{ 
+                          min: 1, 
+                          max: maxAvailable,
+                          step: 1 
+                        }}
+                        error={!!assignmentErrors.assigned_design_quantity || !!isOverMax}
+                        helperText={
+                          isOverMax 
+                            ? `Cannot exceed ${maxAvailable} available designs`
+                            : assignmentErrors.assigned_design_quantity?.message || 
+                              `Number of designs to assign (Available: ${maxAvailable})`
+                        }
+                        onChange={(e) => {
+                          const value = parseInt(e.target.value) || 0;
+                          field.onChange(Math.min(value, maxAvailable));
+                        }}
+                      />
+                    );
+                  }}
                 />
 
                 <Controller

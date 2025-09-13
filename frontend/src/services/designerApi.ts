@@ -103,6 +103,7 @@ interface CreateAssignmentRequest {
   estimated_hours?: number;
   design_library_id?: string;
   assignment_notes?: string;
+  assigned_design_quantity?: number;
 }
 
 export const designerApi = {
@@ -190,6 +191,7 @@ export const designerApi = {
         estimated_hours: assignment.estimated_hours || 2.0,
         design_library_id: assignment.design_library_id || null,
         assignment_notes: assignment.assignment_notes || null,
+        assigned_design_quantity: assignment.assigned_design_quantity || 1,
         status: 'assigned'
       })
       .select('id')
@@ -580,6 +582,53 @@ export const designerApi = {
     }
 
     componentLogger.info('Time tracking history fetched successfully', { count: data?.length });
+    return data || [];
+  },
+
+  // Design Assignment Quantity APIs
+  async getDesignAssignmentSummary(orderItemId: string): Promise<any> {
+    componentLogger.info('Fetching design assignment summary...', { orderItemId });
+    
+    const { data, error } = await supabase
+      .from('design_assignment_summary')
+      .select('*')
+      .eq('order_item_id', orderItemId)
+      .single();
+
+    if (error) {
+      componentLogger.error('Failed to fetch design assignment summary', error);
+      throw new Error(`Failed to fetch design assignment summary: ${error.message}`);
+    }
+
+    componentLogger.info('Design assignment summary fetched successfully');
+    return data;
+  },
+
+  async getOrderItemAssignments(orderItemId: string): Promise<any[]> {
+    componentLogger.info('Fetching order item assignments...', { orderItemId });
+    
+    const { data, error } = await supabase
+      .from('designer_assignments')
+      .select(`
+        id,
+        designer_id,
+        assigned_design_quantity,
+        status,
+        priority_level,
+        expected_delivery_date,
+        estimated_hours,
+        assignment_notes,
+        created_at
+      `)
+      .eq('order_item_id', orderItemId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      componentLogger.error('Failed to fetch order item assignments', error);
+      throw new Error(`Failed to fetch order item assignments: ${error.message}`);
+    }
+
+    componentLogger.info('Order item assignments fetched successfully', { count: data?.length });
     return data || [];
   },
 };
