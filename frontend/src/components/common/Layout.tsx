@@ -61,6 +61,7 @@ const menuItems = [
     { text: 'Designer Dashboard', icon: <Assignment />, path: '/designer-dashboard' },
     { text: 'Designer Workload', icon: <Person />, path: '/designer-workload' },
     { text: 'Design Library', icon: <PaletteOutlined />, path: '/design-library' },
+    { text: 'My Assignments', icon: <Assignment />, path: '/my-assignments' },
     // End Designer Section
     // { text: 'Schema Analysis', icon: <Schema />, path: '/schema-analysis' }, // Commented out - not needed for business operations
     { text: 'Materials', icon: <Palette />, path: '/materials' },

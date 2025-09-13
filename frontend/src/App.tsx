@@ -28,6 +28,7 @@ import DebugPanel from './components/debug/DebugPanel';
 import DesignerDashboard from './pages/DesignerDashboard';
 import DesignerWorkload from './pages/DesignerWorkload';
 import DesignLibrary from './pages/DesignLibrary';
+import MyAssignments from './pages/MyAssignments';
 // import SchemaAnalysis from './pages/SchemaAnalysis'; // Commented out - not required for business operations
 import './utils/debugDatabase'; // Import debug database helpers
 import './utils/loginDebugHelper'; // Import login debug helpers
@@ -141,6 +142,16 @@ function App() {
                 <ProtectedRoute>
                   <Layout>
                     <DesignLibrary />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/my-assignments"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <MyAssignments />
                   </Layout>
                 </ProtectedRoute>
               }

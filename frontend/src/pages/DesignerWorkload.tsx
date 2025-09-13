@@ -28,6 +28,8 @@ import {
   Badge,
   Tooltip,
   Divider,
+  InputAdornment,
+  Grid,
 } from '@mui/material';
 import {
   Person,
@@ -42,6 +44,9 @@ import {
   Add,
   Refresh,
   PieChart,
+  Search,
+  DateRange,
+  Clear,
 } from '@mui/icons-material';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -106,6 +111,14 @@ const DesignerWorkload: React.FC = () => {
   const [bulkAssignDialogOpen, setBulkAssignDialogOpen] = useState(false);
   const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
   const [selectedAssignments, setSelectedAssignments] = useState<string[]>([]);
+  
+  // Advanced filtering state
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [priorityFilter, setPriorityFilter] = useState<string>('all');
+  const [urgencyFilter, setUrgencyFilter] = useState<string>('all');
+  const [fromDate, setFromDate] = useState<string>('');
+  const [toDate, setToDate] = useState<string>('');
 
   // Forms
   const reassignForm = useForm({
@@ -239,12 +252,40 @@ const DesignerWorkload: React.FC = () => {
 
   // Helper functions
   const getFilteredAssignments = () => {
-    return selectedDesigner 
+    let filtered = selectedDesigner 
       ? assignments.filter(a => 
           designerWorkloads.find(d => d.designer_id === selectedDesigner)?.designer_email === 
           designerWorkloads.find(d => d.designer_name === a.designer_name)?.designer_email
         )
       : assignments;
+
+    // Apply advanced filters
+    filtered = filtered.filter(assignment => {
+      // Search filter
+      const matchesSearch = !searchTerm || 
+        assignment.order_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        assignment.customer_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        assignment.material_type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        assignment.designer_name?.toLowerCase().includes(searchTerm.toLowerCase());
+
+      // Status filter
+      const matchesStatus = statusFilter === 'all' || assignment.status === statusFilter;
+
+      // Priority filter
+      const matchesPriority = priorityFilter === 'all' || assignment.priority_level === priorityFilter;
+
+      // Urgency filter
+      const matchesUrgency = urgencyFilter === 'all' || assignment.urgency_status === urgencyFilter;
+
+      // Date range filter
+      const assignmentDate = new Date(assignment.expected_delivery_date);
+      const matchesFromDate = !fromDate || assignmentDate >= new Date(fromDate);
+      const matchesToDate = !toDate || assignmentDate <= new Date(toDate + 'T23:59:59');
+
+      return matchesSearch && matchesStatus && matchesPriority && matchesUrgency && matchesFromDate && matchesToDate;
+    });
+
+    return filtered;
   };
 
   const getWorkloadColor = (hours: number) => {
@@ -479,6 +520,147 @@ const DesignerWorkload: React.FC = () => {
                   </Button>
                 )}
               </Box>
+
+              {/* Advanced Filters */}
+              <Card variant="outlined" sx={{ mb: 3, bgcolor: 'grey.50' }}>
+                <CardContent>
+                  <Typography variant="subtitle2" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Search />
+                    Advanced Filters
+                  </Typography>
+                  
+                  <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 2 }}>
+                    <Box sx={{ flex: '2 1 200px', minWidth: 200 }}>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        placeholder="Search assignments..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        InputProps={{
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <Search />
+                            </InputAdornment>
+                          ),
+                        }}
+                      />
+                    </Box>
+                    
+                    <Box sx={{ flex: '1 1 150px', minWidth: 150 }}>
+                      <FormControl fullWidth size="small">
+                        <InputLabel>Status</InputLabel>
+                        <Select
+                          value={statusFilter}
+                          onChange={(e) => setStatusFilter(e.target.value)}
+                          label="Status"
+                        >
+                          <MenuItem value="all">All Statuses</MenuItem>
+                          <MenuItem value="assigned">Assigned</MenuItem>
+                          <MenuItem value="in_progress">In Progress</MenuItem>
+                          <MenuItem value="completed">Completed</MenuItem>
+                          <MenuItem value="on_hold">On Hold</MenuItem>
+                        </Select>
+                      </FormControl>
+                    </Box>
+                    
+                    <Box sx={{ flex: '1 1 150px', minWidth: 150 }}>
+                      <FormControl fullWidth size="small">
+                        <InputLabel>Priority</InputLabel>
+                        <Select
+                          value={priorityFilter}
+                          onChange={(e) => setPriorityFilter(e.target.value)}
+                          label="Priority"
+                        >
+                          <MenuItem value="all">All Priorities</MenuItem>
+                          <MenuItem value="urgent">Urgent</MenuItem>
+                          <MenuItem value="high">High</MenuItem>
+                          <MenuItem value="normal">Normal</MenuItem>
+                          <MenuItem value="low">Low</MenuItem>
+                        </Select>
+                      </FormControl>
+                    </Box>
+                    
+                    <Box sx={{ flex: '1 1 150px', minWidth: 150 }}>
+                      <FormControl fullWidth size="small">
+                        <InputLabel>Urgency</InputLabel>
+                        <Select
+                          value={urgencyFilter}
+                          onChange={(e) => setUrgencyFilter(e.target.value)}
+                          label="Urgency"
+                        >
+                          <MenuItem value="all">All</MenuItem>
+                          <MenuItem value="overdue">Overdue</MenuItem>
+                          <MenuItem value="due_today">Due Today</MenuItem>
+                          <MenuItem value="due_tomorrow">Due Tomorrow</MenuItem>
+                          <MenuItem value="upcoming">Upcoming</MenuItem>
+                        </Select>
+                      </FormControl>
+                    </Box>
+                    
+                    <Box sx={{ flex: '1 1 140px', minWidth: 140 }}>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        type="date"
+                        label="From Date"
+                        value={fromDate}
+                        onChange={(e) => setFromDate(e.target.value)}
+                        InputLabelProps={{ shrink: true }}
+                        InputProps={{
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <DateRange />
+                            </InputAdornment>
+                          ),
+                        }}
+                      />
+                    </Box>
+                    
+                    <Box sx={{ flex: '1 1 140px', minWidth: 140 }}>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        type="date"
+                        label="To Date"
+                        value={toDate}
+                        onChange={(e) => setToDate(e.target.value)}
+                        InputLabelProps={{ shrink: true }}
+                        InputProps={{
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <DateRange />
+                            </InputAdornment>
+                          ),
+                        }}
+                      />
+                    </Box>
+                  </Box>
+                  
+                  {(searchTerm || statusFilter !== 'all' || priorityFilter !== 'all' || urgencyFilter !== 'all' || fromDate || toDate) && (
+                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', justifyContent: 'center', pt: 1 }}>
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        startIcon={<Clear />}
+                        onClick={() => {
+                          setSearchTerm('');
+                          setStatusFilter('all');
+                          setPriorityFilter('all');
+                          setUrgencyFilter('all');
+                          setFromDate('');
+                          setToDate('');
+                        }}
+                      >
+                        Clear All Filters
+                      </Button>
+                      <Typography variant="caption" color="text.secondary">
+                        Showing {filteredAssignments.length} of {assignments.length} assignments
+                      </Typography>
+                    </Box>
+                  )}
+                </CardContent>
+              </Card>
 
               {filteredAssignments.length === 0 ? (
                 <Box sx={{ textAlign: 'center', py: 4 }}>

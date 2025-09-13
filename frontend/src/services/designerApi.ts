@@ -499,6 +499,89 @@ export const designerApi = {
     componentLogger.info('Designer performance fetched successfully');
     return data;
   },
+
+  // Time Tracking APIs
+  async logTime(assignmentId: string, hoursWorked: number, notes?: string): Promise<void> {
+    componentLogger.info('Logging time for assignment...', { assignmentId, hoursWorked, notes });
+    
+    const { error } = await supabase.rpc('log_assignment_time', {
+      p_assignment_id: assignmentId,
+      p_hours_worked: hoursWorked,
+      p_work_notes: notes || null
+    });
+
+    if (error) {
+      componentLogger.error('Failed to log time', error);
+      throw new Error(`Failed to log time: ${error.message}`);
+    }
+
+    componentLogger.info('Time logged successfully');
+  },
+
+  async startTimeTracking(assignmentId: string): Promise<void> {
+    componentLogger.info('Starting time tracking...', { assignmentId });
+    
+    const { error } = await supabase.rpc('start_time_tracking', {
+      p_assignment_id: assignmentId
+    });
+
+    if (error) {
+      componentLogger.error('Failed to start time tracking', error);
+      throw new Error(`Failed to start time tracking: ${error.message}`);
+    }
+
+    componentLogger.info('Time tracking started successfully');
+  },
+
+  async pauseTimeTracking(assignmentId: string): Promise<void> {
+    componentLogger.info('Pausing time tracking...', { assignmentId });
+    
+    const { error } = await supabase.rpc('pause_time_tracking', {
+      p_assignment_id: assignmentId
+    });
+
+    if (error) {
+      componentLogger.error('Failed to pause time tracking', error);
+      throw new Error(`Failed to pause time tracking: ${error.message}`);
+    }
+
+    componentLogger.info('Time tracking paused successfully');
+  },
+
+  async stopTimeTracking(assignmentId: string, notes?: string): Promise<number> {
+    componentLogger.info('Stopping time tracking...', { assignmentId, notes });
+    
+    const { data, error } = await supabase.rpc('stop_time_tracking', {
+      p_assignment_id: assignmentId,
+      p_work_notes: notes || null
+    });
+
+    if (error) {
+      componentLogger.error('Failed to stop time tracking', error);
+      throw new Error(`Failed to stop time tracking: ${error.message}`);
+    }
+
+    componentLogger.info('Time tracking stopped successfully', { hoursLogged: data });
+    return data || 0;
+  },
+
+  async getTimeTrackingHistory(assignmentId: string): Promise<any[]> {
+    componentLogger.info('Fetching time tracking history...', { assignmentId });
+    
+    const { data, error } = await supabase
+      .from('assignment_time_logs')
+      .select('*')
+      .eq('assignment_id', assignmentId)
+      .order('logged_at', { ascending: false });
+
+    if (error) {
+      componentLogger.error('Failed to fetch time tracking history', error);
+      throw new Error(`Failed to fetch time tracking history: ${error.message}`);
+    }
+
+    componentLogger.info('Time tracking history fetched successfully', { count: data?.length });
+    return data || [];
+  },
 };
 
 export default designerApi;

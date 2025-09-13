@@ -35,12 +35,13 @@ import {
   Factory,
   Visibility,
   Clear,
+  PersonAdd,
 } from '@mui/icons-material';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { OrderItem, Order, ProductionStage, DesignStatus, ProductionStatus, MaterialIn, CustomerDesignSummary } from '../types';
-import { orderItemApi, orderApi, materialInApi, customerDesignApi } from '../services/supabaseApi';
+import { orderItemApi, orderApi, materialInApi, customerDesignApi, designerApi } from '../services/supabaseApi';
 import { componentLogger } from '../utils/debug';
 import { parseDesignStatus, parseDesignStatusLegacy, parseProductionStatus, getDesignStatusLabel, getProductionStatusLabel } from '../utils/productionUtils';
 
@@ -64,6 +65,15 @@ const productionStatusUpdateSchema = yup.object({
   production_status: yup.string().required('Production status is required'),
 });
 
+// Form validation schema for assignment creation
+const assignmentCreateSchema = yup.object({
+  designer_id: yup.string().required('Designer is required'),
+  priority_level: yup.string().required('Priority level is required'),
+  expected_delivery_date: yup.string().required('Expected delivery date is required'),
+  estimated_hours: yup.number().min(0.5, 'Must be at least 0.5 hours').required('Estimated hours is required'),
+  assignment_notes: yup.string(),
+});
+
 const Production: React.FC = () => {
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -83,7 +93,9 @@ const Production: React.FC = () => {
   const [success, setSuccess] = useState<string | null>(null);
   const [fabricStageDialogOpen, setFabricStageDialogOpen] = useState(false);
   const [designDialogOpen, setDesignDialogOpen] = useState(false);
+  const [assignmentDialogOpen, setAssignmentDialogOpen] = useState(false);
   const [selectedOrderItem, setSelectedOrderItem] = useState<OrderItem | null>(null);
+  const [designerWorkloads, setDesignerWorkloads] = useState<any[]>([]);
 
   // const form = useForm({
   //   resolver: yupResolver(productionUpdateSchema),
@@ -124,6 +136,23 @@ const Production: React.FC = () => {
     },
   });
 
+  // Assignment creation form
+  const { 
+    control: assignmentControl, 
+    handleSubmit: handleAssignmentSubmit, 
+    reset: assignmentReset, 
+    formState: { errors: assignmentErrors, isSubmitting: isAssignmentSubmitting } 
+  } = useForm({
+    resolver: yupResolver(assignmentCreateSchema),
+    defaultValues: {
+      designer_id: '',
+      priority_level: 'normal',
+      expected_delivery_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 days from now
+      estimated_hours: 2.0,
+      assignment_notes: '',
+    },
+  });
+
   const loadProductionData = useCallback(async () => {
     componentLogger.info('Loading production data...');
     try {
@@ -145,11 +174,16 @@ const Production: React.FC = () => {
       const customerDesignData = await customerDesignApi.getCustomerDesignSummaries();
       setCustomerDesignSummaries(customerDesignData);
       
+      // Load designer workloads for assignment creation
+      const designerWorkloadData = await designerApi.getDesignerWorkloads();
+      setDesignerWorkloads(designerWorkloadData);
+      
       componentLogger.info('Production data loaded successfully', { 
         orderItems: orderItemsData.length,
         orders: ordersData.length,
         materialStock: materialStockData.length,
-        customerDesignSummaries: customerDesignData.length
+        customerDesignSummaries: customerDesignData.length,
+        designerWorkloads: designerWorkloadData.length
       });
     } catch (error: any) {
       componentLogger.error('Failed to load production data', error);
@@ -204,6 +238,18 @@ const Production: React.FC = () => {
     setFabricStageDialogOpen(true);
   };
 
+  const handleAssignmentCreate = (orderItem: OrderItem) => {
+    setSelectedOrderItem(orderItem);
+    assignmentReset({
+      designer_id: '',
+      priority_level: 'normal',
+      expected_delivery_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      estimated_hours: 2.0,
+      assignment_notes: '',
+    });
+    setAssignmentDialogOpen(true);
+  };
+
   const onDesignSubmit = async (data: any) => {
     if (!selectedOrderItem) return;
 
@@ -242,6 +288,28 @@ const Production: React.FC = () => {
       loadProductionData();
     } catch (error: any) {
       setError('Failed to update production status: ' + error.message);
+    }
+  };
+
+  const onAssignmentSubmit = async (data: any) => {
+    if (!selectedOrderItem) return;
+    try {
+      // Create design assignment
+      const assignmentId = await designerApi.createAssignment({
+        order_item_id: selectedOrderItem.id,
+        designer_id: data.designer_id,
+        priority_level: data.priority_level,
+        expected_delivery_date: data.expected_delivery_date,
+        estimated_hours: data.estimated_hours,
+        assignment_notes: data.assignment_notes,
+      });
+      
+      setSuccess(`Design assignment created successfully (ID: ${assignmentId})`);
+      setAssignmentDialogOpen(false);
+      setSelectedOrderItem(null);
+      loadProductionData();
+    } catch (error: any) {
+      setError('Failed to create assignment: ' + error.message);
     }
   };
 
@@ -1178,6 +1246,14 @@ const Production: React.FC = () => {
                             >
                               <Factory />
                             </IconButton>
+                            <IconButton 
+                              size="small" 
+                              onClick={() => handleAssignmentCreate(item)}
+                              title="Create Design Assignment"
+                              color="secondary"
+                            >
+                              <PersonAdd />
+                            </IconButton>
                           </Box>
                         </TableCell>
                       </TableRow>
@@ -1467,6 +1543,153 @@ const Production: React.FC = () => {
             <Button onClick={() => setDesignDialogOpen(false)}>Cancel</Button>
             <Button type="submit" variant="contained" disabled={isDesignSubmitting}>
               {isDesignSubmitting ? 'Updating...' : 'Update Design'}
+            </Button>
+          </DialogActions>
+        </form>
+      </Dialog>
+
+      {/* Assignment Creation Dialog */}
+      <Dialog open={assignmentDialogOpen} onClose={() => setAssignmentDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <PersonAdd />
+            <Typography variant="h6">Create Design Assignment</Typography>
+          </Box>
+        </DialogTitle>
+        <form onSubmit={handleAssignmentSubmit(onAssignmentSubmit)}>
+          <DialogContent>
+            {selectedOrderItem && (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                <Alert severity="info">
+                  Creating assignment for: {selectedOrderItem.material_type} (Qty: {selectedOrderItem.quantity})
+                  <br />
+                  Order: {orders.find(o => o.order_items?.some(oi => oi.id === selectedOrderItem.id))?.order_number || 'Unknown'}
+                </Alert>
+
+                <Controller
+                  name="designer_id"
+                  control={assignmentControl}
+                  render={({ field }) => (
+                    <FormControl fullWidth error={!!assignmentErrors.designer_id}>
+                      <InputLabel>Assign to Designer</InputLabel>
+                      <Select {...field} label="Assign to Designer">
+                        {designerWorkloads.map((designer) => (
+                          <MenuItem key={designer.designer_id} value={designer.designer_id}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
+                              <Box sx={{ flex: 1 }}>
+                                <Typography variant="body2">
+                                  {designer.designer_name || designer.designer_email}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  Workload: {designer.pending_hours}h • {designer.pending_assignments} pending
+                                </Typography>
+                              </Box>
+                              <Chip
+                                label={designer.pending_hours > 30 ? 'Busy' : 'Available'}
+                                color={designer.pending_hours > 30 ? 'error' : designer.pending_hours > 20 ? 'warning' : 'success'}
+                                size="small"
+                              />
+                            </Box>
+                          </MenuItem>
+                        ))}
+                      </Select>
+                      {assignmentErrors.designer_id && (
+                        <Typography variant="caption" color="error">
+                          {assignmentErrors.designer_id.message}
+                        </Typography>
+                      )}
+                    </FormControl>
+                  )}
+                />
+
+                <Controller
+                  name="priority_level"
+                  control={assignmentControl}
+                  render={({ field }) => (
+                    <FormControl fullWidth error={!!assignmentErrors.priority_level}>
+                      <InputLabel>Priority Level</InputLabel>
+                      <Select {...field} label="Priority Level">
+                        <MenuItem value="urgent">
+                          <Chip label="URGENT" color="error" size="small" />
+                          <Typography sx={{ ml: 1 }}>Urgent</Typography>
+                        </MenuItem>
+                        <MenuItem value="high">
+                          <Chip label="HIGH" color="warning" size="small" />
+                          <Typography sx={{ ml: 1 }}>High</Typography>
+                        </MenuItem>
+                        <MenuItem value="normal">
+                          <Chip label="NORMAL" color="info" size="small" />
+                          <Typography sx={{ ml: 1 }}>Normal</Typography>
+                        </MenuItem>
+                        <MenuItem value="low">
+                          <Chip label="LOW" color="default" size="small" />
+                          <Typography sx={{ ml: 1 }}>Low</Typography>
+                        </MenuItem>
+                      </Select>
+                      {assignmentErrors.priority_level && (
+                        <Typography variant="caption" color="error">
+                          {assignmentErrors.priority_level.message}
+                        </Typography>
+                      )}
+                    </FormControl>
+                  )}
+                />
+
+                <Controller
+                  name="expected_delivery_date"
+                  control={assignmentControl}
+                  render={({ field }) => (
+                    <TextField
+                      {...field}
+                      fullWidth
+                      type="date"
+                      label="Expected Delivery Date"
+                      InputLabelProps={{ shrink: true }}
+                      error={!!assignmentErrors.expected_delivery_date}
+                      helperText={assignmentErrors.expected_delivery_date?.message}
+                    />
+                  )}
+                />
+
+                <Controller
+                  name="estimated_hours"
+                  control={assignmentControl}
+                  render={({ field }) => (
+                    <TextField
+                      {...field}
+                      fullWidth
+                      type="number"
+                      label="Estimated Hours"
+                      inputProps={{ min: 0.5, step: 0.5 }}
+                      error={!!assignmentErrors.estimated_hours}
+                      helperText={assignmentErrors.estimated_hours?.message || "Hours needed to complete this design work"}
+                    />
+                  )}
+                />
+
+                <Controller
+                  name="assignment_notes"
+                  control={assignmentControl}
+                  render={({ field }) => (
+                    <TextField
+                      {...field}
+                      fullWidth
+                      label="Assignment Notes (Optional)"
+                      multiline
+                      rows={3}
+                      placeholder="Special instructions, requirements, or notes for the designer..."
+                      error={!!assignmentErrors.assignment_notes}
+                      helperText={assignmentErrors.assignment_notes?.message}
+                    />
+                  )}
+                />
+              </Box>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setAssignmentDialogOpen(false)}>Cancel</Button>
+            <Button type="submit" variant="contained" disabled={isAssignmentSubmitting}>
+              {isAssignmentSubmitting ? 'Creating Assignment...' : 'Create Assignment'}
             </Button>
           </DialogActions>
         </form>
