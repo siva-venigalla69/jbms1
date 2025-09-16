@@ -2521,3 +2521,6 @@ export const gstInvoiceApi = {
 
 // Export designer API for use in components
 export { designerApi }
+
+// Export production batch API
+export { productionBatchApi } from './productionBatchApi';

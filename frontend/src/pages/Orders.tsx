@@ -27,6 +27,8 @@ import {
   IconButton,
   Autocomplete,
   Divider,
+  Tabs,
+  Tab,
 } from '@mui/material';
 import {
   Add,
@@ -38,6 +40,11 @@ import {
   Edit,
   Visibility,
   DateRange,
+  Factory,
+  Palette,
+  Assignment,
+  CheckCircle,
+  Schedule,
 } from '@mui/icons-material';
 import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -45,6 +52,8 @@ import * as yup from 'yup';
 import { Order, Customer } from '../types';
 import { orderApi, orderItemApi, customerApi } from '../services/supabaseApi';
 import { componentLogger } from '../utils/debug';
+import ProductionBatchList from '../components/ProductionBatchList';
+import CreateProductionBatchDialog from '../components/CreateProductionBatchDialog';
 
 // Form validation schema
 const orderCreateSchema = yup.object({
@@ -104,6 +113,10 @@ const Orders: React.FC = () => {
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [activeTab, setActiveTab] = useState(0);
+  const [createBatchDialogOpen, setCreateBatchDialogOpen] = useState(false);
+  const [selectedOrderForBatch, setSelectedOrderForBatch] = useState<string | null>(null);
+  const [selectedOrderItemForBatch, setSelectedOrderItemForBatch] = useState<string | null>(null);
 
   // Create order form
   const { control, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm({
@@ -441,14 +454,14 @@ const Orders: React.FC = () => {
 
   const handleDeleteOrder = async (orderId: string, orderNumber: string) => {
     componentLogger.info('Deleting order', { orderId, orderNumber });
-    
+
     // Show confirmation dialog
     const confirmed = window.confirm(
       `Are you sure you want to delete order ${orderNumber}? This action cannot be undone.`
     );
-    
+
     if (!confirmed) return;
-    
+
     try {
       await orderApi.deleteOrder(orderId);
       setSuccess(`Order ${orderNumber} deleted successfully`);
@@ -459,16 +472,47 @@ const Orders: React.FC = () => {
     }
   };
 
+  const handleCreateBatch = (orderId?: string, orderItemId?: string) => {
+    setSelectedOrderForBatch(orderId || null);
+    setSelectedOrderItemForBatch(orderItemId || null);
+    setCreateBatchDialogOpen(true);
+  };
+
+  const handleCreateBatchSuccess = () => {
+    setSuccess('Production batch created successfully');
+    setCreateBatchDialogOpen(false);
+    setSelectedOrderForBatch(null);
+    setSelectedOrderItemForBatch(null);
+    // Refresh the production batches by switching tab or triggering refresh
+  };
+
+  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    setActiveTab(newValue);
+  };
+
   return (
     <Box>
       {/* Header */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h4" fontWeight="bold">
-          Order Management
+          Order & Production Management
         </Typography>
-        <Button variant="contained" startIcon={<Add />} onClick={handleCreateOrder} sx={{ px: 3 }}>
-          Create Order
-        </Button>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <Button variant="outlined" startIcon={<Factory />} onClick={() => handleCreateBatch()} sx={{ px: 3 }}>
+            Create Batch
+          </Button>
+          <Button variant="contained" startIcon={<Add />} onClick={handleCreateOrder} sx={{ px: 3 }}>
+            Create Order
+          </Button>
+        </Box>
+      </Box>
+
+      {/* Tabs Navigation */}
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+        <Tabs value={activeTab} onChange={handleTabChange}>
+          <Tab label="Orders" />
+          <Tab label="Production Batches" />
+        </Tabs>
       </Box>
 
       {/* Alerts */}
@@ -483,8 +527,11 @@ const Orders: React.FC = () => {
         </Alert>
       )}
 
-      {/* Summary Cards - Clickable Status Filters */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 3, mb: 3 }}>
+      {/* Tab Panels */}
+      {activeTab === 0 && (
+        <>
+          {/* Summary Cards - Clickable Status Filters */}
+          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 3, mb: 3 }}>
         <Card 
           sx={{ 
             cursor: 'pointer', 
@@ -837,22 +884,30 @@ const Orders: React.FC = () => {
                       <TableCell>{order.order_items?.length || 0} items</TableCell>
                       <TableCell>
                         <Box sx={{ display: 'flex', gap: 1 }}>
-                          <IconButton 
-                            size="small" 
+                          <IconButton
+                            size="small"
                             onClick={() => handleViewOrder(order.id)}
                             title="View Order Details"
                           >
                             <Visibility />
                           </IconButton>
-                          <IconButton 
-                            size="small" 
+                          <IconButton
+                            size="small"
                             onClick={() => handleEditOrder(order.id)}
                             title="Edit Order"
                           >
                             <Edit />
                           </IconButton>
-                          <IconButton 
-                            size="small" 
+                          <IconButton
+                            size="small"
+                            onClick={() => handleCreateBatch(order.id)}
+                            title="Create Production Batch"
+                            sx={{ color: 'primary.main' }}
+                          >
+                            <Factory />
+                          </IconButton>
+                          <IconButton
+                            size="small"
                             onClick={() => handleDeleteOrder(order.id, order.order_number)}
                             title="Delete Order"
                             sx={{ color: 'error.main' }}
@@ -869,6 +924,16 @@ const Orders: React.FC = () => {
           )}
         </CardContent>
       </Card>
+        </>
+      )}
+
+      {/* Production Batches Tab */}
+      {activeTab === 1 && (
+        <ProductionBatchList
+          onCreateBatch={() => handleCreateBatch()}
+          title="All Production Batches"
+        />
+      )}
 
       {/* Create Order Dialog */}
       <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="md" fullWidth>
@@ -1388,6 +1453,15 @@ const Orders: React.FC = () => {
           </DialogActions>
         </form>
       </Dialog>
+
+      {/* Create Production Batch Dialog */}
+      <CreateProductionBatchDialog
+        open={createBatchDialogOpen}
+        onClose={() => setCreateBatchDialogOpen(false)}
+        onSuccess={handleCreateBatchSuccess}
+        preSelectedOrderId={selectedOrderForBatch || undefined}
+        preSelectedOrderItemId={selectedOrderItemForBatch || undefined}
+      />
     </Box>
   );
 };

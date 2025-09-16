@@ -45,9 +45,10 @@ export interface CustomerUpdate extends Partial<CustomerCreate> { }
 
 // Order types
 export type MaterialType = 'saree' | 'dupatta' | 'voni' | 'running_material' | 'blouse_material';
-export type OrderStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
+export type OrderStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled' | 'partially_delivered' | 'in_production';
 export type DesignStatus = 'pending_from_customer' | 'design_received_from_customer' | 'design_ready';
-export type ProductionStatus = 'pending' | 'pre_treatment' | 'printing' | 'post_process';
+export type ProductionStatus = 'pending' | 'pre_treatment' | 'printing' | 'post_process' | 'completed';
+export type ProductionBatchStatus = 'planned' | 'in_progress' | 'completed' | 'delivered' | 'cancelled';
 // @deprecated - Use DesignStatus and ProductionStatus instead
 export type ProductionStage = 'design_pending' | 'design_ready' | 'pre_treatment' | 'printing' | 'post_process';
 
@@ -138,6 +139,111 @@ export interface OrderCreate {
     status?: OrderStatus;
     notes?: string;
     order_items: OrderItemCreate[];
+}
+
+// Production Batch types
+export interface ProductionBatch {
+    id: string;
+    production_batch_number: string;
+    order_id: string;
+    order_item_id: string;
+
+    // Production Details
+    material_type: MaterialType;
+    planned_quantity: number;
+    actual_quantity?: number;
+
+    // Design Information
+    design_status: DesignStatus;
+    design_file_url?: string;
+    design_notes?: string;
+
+    // Production Workflow Status
+    production_status: ProductionStatus;
+    batch_status: ProductionBatchStatus;
+
+    // Stage Completion Tracking
+    pre_treatment_started_at?: string;
+    pre_treatment_completed_at?: string;
+    pre_treatment_completed_by?: string;
+
+    printing_started_at?: string;
+    printing_completed_at?: string;
+    printing_completed_by?: string;
+
+    post_process_started_at?: string;
+    post_process_completed_at?: string;
+    post_process_completed_by?: string;
+
+    // Batch Management
+    priority: 'low' | 'medium' | 'high' | 'urgent';
+    planned_start_date: string;
+    planned_completion_date?: string;
+    actual_start_date?: string;
+    actual_completion_date?: string;
+
+    // Quality & Notes
+    quality_rating?: number;
+    production_notes?: string;
+    issues_encountered?: string;
+
+    // Delivery Tracking
+    delivery_challan_id?: string;
+    delivered_quantity?: number;
+    delivery_date?: string;
+
+    // Audit
+    created_at: string;
+    updated_at: string;
+    created_by?: string;
+
+    // Related entities
+    order?: Order;
+    order_item?: OrderItem;
+}
+
+export interface ProductionBatchCreate {
+    order_id: string;
+    order_item_id: string;
+    planned_quantity: number;
+    material_type: MaterialType;
+    design_status?: DesignStatus;
+    production_status?: ProductionStatus;
+    priority?: 'low' | 'medium' | 'high' | 'urgent';
+    planned_start_date: string;
+    planned_completion_date?: string;
+    design_notes?: string;
+    production_notes?: string;
+}
+
+export interface ProductionBatchUpdate {
+    planned_quantity?: number;
+    actual_quantity?: number;
+    design_status?: DesignStatus;
+    design_file_url?: string;
+    design_notes?: string;
+    production_status?: ProductionStatus;
+    batch_status?: ProductionBatchStatus;
+    priority?: 'low' | 'medium' | 'high' | 'urgent';
+    planned_completion_date?: string;
+    actual_start_date?: string;
+    actual_completion_date?: string;
+    quality_rating?: number;
+    production_notes?: string;
+    issues_encountered?: string;
+}
+
+export interface ProductionBatchFilter {
+    order_id?: string;
+    order_item_id?: string;
+    material_type?: MaterialType | 'all';
+    design_status?: DesignStatus | 'all';
+    production_status?: ProductionStatus | 'all';
+    batch_status?: ProductionBatchStatus | 'all';
+    priority?: 'low' | 'medium' | 'high' | 'urgent' | 'all';
+    customer_id?: string;
+    from_date?: string;
+    to_date?: string;
 }
 
 // API Response types

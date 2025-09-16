@@ -338,7 +338,8 @@ export const getNextProductionStatus = (currentStatus: ProductionStatus): Produc
     'pending': 'pre_treatment',
     'pre_treatment': 'printing',
     'printing': 'post_process',
-    'post_process': null
+    'post_process': 'completed',
+    'completed': null
   }
   
   return statusFlow[currentStatus] || null
