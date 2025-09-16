@@ -35,7 +35,6 @@ import {
     Edit,
     Delete,
     MoreVert,
-    Person,
     Phone,
     Email,
     Business,
@@ -132,10 +131,17 @@ const Employees: React.FC = () => {
     const onSubmit = async (data: CreateEmployeeRequest) => {
         try {
             setLoading(true);
+            
+            // Clean data - convert empty strings to undefined for UUID fields
+            const cleanedData = {
+                ...data,
+                reporting_manager_id: data.reporting_manager_id || undefined,
+            };
+
             if (editingEmployee) {
-                await employeeApi.updateEmployee(editingEmployee.id, data);
+                await employeeApi.updateEmployee(editingEmployee.id, cleanedData);
             } else {
-                await employeeApi.createEmployee(data);
+                await employeeApi.createEmployee(cleanedData);
             }
             await loadEmployees();
             handleCloseDialog();

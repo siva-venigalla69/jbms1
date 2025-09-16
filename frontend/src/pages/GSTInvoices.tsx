@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Card,
@@ -38,6 +39,10 @@ import {
   Error as ErrorIcon,
   Schedule,
   CurrencyRupee,
+  Print,
+  PictureAsPdf,
+  DateRange,
+  LocalShipping,
 } from '@mui/icons-material';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -45,6 +50,7 @@ import * as yup from 'yup';
 import { GST_Invoice, Customer, Order } from '../types';
 import { gstInvoiceApi, customerApi, orderApi } from '../services/supabaseApi';
 import { componentLogger } from '../utils/debug';
+import PrintService, { PrintConfig } from '../services/printService';
 
 // Form validation schema
 const invoiceCreateSchema = yup.object({
@@ -70,12 +76,15 @@ const invoiceEditSchema = yup.object({
 });
 
 const GSTInvoices: React.FC = () => {
+  const navigate = useNavigate();
   const [invoices, setInvoices] = useState<GST_Invoice[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -205,6 +214,10 @@ const GSTInvoices: React.FC = () => {
     }
   };
 
+  const handleCreateFromDeliveryChallan = () => {
+    navigate('/challans');
+  };
+
   const handleViewInvoice = async (invoiceId: string) => {
     componentLogger.info('Viewing GST invoice details', { invoiceId });
     try {
@@ -289,8 +302,129 @@ const GSTInvoices: React.FC = () => {
       invoice.customer?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       invoice.order?.order_number?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = !statusFilter || invoice.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    
+    // Date filtering
+    const invoiceDate = new Date(invoice.invoice_date);
+    const matchesFromDate = !fromDate || invoiceDate >= new Date(fromDate);
+    const matchesToDate = !toDate || invoiceDate <= new Date(toDate + 'T23:59:59');
+    
+    return matchesSearch && matchesStatus && matchesFromDate && matchesToDate;
   });
+
+  // Print Functions
+  const handlePrintInvoice = useCallback(async (invoice: GST_Invoice) => {
+    try {
+      // Create a default item since GST_Invoice doesn't have line_items property
+      const invoiceItems = [
+        {
+          description: `Invoice: ${invoice.invoice_number}`,
+          quantity: 1,
+          unit_price: invoice.subtotal,
+          line_total: invoice.subtotal
+        }
+      ];
+      const itemsWithIndex = invoiceItems.map((item, index) => ({
+        ...item,
+        index: index + 1
+      }));
+
+      PrintService.generateInvoicePDF({
+        ...invoice,
+        customer_name: invoice.customer?.name || 'Unknown Customer'
+      }, itemsWithIndex);
+      
+      setSuccess('Invoice PDF generated successfully!');
+    } catch (error: any) {
+      setError('Failed to generate invoice PDF: ' + error.message);
+    }
+  }, []);
+
+  const handlePrintInvoiceDirect = useCallback(async (invoice: GST_Invoice) => {
+    try {
+      // Create a default item since GST_Invoice doesn't have line_items property
+      const invoiceItems = [
+        {
+          description: `Invoice: ${invoice.invoice_number}`,
+          quantity: 1,
+          unit_price: invoice.subtotal,
+          line_total: invoice.subtotal
+        }
+      ];
+      const itemsWithIndex = invoiceItems.map((item, index) => ({
+        ...item,
+        index: index + 1
+      }));
+
+      const config: PrintConfig = {
+        title: `GST INVOICE`,
+        subtitle: `Invoice No: ${invoice.invoice_number} | Date: ${new Date(invoice.invoice_date).toLocaleDateString('en-IN')}`,
+        data: itemsWithIndex,
+        columns: [
+          { header: 'S.No', dataKey: 'index', align: 'center' },
+          { header: 'Description', dataKey: 'description' },
+          { header: 'Qty', dataKey: 'quantity', align: 'right', format: 'number' },
+          { header: 'Rate', dataKey: 'unit_price', align: 'right', format: 'currency' },
+          { header: 'Amount', dataKey: 'line_total', align: 'right', format: 'currency' }
+        ],
+        summary: [
+          { label: 'Subtotal', value: invoice.subtotal, format: 'currency' },
+          { label: 'GST (18%)', value: invoice.tax_amount, format: 'currency' },
+          { label: 'Total Amount', value: invoice.total_amount, format: 'currency' }
+        ],
+        footer: `Customer: ${invoice.customer?.name || 'Unknown'} | Due Date: ${new Date(invoice.due_date || '').toLocaleDateString('en-IN')}`
+      };
+
+      PrintService.printDocument(config);
+      setSuccess('Invoice sent to printer!');
+    } catch (error: any) {
+      setError('Failed to print invoice: ' + error.message);
+    }
+  }, []);
+
+  const handlePrintInvoiceStatement = useCallback(() => {
+    try {
+      if (filteredInvoices.length === 0) {
+        setError('No invoices found for the selected criteria');
+        return;
+      }
+
+      const config: PrintConfig = {
+        title: `INVOICE STATEMENT`,
+        subtitle: `Total Invoices: ${filteredInvoices.length}`,
+        dateRange: fromDate && toDate ? { from: fromDate, to: toDate } : undefined,
+        data: filteredInvoices.map((invoice, index) => ({
+          index: index + 1,
+          invoice_number: invoice.invoice_number,
+          invoice_date: invoice.invoice_date,
+          customer_name: invoice.customer?.name || 'Unknown',
+          status: invoice.status.toUpperCase(),
+          subtotal: invoice.subtotal,
+          tax_amount: invoice.tax_amount,
+          total_amount: invoice.total_amount
+        })),
+        columns: [
+          { header: 'S.No', dataKey: 'index', align: 'center' },
+          { header: 'Invoice No', dataKey: 'invoice_number' },
+          { header: 'Date', dataKey: 'invoice_date', format: 'date' },
+          { header: 'Customer', dataKey: 'customer_name' },
+          { header: 'Status', dataKey: 'status', align: 'center' },
+          { header: 'Subtotal', dataKey: 'subtotal', align: 'right', format: 'currency' },
+          { header: 'Tax', dataKey: 'tax_amount', align: 'right', format: 'currency' },
+          { header: 'Total', dataKey: 'total_amount', align: 'right', format: 'currency' }
+        ],
+        summary: [
+          { label: 'Total Invoices', value: filteredInvoices.length, format: 'number' },
+          { label: 'Total Value', value: filteredInvoices.reduce((sum, inv) => sum + inv.total_amount, 0), format: 'currency' },
+          { label: 'Total Tax', value: filteredInvoices.reduce((sum, inv) => sum + inv.tax_amount, 0), format: 'currency' }
+        ]
+      };
+
+      PrintService.generatePDF(config);
+      setSuccess('Invoice statement generated successfully!');
+    } catch (error: any) {
+      setError('Failed to generate invoice statement: ' + error.message);
+    }
+  }, [filteredInvoices, fromDate, toDate]);
 
   const statusOptions = ['draft', 'sent', 'paid', 'overdue'];
 
@@ -306,9 +440,18 @@ const GSTInvoices: React.FC = () => {
         <Typography variant="h4" fontWeight="bold">
           GST Invoices
         </Typography>
-        <Button variant="contained" startIcon={<Add />} onClick={handleCreateInvoice} sx={{ px: 3 }}>
-          Create Invoice
-        </Button>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <Button
+            variant="outlined"
+            startIcon={<LocalShipping />}
+            onClick={handleCreateFromDeliveryChallan}
+          >
+            From Delivery Challan
+          </Button>
+          <Button variant="contained" startIcon={<Add />} onClick={handleCreateInvoice} sx={{ px: 3 }}>
+            Create Invoice
+          </Button>
+        </Box>
       </Box>
 
       {/* Alerts */}
@@ -370,7 +513,7 @@ const GSTInvoices: React.FC = () => {
       {/* Search and Filters */}
       <Card sx={{ mb: 3 }}>
         <CardContent>
-          <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', md: 'row' } }}>
+          <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', md: 'row' }, mb: 2 }}>
             <Box sx={{ flex: 2 }}>
               <TextField
                 fullWidth
@@ -402,6 +545,56 @@ const GSTInvoices: React.FC = () => {
                   ))}
                 </Select>
               </FormControl>
+            </Box>
+          </Box>
+          
+          {/* Date Range Filters */}
+          <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', md: 'row' }, alignItems: 'center' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1 }}>
+              <DateRange sx={{ color: 'text.secondary' }} />
+              <TextField
+                label="From Date"
+                type="date"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+                size="small"
+                sx={{ minWidth: 150 }}
+              />
+              <TextField
+                label="To Date"
+                type="date"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+                size="small"
+                sx={{ minWidth: 150 }}
+              />
+            </Box>
+            
+            {/* Print Statement Button */}
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button
+                variant="outlined"
+                startIcon={<PictureAsPdf />}
+                onClick={handlePrintInvoiceStatement}
+                disabled={filteredInvoices.length === 0}
+                size="small"
+              >
+                Generate Statement
+              </Button>
+              {(fromDate || toDate) && (
+                <Button
+                  variant="text"
+                  onClick={() => {
+                    setFromDate('');
+                    setToDate('');
+                  }}
+                  size="small"
+                >
+                  Clear Dates
+                </Button>
+              )}
             </Box>
           </Box>
         </CardContent>
@@ -491,6 +684,22 @@ const GSTInvoices: React.FC = () => {
                             title="Edit Invoice"
                           >
                             <Edit />
+                          </IconButton>
+                          <IconButton 
+                            size="small" 
+                            onClick={() => handlePrintInvoice(invoice)}
+                            title="Generate PDF"
+                            color="primary"
+                          >
+                            <PictureAsPdf />
+                          </IconButton>
+                          <IconButton 
+                            size="small" 
+                            onClick={() => handlePrintInvoiceDirect(invoice)}
+                            title="Print Invoice"
+                            color="secondary"
+                          >
+                            <Print />
                           </IconButton>
                         </Box>
                       </TableCell>

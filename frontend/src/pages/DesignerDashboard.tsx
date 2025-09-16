@@ -35,11 +35,9 @@ import {
   CheckCircle,
   Schedule,
   TrendingUp,
-  Visibility,
   Edit,
   PlayArrow,
   Pause,
-  Stop,
   Refresh,
 } from '@mui/icons-material';
 import { useForm, Controller } from 'react-hook-form';

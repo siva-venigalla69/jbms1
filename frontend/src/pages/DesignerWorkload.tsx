@@ -29,21 +29,14 @@ import {
   Tooltip,
   Divider,
   InputAdornment,
-  Grid,
 } from '@mui/material';
 import {
   Person,
   Assignment,
-  Schedule,
   TrendingUp,
   Warning,
-  CheckCircle,
   SwapHoriz,
-  Visibility,
-  Edit,
-  Add,
   Refresh,
-  PieChart,
   Search,
   DateRange,
   Clear,
@@ -55,7 +48,7 @@ import { designerApi } from '../services/supabaseApi';
 import { componentLogger } from '../utils/debug';
 
 // Types
-interface DesignerWorkload {
+interface DesignerWorkloadData {
   designer_id: string;
   designer_email: string;
   designer_name: string;
@@ -71,7 +64,7 @@ interface DesignerWorkload {
   total_completed: number;
 }
 
-interface Assignment {
+interface AssignmentData {
   assignment_id: string;
   order_item_id: string;
   order_number: string;
@@ -101,15 +94,15 @@ const bulkAssignSchema = yup.object({
 
 const DesignerWorkload: React.FC = () => {
   // State
-  const [designerWorkloads, setDesignerWorkloads] = useState<DesignerWorkload[]>([]);
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [designerWorkloads, setDesignerWorkloads] = useState<DesignerWorkloadData[]>([]);
+  const [assignments, setAssignments] = useState<AssignmentData[]>([]);
   const [selectedDesigner, setSelectedDesigner] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [reassignDialogOpen, setReassignDialogOpen] = useState(false);
   const [bulkAssignDialogOpen, setBulkAssignDialogOpen] = useState(false);
-  const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
+  const [selectedAssignment, setSelectedAssignment] = useState<AssignmentData | null>(null);
   const [selectedAssignments, setSelectedAssignments] = useState<string[]>([]);
   
   // Advanced filtering state
@@ -179,7 +172,7 @@ const DesignerWorkload: React.FC = () => {
   }, [error, success]);
 
   // Handle reassignment
-  const handleReassign = (assignment: Assignment) => {
+  const handleReassign = (assignment: AssignmentData) => {
     setSelectedAssignment(assignment);
     reassignForm.reset({
       new_designer_id: '',

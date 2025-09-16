@@ -40,16 +40,10 @@ import {
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
-import { OrderItem, Order, ProductionStage, DesignStatus, ProductionStatus, MaterialIn, CustomerDesignSummary } from '../types';
+import { OrderItem, Order, ProductionStage, DesignStatus, ProductionStatus, MaterialIn } from '../types';
 import { orderItemApi, orderApi, materialInApi, customerDesignApi, designerApi } from '../services/supabaseApi';
 import { componentLogger } from '../utils/debug';
 import { parseDesignStatus, parseDesignStatusLegacy, parseProductionStatus, getDesignStatusLabel, getProductionStatusLabel } from '../utils/productionUtils';
-
-// Form validation schema for updating production stage
-const productionUpdateSchema = yup.object({
-  stage: yup.string().required('Production stage is required'),
-  notes: yup.string(),
-});
 
 // Form validation schema for design updates
 const designUpdateSchema = yup.object({
@@ -79,7 +73,6 @@ const Production: React.FC = () => {
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [materialStock, setMaterialStock] = useState<MaterialIn[]>([]);
-  const [customerDesignSummaries, setCustomerDesignSummaries] = useState<CustomerDesignSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   // Clean 2-column filters
@@ -210,7 +203,6 @@ const Production: React.FC = () => {
       
       // Load customer design summaries for stock-wide tracking
       const customerDesignData = await customerDesignApi.getCustomerDesignSummaries();
-      setCustomerDesignSummaries(customerDesignData);
       
       // Load designer workloads for assignment creation
       const designerWorkloadData = await designerApi.getDesignerWorkloads();
@@ -373,7 +365,7 @@ const Production: React.FC = () => {
     if (!selectedOrderItem) return;
     try {
       // Create design assignment
-      const assignmentId = await designerApi.createAssignment({
+      await designerApi.createAssignment({
         order_item_id: selectedOrderItem.id,
         designer_id: data.designer_id,
         priority_level: data.priority_level,
@@ -428,23 +420,6 @@ const Production: React.FC = () => {
         return 'success';
       default:
         return 'default';
-    }
-  };
-
-  const getStageIcon = (stage: ProductionStage) => {
-    switch (stage) {
-      case 'design_pending':
-        return <Pending />;
-      case 'design_ready':
-        return <CheckCircle />;
-      case 'pre_treatment':
-        return <Assignment />;
-      case 'printing':
-        return <Factory />;
-      case 'post_process':
-        return <CheckCircle />;
-      default:
-        return <Pending />;
     }
   };
 

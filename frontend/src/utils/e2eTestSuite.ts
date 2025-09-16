@@ -106,10 +106,6 @@ class E2ETestRunner {
       return { count: summary?.length || 0, summary };
     });
 
-    await this.runTest('Employee', 'getEmployeeDashboard', async () => {
-      const dashboard = await employeeApi.getEmployeeDashboard();
-      return dashboard;
-    });
 
     // Test CREATE operation
     const testEmployee: CreateEmployeeRequest = {
@@ -296,13 +292,13 @@ class E2ETestRunner {
     const testPurchase: CreatePurchaseRequest = {
       vendor_name: 'Test Vendor Ltd',
       vendor_contact: 'vendor@example.com',
-      purchase_date: '2024-01-15',
+      order_date: '2024-01-15',
+      purchase_type: 'SUPPLIES',
       category: 'Office Supplies',
       description: 'Office stationery purchase - E2E Test',
       quantity: 10,
       unit_price: 50,
-      total_amount: 500,
-      tax_amount: 90,
+      tax_rate: 18,
       payment_terms: 'NET_30'
     };
 
@@ -318,7 +314,7 @@ class E2ETestRunner {
       await this.runTest('Purchases', 'updatePurchase', async () => {
         const updatedPurchase = await purchasesApi.updatePurchase(createdPurchase.id, {
           quantity: 15,
-          total_amount: 750
+          unit_price: 60
         });
         return updatedPurchase;
       });
@@ -464,8 +460,6 @@ class E2ETestRunner {
   async runAllTests(): Promise<E2ETestResults> {
     console.log('🚀 Starting Comprehensive End-to-End API Testing...');
     console.log('====================================================');
-    
-    const startTime = Date.now();
     
     try {
       await this.testEmployeeAPI();

@@ -38,6 +38,9 @@ import {
     Assignment,
     Person,
     PaletteOutlined,
+    AttachMoney,
+    CreditCard,
+    Business,
     // Schema, // Removed - not needed for business operations
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -69,6 +72,12 @@ const menuItems = [
     { text: 'Inventory', icon: <Inventory />, path: '/inventory' },
     { text: 'Delivery Challans', icon: <LocalShipping />, path: '/challans' },
     { text: 'Invoices', icon: <Receipt />, path: '/invoices' },
+    // Financial Management Section
+    { text: 'Employees', icon: <Person />, path: '/employees' },
+    { text: 'Payroll', icon: <AttachMoney />, path: '/payroll' },
+    { text: 'Expenses', icon: <CreditCard />, path: '/expenses' },
+    { text: 'Purchases', icon: <Business />, path: '/purchases' },
+    // End Financial Section
     { text: 'Reports', icon: <Assessment />, path: '/reports' },
 ];
 

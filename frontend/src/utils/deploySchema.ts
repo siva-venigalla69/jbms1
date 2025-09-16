@@ -33,7 +33,7 @@ export async function testAPIServices() {
   
   try {
     // Test basic connectivity
-    const { data: healthCheck, error } = await supabase
+    const { error } = await supabase
       .from('customers')
       .select('count')
       .limit(1);

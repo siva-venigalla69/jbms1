@@ -41,6 +41,8 @@ import {
   RemoveCircle,
   Receipt,
   DateRange,
+  Print,
+  PictureAsPdf,
 } from '@mui/icons-material';
 import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -48,6 +50,7 @@ import * as yup from 'yup';
 import { DeliveryChallan, Customer, Order } from '../types';
 import { deliveryChallanApi, customerApi, orderApi } from '../services/supabaseApi';
 import { componentLogger } from '../utils/debug';
+import PrintService, { PrintConfig } from '../services/printService';
 
 // Form validation schema
 const challanCreateSchema = yup.object({
@@ -91,6 +94,7 @@ const DeliveryChallans: React.FC = () => {
   const [challanItems, setChallanItems] = useState<any[]>([]);
   const [selectedChallans, setSelectedChallans] = useState<string[]>([]);
   const [bulkInvoiceDialogOpen, setBulkInvoiceDialogOpen] = useState(false);
+  const [gstRate, setGstRate] = useState<number>(5); // Default 5% GST
 
   // Create challan form
   const { control, handleSubmit, reset, watch, setValue, formState: { errors, isSubmitting } } = useForm({
@@ -338,15 +342,92 @@ const DeliveryChallans: React.FC = () => {
     }
   };
 
+  // Print Functions
+  const handlePrintChallan = useCallback(async (challan: DeliveryChallan) => {
+    try {
+      // Get challan items
+      const items = await deliveryChallanApi.getDeliveryChallanItems(challan.id);
+      const itemsWithIndex = items.map((item, index) => ({
+        ...item,
+        index: index + 1,
+        material_type: item.order_item?.material_type || 'Unknown',
+        quantity: item.quantity,
+        unit_price: item.order_item?.unit_price || 0,
+        line_total: item.quantity * (item.order_item?.unit_price || 0),
+        description: `${item.order_item?.material_type || 'Item'} - ${item.order_item?.design_notes || 'No details'}`
+      }));
+
+      PrintService.generateChallanPDF({
+        ...challan,
+        customer_name: challan.customer?.name || 'Unknown Customer'
+      }, itemsWithIndex);
+      
+      setSuccess('Challan PDF generated successfully!');
+    } catch (error: any) {
+      setError('Failed to generate challan PDF: ' + error.message);
+    }
+  }, []);
+
+  const handlePrintChallanDirect = useCallback(async (challan: DeliveryChallan) => {
+    try {
+      // Get challan items
+      const items = await deliveryChallanApi.getDeliveryChallanItems(challan.id);
+      const itemsWithIndex = items.map((item, index) => ({
+        ...item,
+        index: index + 1,
+        material_type: item.order_item?.material_type || 'Unknown',
+        quantity: item.quantity,
+        unit_price: item.order_item?.unit_price || 0,
+        line_total: item.quantity * (item.order_item?.unit_price || 0),
+        description: `${item.order_item?.material_type || 'Item'} - ${item.order_item?.design_notes || 'No details'}`
+      }));
+
+      const config: PrintConfig = {
+        title: `DELIVERY CHALLAN`,
+        subtitle: `Challan No: ${challan.challan_number} | Date: ${new Date(challan.delivery_date).toLocaleDateString('en-IN')}`,
+        data: itemsWithIndex,
+        columns: [
+          { header: 'S.No', dataKey: 'index', align: 'center' },
+          { header: 'Description', dataKey: 'description' },
+          { header: 'Material', dataKey: 'material_type' },
+          { header: 'Qty Delivered', dataKey: 'quantity', align: 'right', format: 'number' },
+          { header: 'Rate', dataKey: 'unit_price', align: 'right', format: 'currency' },
+          { header: 'Amount', dataKey: 'line_total', align: 'right', format: 'currency' }
+        ],
+        summary: [
+          { label: 'Total Items', value: items.length, format: 'number' },
+          { label: 'Total Quantity', value: items.reduce((sum, item) => sum + item.quantity, 0), format: 'number' },
+          { label: 'Total Amount', value: items.reduce((sum, item) => sum + (item.quantity * (item.order_item?.unit_price || 0)), 0), format: 'currency' }
+        ],
+        footer: `Customer: ${challan.customer?.name || 'Unknown'} | Status: ${challan.status.toUpperCase()}`
+      };
+
+      PrintService.printDocument(config);
+      setSuccess('Challan sent to printer!');
+    } catch (error: any) {
+      setError('Failed to print challan: ' + error.message);
+    }
+  }, []);
+
+
   const handleGenerateInvoice = async (challanId: string, challanNumber: string) => {
-    if (!window.confirm(`Generate invoice for delivery challan ${challanNumber}?`)) {
+    const gstRateInput = prompt(`Enter GST rate (%) for invoice generation:`, gstRate.toString());
+    if (gstRateInput === null) return; // User cancelled
+    
+    const inputGstRate = parseFloat(gstRateInput);
+    if (isNaN(inputGstRate) || inputGstRate < 0 || inputGstRate > 100) {
+      setError('Please enter a valid GST rate between 0 and 100');
+      return;
+    }
+
+    if (!window.confirm(`Generate invoice for delivery challan ${challanNumber} with ${inputGstRate}% GST?`)) {
       return;
     }
 
     try {
-      componentLogger.info('Generating invoice from delivery challan', { challanId });
-      const invoice = await deliveryChallanApi.generateInvoiceFromChallan(challanId);
-      setSuccess(`Invoice ${invoice.invoice_number} generated successfully from challan ${challanNumber}!`);
+      componentLogger.info('Generating invoice from delivery challan', { challanId, gstRate: inputGstRate });
+      const invoice = await deliveryChallanApi.generateInvoiceFromChallan(challanId, inputGstRate);
+      setSuccess(`Invoice ${invoice.invoice_number} generated successfully from challan ${challanNumber} with ${inputGstRate}% GST!`);
     } catch (error: any) {
       componentLogger.error('Failed to generate invoice from challan', error);
       setError('Failed to generate invoice: ' + error.message);
@@ -364,7 +445,12 @@ const DeliveryChallans: React.FC = () => {
       return;
     }
 
-    if (!window.confirm(`Generate ${deliveredChallans.length} invoice(s) for selected delivery challans?`)) {
+    if (isNaN(gstRate) || gstRate < 0 || gstRate > 100) {
+      setError('Please enter a valid GST rate between 0 and 100');
+      return;
+    }
+
+    if (!window.confirm(`Generate ${deliveredChallans.length} separate invoice(s) for selected delivery challans with ${gstRate}% GST?`)) {
       return;
     }
 
@@ -373,17 +459,59 @@ const DeliveryChallans: React.FC = () => {
       for (const challanId of deliveredChallans) {
         const challan = challans.find(c => c.id === challanId);
         if (challan) {
-          const invoice = await deliveryChallanApi.generateInvoiceFromChallan(challanId);
+          const invoice = await deliveryChallanApi.generateInvoiceFromChallan(challanId, gstRate);
           invoices.push(invoice);
         }
       }
       
-      setSuccess(`Successfully generated ${invoices.length} invoice(s) from selected delivery challans!`);
+      setSuccess(`Successfully generated ${invoices.length} separate invoice(s) from selected delivery challans with ${gstRate}% GST!`);
       setSelectedChallans([]);
       setBulkInvoiceDialogOpen(false);
     } catch (error: any) {
       componentLogger.error('Failed to generate bulk invoices', error);
       setError('Failed to generate invoices: ' + error.message);
+    }
+  };
+
+  const handleConsolidatedInvoiceGeneration = async () => {
+    const deliveredChallans = selectedChallans.filter(challanId => {
+      const challan = challans.find(c => c.id === challanId);
+      return challan?.status === 'delivered';
+    });
+
+    if (deliveredChallans.length === 0) {
+      setError('Please select at least one delivered challan to generate consolidated invoice.');
+      return;
+    }
+
+    // Check if all challans belong to the same customer
+    const customers = Array.from(new Set(deliveredChallans.map(challanId => {
+      const challan = challans.find(c => c.id === challanId);
+      return challan?.customer_id;
+    })));
+
+    if (customers.length > 1) {
+      setError('All selected delivery challans must belong to the same customer for consolidated invoicing.');
+      return;
+    }
+
+    if (isNaN(gstRate) || gstRate < 0 || gstRate > 100) {
+      setError('Please enter a valid GST rate between 0 and 100');
+      return;
+    }
+
+    if (!window.confirm(`Generate 1 consolidated invoice for ${deliveredChallans.length} selected delivery challans with ${gstRate}% GST?`)) {
+      return;
+    }
+
+    try {
+      const invoice = await deliveryChallanApi.generateConsolidatedInvoice(deliveredChallans, gstRate);
+      setSuccess(`Successfully generated consolidated invoice ${invoice.invoice_number} from ${deliveredChallans.length} delivery challans with ${gstRate}% GST!`);
+      setSelectedChallans([]);
+      setBulkInvoiceDialogOpen(false);
+    } catch (error: any) {
+      componentLogger.error('Failed to generate consolidated invoice', error);
+      setError('Failed to generate consolidated invoice: ' + error.message);
     }
   };
 
@@ -446,6 +574,49 @@ const DeliveryChallans: React.FC = () => {
     
     return matchesSearch && matchesStatus && matchesFromDate && matchesToDate;
   });
+
+  const handlePrintChallanStatement = useCallback(() => {
+    try {
+      if (filteredChallans.length === 0) {
+        setError('No challans found for the selected criteria');
+        return;
+      }
+
+      // For the statement, we'll omit amount information since DeliveryChallan doesn't have total_amount
+      const config: PrintConfig = {
+        title: `DELIVERY CHALLAN STATEMENT`,
+        subtitle: `Total Challans: ${filteredChallans.length}`,
+        dateRange: fromDate && toDate ? { from: fromDate, to: toDate } : undefined,
+        data: filteredChallans.map((challan, index) => ({
+          index: index + 1,
+          challan_number: challan.challan_number,
+          delivery_date: challan.delivery_date,
+          customer_name: challan.customer?.name || 'Unknown',
+          status: challan.status.toUpperCase(),
+          created_date: challan.created_at
+        })),
+        columns: [
+          { header: 'S.No', dataKey: 'index', align: 'center' },
+          { header: 'Challan No', dataKey: 'challan_number' },
+          { header: 'Delivery Date', dataKey: 'delivery_date', format: 'date' },
+          { header: 'Customer', dataKey: 'customer_name' },
+          { header: 'Status', dataKey: 'status', align: 'center' },
+          { header: 'Created', dataKey: 'created_date', format: 'date' }
+        ],
+        summary: [
+          { label: 'Total Challans', value: filteredChallans.length, format: 'number' },
+          { label: 'Pending', value: filteredChallans.filter(c => c.status === 'pending').length, format: 'number' },
+          { label: 'Delivered', value: filteredChallans.filter(c => c.status === 'delivered').length, format: 'number' },
+          { label: 'Returned', value: filteredChallans.filter(c => c.status === 'returned').length, format: 'number' }
+        ]
+      };
+
+      PrintService.generatePDF(config);
+      setSuccess('Challan statement generated successfully!');
+    } catch (error: any) {
+      setError('Failed to generate challan statement: ' + error.message);
+    }
+  }, [filteredChallans, fromDate, toDate]);
 
   const statusOptions = ['pending', 'delivered', 'returned'];
 
@@ -603,11 +774,21 @@ const DeliveryChallans: React.FC = () => {
               />
             </Box>
 
-            {/* Clear Filters Button */}
-            {(searchTerm || statusFilter || fromDate || toDate) && (
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            {/* Print Statement Button */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Button
+                variant="outlined"
+                startIcon={<PictureAsPdf />}
+                onClick={handlePrintChallanStatement}
+                disabled={filteredChallans.length === 0}
+                size="small"
+              >
+                Generate Statement
+              </Button>
+              {/* Clear Filters Button */}
+              {(searchTerm || statusFilter || fromDate || toDate) && (
                 <Button
-                  variant="outlined"
+                  variant="text"
                   onClick={() => {
                     setSearchTerm('');
                     setStatusFilter('');
@@ -618,8 +799,8 @@ const DeliveryChallans: React.FC = () => {
                 >
                   Clear Filters
                 </Button>
-              </Box>
-            )}
+              )}
+            </Box>
           </Box>
         </CardContent>
       </Card>
@@ -717,6 +898,22 @@ const DeliveryChallans: React.FC = () => {
                             title="Edit Challan"
                           >
                             <Edit />
+                          </IconButton>
+                          <IconButton 
+                            size="small" 
+                            onClick={() => handlePrintChallan(challan)}
+                            title="Generate PDF"
+                            color="primary"
+                          >
+                            <PictureAsPdf />
+                          </IconButton>
+                          <IconButton 
+                            size="small" 
+                            onClick={() => handlePrintChallanDirect(challan)}
+                            title="Print Challan"
+                            color="secondary"
+                          >
+                            <Print />
                           </IconButton>
                           {challan.status === 'delivered' && (
                             <IconButton 
@@ -1315,17 +1512,12 @@ const DeliveryChallans: React.FC = () => {
           </Box>
         </DialogTitle>
         <DialogContent>
-          <Box sx={{ mt: 2 }}>
-            <Alert severity="info" sx={{ mb: 3 }}>
-              This will generate individual invoices for each selected delivery challan.
-              Only delivered challans can be converted to invoices.
-            </Alert>
-            
+          <Box sx={{ mt: 2 }}>            
             <Typography variant="h6" gutterBottom>
               Selected Challans ({selectedChallans.length}):
             </Typography>
             
-            <Box sx={{ maxHeight: 300, overflow: 'auto', border: 1, borderColor: 'divider', borderRadius: 1, p: 2 }}>
+            <Box sx={{ maxHeight: 300, overflow: 'auto', border: 1, borderColor: 'divider', borderRadius: 1, p: 2, mb: 3 }}>
               {selectedChallans.map(challanId => {
                 const challan = challans.find(c => c.id === challanId);
                 return challan ? (
@@ -1350,21 +1542,81 @@ const DeliveryChallans: React.FC = () => {
               })}
             </Box>
             
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-              Each challan will generate a separate invoice with 18% GST automatically calculated.
-              Invoice numbers will be generated automatically in the format: INV-DC-[CHALLAN_NUMBER]-[TIMESTAMP]
+            <Box sx={{ mb: 3 }}>
+              <TextField
+                label="GST Rate (%)"
+                type="number"
+                value={gstRate}
+                onChange={(e) => setGstRate(parseFloat(e.target.value) || 0)}
+                inputProps={{ min: 0, max: 100, step: 0.1 }}
+                sx={{ width: 150 }}
+                size="small"
+              />
+            </Box>
+
+            <Typography variant="h6" gutterBottom>
+              Choose Invoice Generation Method:
             </Typography>
+            
+            <Grid container spacing={2}>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <Card variant="outlined" sx={{ p: 2, height: '100%', cursor: 'pointer', '&:hover': { bgcolor: 'action.hover' } }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                    <Receipt color="primary" />
+                    <Typography variant="h6" color="primary">
+                      Separate Invoices
+                    </Typography>
+                  </Box>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                    Generate {selectedChallans.length} individual invoice(s), one for each delivery challan.
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    • Each challan becomes a separate invoice
+                    • Individual invoice numbers (INV-DC-[CHALLAN_NUMBER]-[TIMESTAMP])
+                    • GST rate will be provided during generation
+                  </Typography>
+                </Card>
+              </Grid>
+
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <Card variant="outlined" sx={{ p: 2, height: '100%', cursor: 'pointer', '&:hover': { bgcolor: 'action.hover' } }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                    <Receipt color="success" />
+                    <Typography variant="h6" color="success">
+                      Consolidated Invoice
+                    </Typography>
+                  </Box>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                    Generate 1 consolidated invoice combining all {selectedChallans.length} delivery challan(s).
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    • All challans combined into single invoice
+                    • Single invoice number (INV-CONSOLIDATED-[TIMESTAMP])
+                    • GST rate will be provided during generation
+                    • Must belong to same customer
+                  </Typography>
+                </Card>
+              </Grid>
+            </Grid>
           </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setBulkInvoiceDialogOpen(false)}>Cancel</Button>
           <Button 
-            variant="contained" 
+            variant="outlined" 
             onClick={handleBulkInvoiceGeneration}
+            startIcon={<Receipt />}
+            color="primary"
+          >
+            Generate {selectedChallans.length} Separate Invoice(s)
+          </Button>
+          <Button 
+            variant="contained" 
+            onClick={handleConsolidatedInvoiceGeneration}
             startIcon={<Receipt />}
             color="success"
           >
-            Generate {selectedChallans.length} Invoice(s)
+            Generate 1 Consolidated Invoice
           </Button>
         </DialogActions>
       </Dialog>

@@ -44,6 +44,9 @@ import {
   MonetizationOn,
   Edit,
   Visibility,
+  Print,
+  PictureAsPdf,
+  DateRange,
 } from '@mui/icons-material';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -51,6 +54,7 @@ import * as yup from 'yup';
 import { Payment as PaymentType, Customer, GST_Invoice } from '../types';
 import { paymentApi, customerApi, gstInvoiceApi } from '../services/supabaseApi';
 import { componentLogger } from '../utils/debug';
+import PrintService, { PrintConfig } from '../services/printService';
 
 // Payment validation schema
 const paymentCreateSchema = yup.object({
@@ -86,6 +90,8 @@ const Payments: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [methodFilter, setMethodFilter] = useState('');
   const [customerFilter, setCustomerFilter] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -220,6 +226,56 @@ const Payments: React.FC = () => {
     return { ...invoice, totalPaid, outstanding };
   };
 
+  // Print Functions
+  const handlePrintPaymentReceipt = useCallback(async (payment: PaymentWithDetails) => {
+    try {
+      PrintService.generatePaymentReceiptPDF({
+        ...payment,
+        customer_name: payment.customer?.name || 'Unknown Customer',
+        invoice_number: payment.invoice?.invoice_number || 'N/A'
+      });
+      
+      setSuccess('Payment receipt PDF generated successfully!');
+    } catch (error: any) {
+      setError('Failed to generate payment receipt PDF: ' + error.message);
+    }
+  }, []);
+
+  const handlePrintPaymentReceiptDirect = useCallback(async (payment: PaymentWithDetails) => {
+    try {
+      const config: PrintConfig = {
+        title: `PAYMENT RECEIPT`,
+        subtitle: `Receipt Date: ${new Date(payment.payment_date).toLocaleDateString('en-IN')}`,
+        data: [{
+          index: 1,
+          description: `Payment for Invoice: ${payment.invoice?.invoice_number || 'N/A'}`,
+          payment_method: payment.payment_method.toUpperCase(),
+          reference_number: payment.reference_number || 'N/A',
+          payment_amount: payment.payment_amount,
+          outstanding: payment.outstanding_amount || 0
+        }],
+        columns: [
+          { header: 'Description', dataKey: 'description' },
+          { header: 'Method', dataKey: 'payment_method' },
+          { header: 'Reference', dataKey: 'reference_number' },
+          { header: 'Amount', dataKey: 'payment_amount', align: 'right', format: 'currency' }
+        ],
+        summary: [
+          { label: 'Payment Amount', value: payment.payment_amount, format: 'currency' },
+          { label: 'Outstanding Balance', value: payment.outstanding_amount || 0, format: 'currency' },
+          { label: 'Payment Method', value: payment.payment_method.toUpperCase() }
+        ],
+        footer: `Customer: ${payment.customer?.name || 'Unknown'} | Invoice: ${payment.invoice?.invoice_number || 'N/A'}`
+      };
+
+      PrintService.printDocument(config);
+      setSuccess('Payment receipt sent to printer!');
+    } catch (error: any) {
+      setError('Failed to print payment receipt: ' + error.message);
+    }
+  }, []);
+
+
   const onSubmit = async (data: any) => {
     try {
       componentLogger.info('Creating payment', data);
@@ -269,8 +325,59 @@ const Payments: React.FC = () => {
       payment.reference_number?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesMethod = !methodFilter || payment.payment_method === methodFilter;
     const matchesCustomer = !customerFilter || payment.customer_id === customerFilter;
-    return matchesSearch && matchesMethod && matchesCustomer;
+    
+    // Date filtering
+    const paymentDate = new Date(payment.payment_date);
+    const matchesFromDate = !fromDate || paymentDate >= new Date(fromDate);
+    const matchesToDate = !toDate || paymentDate <= new Date(toDate + 'T23:59:59');
+    
+    return matchesSearch && matchesMethod && matchesCustomer && matchesFromDate && matchesToDate;
   });
+
+  const handlePrintPaymentStatement = useCallback(() => {
+    try {
+      if (filteredPayments.length === 0) {
+        setError('No payments found for the selected criteria');
+        return;
+      }
+
+      const config: PrintConfig = {
+        title: `PAYMENT STATEMENT`,
+        subtitle: `Total Payments: ${filteredPayments.length}`,
+        dateRange: fromDate && toDate ? { from: fromDate, to: toDate } : undefined,
+        data: filteredPayments.map((payment, index) => ({
+          index: index + 1,
+          payment_date: payment.payment_date,
+          customer_name: payment.customer?.name || 'Unknown',
+          invoice_number: payment.invoice?.invoice_number || 'N/A',
+          payment_method: payment.payment_method.toUpperCase(),
+          reference_number: payment.reference_number || 'N/A',
+          payment_amount: payment.payment_amount,
+          outstanding_amount: payment.outstanding_amount || 0
+        })),
+        columns: [
+          { header: 'S.No', dataKey: 'index', align: 'center' },
+          { header: 'Date', dataKey: 'payment_date', format: 'date' },
+          { header: 'Customer', dataKey: 'customer_name' },
+          { header: 'Invoice', dataKey: 'invoice_number' },
+          { header: 'Method', dataKey: 'payment_method' },
+          { header: 'Reference', dataKey: 'reference_number' },
+          { header: 'Amount', dataKey: 'payment_amount', align: 'right', format: 'currency' },
+          { header: 'Outstanding', dataKey: 'outstanding_amount', align: 'right', format: 'currency' }
+        ],
+        summary: [
+          { label: 'Total Payments', value: filteredPayments.length, format: 'number' },
+          { label: 'Total Amount Received', value: filteredPayments.reduce((sum, payment) => sum + payment.payment_amount, 0), format: 'currency' },
+          { label: 'Total Outstanding', value: filteredPayments.reduce((sum, payment) => sum + (payment.outstanding_amount || 0), 0), format: 'currency' }
+        ]
+      };
+
+      PrintService.generatePDF(config);
+      setSuccess('Payment statement generated successfully!');
+    } catch (error: any) {
+      setError('Failed to generate payment statement: ' + error.message);
+    }
+  }, [filteredPayments, fromDate, toDate]);
 
   const getPaymentMethodColor = (method: string) => {
     switch (method) {
@@ -396,7 +503,7 @@ const Payments: React.FC = () => {
       {/* Search and Filters */}
       <Card sx={{ mb: 3 }}>
         <CardContent>
-          <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', md: 'row' } }}>
+          <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', md: 'row' }, mb: 2 }}>
             <Box sx={{ flex: 2 }}>
               <TextField
                 fullWidth
@@ -447,6 +554,59 @@ const Payments: React.FC = () => {
               </FormControl>
             </Box>
           </Box>
+          
+          {/* Date Range Filters */}
+          <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', md: 'row' }, alignItems: 'center' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1 }}>
+              <DateRange sx={{ color: 'text.secondary' }} />
+              <TextField
+                label="From Date"
+                type="date"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+                size="small"
+                sx={{ minWidth: 150 }}
+              />
+              <TextField
+                label="To Date"
+                type="date"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+                size="small"
+                sx={{ minWidth: 150 }}
+              />
+            </Box>
+            
+            {/* Print Statement Button */}
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button
+                variant="outlined"
+                startIcon={<PictureAsPdf />}
+                onClick={handlePrintPaymentStatement}
+                disabled={filteredPayments.length === 0}
+                size="small"
+              >
+                Generate Statement
+              </Button>
+              {(searchTerm || methodFilter || customerFilter || fromDate || toDate) && (
+                <Button
+                  variant="text"
+                  onClick={() => {
+                    setSearchTerm('');
+                    setMethodFilter('');
+                    setCustomerFilter('');
+                    setFromDate('');
+                    setToDate('');
+                  }}
+                  size="small"
+                >
+                  Clear Filters
+                </Button>
+              )}
+            </Box>
+          </Box>
         </CardContent>
       </Card>
 
@@ -485,6 +645,7 @@ const Payments: React.FC = () => {
                     <TableCell>Reference</TableCell>
                     <TableCell>Outstanding</TableCell>
                     <TableCell>Status</TableCell>
+                    <TableCell>Actions</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -539,6 +700,26 @@ const Payments: React.FC = () => {
                           size="small"
                           icon={(payment.outstanding_amount || 0) > 0 ? <Schedule /> : <CheckCircle />}
                         />
+                      </TableCell>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                          <IconButton 
+                            size="small" 
+                            onClick={() => handlePrintPaymentReceipt(payment)}
+                            title="Generate Receipt PDF"
+                            color="primary"
+                          >
+                            <PictureAsPdf />
+                          </IconButton>
+                          <IconButton 
+                            size="small" 
+                            onClick={() => handlePrintPaymentReceiptDirect(payment)}
+                            title="Print Receipt"
+                            color="secondary"
+                          >
+                            <Print />
+                          </IconButton>
+                        </Box>
                       </TableCell>
                     </TableRow>
                   ))}

@@ -118,40 +118,20 @@ export const purchasesApi = {
     return withApiLogging('purchasesApi.getPurchases', async () => {
       const { data, error } = await supabase
         .from('purchases')
-        .select(`
-          *,
-          vendor:vendors!purchases_vendor_id_fkey (
-            company_name,
-            business_address,
-            email,
-            phone
-          ),
-          requested_by_employee:employees!purchases_requested_by_fkey (
-            first_name,
-            last_name
-          ),
-          approved_by_employee:employees!purchases_approved_by_fkey (
-            first_name,
-            last_name
-          ),
-          received_by_employee:employees!purchases_received_by_fkey (
-            first_name,
-            last_name
-          )
-        `)
+        .select('*')
         .order('order_date', { ascending: false });
 
       if (error) throw new Error(error.message);
       
       return (data || []).map(purchase => ({
         ...purchase,
-        vendor_company_name: purchase.vendor?.company_name,
-        vendor_business_address: purchase.vendor?.business_address,
-        vendor_email: purchase.vendor?.email,
-        vendor_phone: purchase.vendor?.phone,
-        requested_by_name: purchase.requested_by_employee ? `${purchase.requested_by_employee.first_name} ${purchase.requested_by_employee.last_name}` : undefined,
-        approved_by_name: purchase.approved_by_employee ? `${purchase.approved_by_employee.first_name} ${purchase.approved_by_employee.last_name}` : undefined,
-        received_by_name: purchase.received_by_employee ? `${purchase.received_by_employee.first_name} ${purchase.received_by_employee.last_name}` : undefined
+        vendor_company_name: purchase.vendor_name,
+        vendor_business_address: purchase.vendor_address,
+        vendor_email: purchase.vendor_contact,
+        vendor_phone: purchase.vendor_contact,
+        requested_by_name: purchase.requested_by,
+        approved_by_name: purchase.approved_by,
+        received_by_name: purchase.received_by
       }));
     });
   },
@@ -161,27 +141,7 @@ export const purchasesApi = {
     return withApiLogging('purchasesApi.getPurchase', async () => {
       const { data, error } = await supabase
         .from('purchases')
-        .select(`
-          *,
-          vendor:vendors!purchases_vendor_id_fkey (
-            company_name,
-            business_address,
-            email,
-            phone
-          ),
-          requested_by_employee:employees!purchases_requested_by_fkey (
-            first_name,
-            last_name
-          ),
-          approved_by_employee:employees!purchases_approved_by_fkey (
-            first_name,
-            last_name
-          ),
-          received_by_employee:employees!purchases_received_by_fkey (
-            first_name,
-            last_name
-          )
-        `)
+        .select('*')
         .eq('id', id)
         .single();
 
@@ -189,13 +149,13 @@ export const purchasesApi = {
       
       return {
         ...data,
-        vendor_company_name: data.vendor?.company_name,
-        vendor_business_address: data.vendor?.business_address,
-        vendor_email: data.vendor?.email,
-        vendor_phone: data.vendor?.phone,
-        requested_by_name: data.requested_by_employee ? `${data.requested_by_employee.first_name} ${data.requested_by_employee.last_name}` : undefined,
-        approved_by_name: data.approved_by_employee ? `${data.approved_by_employee.first_name} ${data.approved_by_employee.last_name}` : undefined,
-        received_by_name: data.received_by_employee ? `${data.received_by_employee.first_name} ${data.received_by_employee.last_name}` : undefined
+        vendor_company_name: data.vendor_name,
+        vendor_business_address: data.vendor_address,
+        vendor_email: data.vendor_contact,
+        vendor_phone: data.vendor_contact,
+        requested_by_name: data.requested_by,
+        approved_by_name: data.approved_by,
+        received_by_name: data.received_by
       };
     }, { id });
   },
@@ -322,17 +282,7 @@ export const purchasesApi = {
     return withApiLogging('purchasesApi.getPendingApprovalPurchases', async () => {
       const { data, error } = await supabase
         .from('purchases')
-        .select(`
-          *,
-          vendor:vendors!purchases_vendor_id_fkey (
-            company_name,
-            business_address
-          ),
-          requested_by_employee:employees!purchases_requested_by_fkey (
-            first_name,
-            last_name
-          )
-        `)
+        .select('*')
         .eq('status', 'PENDING_APPROVAL')
         .order('order_date', { ascending: true });
 
@@ -340,9 +290,9 @@ export const purchasesApi = {
       
       return (data || []).map(purchase => ({
         ...purchase,
-        vendor_company_name: purchase.vendor?.company_name,
-        vendor_business_address: purchase.vendor?.business_address,
-        requested_by_name: purchase.requested_by_employee ? `${purchase.requested_by_employee.first_name} ${purchase.requested_by_employee.last_name}` : undefined
+        vendor_company_name: purchase.vendor_name,
+        vendor_business_address: purchase.vendor_address,
+        requested_by_name: purchase.requested_by
       }));
     });
   },
@@ -354,13 +304,7 @@ export const purchasesApi = {
       
       const { data, error } = await supabase
         .from('purchases')
-        .select(`
-          *,
-          vendor:vendors!purchases_vendor_id_fkey (
-            company_name,
-            business_address
-          )
-        `)
+        .select('*')
         .in('status', ['ORDERED', 'PARTIALLY_RECEIVED'])
         .lt('expected_delivery_date', today)
         .order('expected_delivery_date', { ascending: true });
@@ -369,8 +313,8 @@ export const purchasesApi = {
       
       return (data || []).map(purchase => ({
         ...purchase,
-        vendor_company_name: purchase.vendor?.company_name,
-        vendor_business_address: purchase.vendor?.business_address
+        vendor_company_name: purchase.vendor_name,
+        vendor_business_address: purchase.vendor_address
       }));
     });
   },
@@ -443,13 +387,7 @@ export const purchasesApi = {
     return withApiLogging('purchasesApi.searchPurchases', async () => {
       const { data, error } = await supabase
         .from('purchases')
-        .select(`
-          *,
-          vendor:vendors!purchases_vendor_id_fkey (
-            company_name,
-            business_address
-          )
-        `)
+        .select('*')
         .or(`purchase_number.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%,vendor_name.ilike.%${searchTerm}%,purchase_type.ilike.%${searchTerm}%`)
         .order('order_date', { ascending: false });
 
@@ -457,8 +395,8 @@ export const purchasesApi = {
       
       return (data || []).map(purchase => ({
         ...purchase,
-        vendor_company_name: purchase.vendor?.company_name,
-        vendor_business_address: purchase.vendor?.business_address
+        vendor_company_name: purchase.vendor_name,
+        vendor_business_address: purchase.vendor_address
       }));
     }, { searchTerm });
   },

@@ -320,7 +320,6 @@ export const orderApi = {
           try {
             // Check if design exists in library for this material type
             let designExists = false;
-            let designId = null;
             
             // Simple design code check from customization details
             const designCode = item.customization_details?.match(/design[:\s]*([A-Z0-9_]+)/i)?.[1];
@@ -1909,7 +1908,7 @@ export const deliveryChallanApi = {
     }, { customerId })
   },
 
-  generateInvoiceFromChallan: async (challanId: string): Promise<GST_Invoice> => {
+  generateInvoiceFromChallan: async (challanId: string, gstRate: number): Promise<GST_Invoice> => {
     return withApiLogging('deliveryChallan.generateInvoiceFromChallan', async () => {
       // Get the delivery challan with items
       const challan = await deliveryChallanApi.getDeliveryChallan(challanId);
@@ -1925,7 +1924,7 @@ export const deliveryChallanApi = {
       
       // Calculate invoice amounts
       const subtotal = challanItems.reduce((sum, item) => sum + item.subtotal, 0);
-      const taxRate = 0.18; // 18% GST
+      const taxRate = gstRate / 100; // Convert percentage to decimal
       const taxAmount = subtotal * taxRate;
       const totalAmount = subtotal + taxAmount;
       
@@ -1951,6 +1950,80 @@ export const deliveryChallanApi = {
       
       return invoice;
     }, { challanId })
+  },
+
+  // Generate consolidated invoice from multiple delivery challans
+  generateConsolidatedInvoice: async (challanIds: string[], gstRate: number): Promise<GST_Invoice> => {
+    return withApiLogging('deliveryChallan.generateConsolidatedInvoice', async () => {
+      if (challanIds.length === 0) {
+        throw new Error('At least one delivery challan must be selected');
+      }
+
+      // Get all challans
+      const challans = await Promise.all(
+        challanIds.map(id => deliveryChallanApi.getDeliveryChallan(id))
+      );
+
+      // Validate all challans belong to the same customer
+      const customerId = challans[0].customer_id;
+      if (!challans.every(challan => challan.customer_id === customerId)) {
+        throw new Error('All delivery challans must belong to the same customer');
+      }
+
+      // Validate all challans are delivered
+      const undeliveredChallans = challans.filter(challan => challan.status !== 'delivered');
+      if (undeliveredChallans.length > 0) {
+        throw new Error('All delivery challans must be in delivered status');
+      }
+
+      // Calculate consolidated totals
+      let totalSubtotal = 0;
+      const allItems: any[] = [];
+      const challanNumbers: string[] = [];
+
+      for (const challan of challans) {
+        challanNumbers.push(challan.challan_number);
+
+        // Get items for this challan
+        const items = await deliveryChallanApi.getDeliveryChallanItems(challan.id);
+
+        for (const item of items) {
+          const itemSubtotal = item.quantity_delivered * item.unit_price;
+          totalSubtotal += itemSubtotal;
+          allItems.push({
+            ...item,
+            challan_number: challan.challan_number,
+            delivery_date: challan.delivery_date
+          });
+        }
+      }
+
+      // Calculate tax using provided GST rate
+      const taxRate = gstRate / 100; // Convert percentage to decimal
+      const taxAmount = totalSubtotal * taxRate;
+      const totalAmount = totalSubtotal + taxAmount;
+
+      // Generate consolidated invoice number
+      const invoiceNumber = `INV-CONSOLIDATED-${Date.now()}`;
+
+      // Create consolidated invoice data
+      const invoiceData = {
+        invoice_number: invoiceNumber,
+        customer_id: customerId,
+        order_id: challans[0].order_id, // Use first challan's order_id or make it nullable
+        invoice_date: new Date().toISOString().split('T')[0],
+        subtotal: totalSubtotal,
+        tax_amount: taxAmount,
+        total_amount: totalAmount,
+        status: 'sent' as const,
+        notes: `Consolidated invoice for Delivery Challans: ${challanNumbers.join(', ')}. Total ${challans.length} deliveries processed.`
+      };
+
+      // Create the consolidated invoice
+      const invoice = await gstInvoiceApi.createGSTInvoice(invoiceData);
+
+      return invoice;
+    }, { challanIds });
   },
 
   createDeliveryChallan: async (challanData: any): Promise<DeliveryChallan> => {
@@ -2266,8 +2339,12 @@ export const gstInvoiceApi = {
       // Generate invoice number if not provided
       const invoiceNumber = invoiceData.invoice_number || `INV${Date.now()}`
       
+      // Remove fields that don't exist in database schema
+      const cleanedData = { ...invoiceData };
+      delete cleanedData.due_date; // due_date column doesn't exist in gst_invoices table
+      
       const { data, error } = await supabaseHelpers.create(TABLES.GST_INVOICES, {
-        ...invoiceData,
+        ...cleanedData,
         invoice_number: invoiceNumber,
         created_at: new Date().toISOString()
       })

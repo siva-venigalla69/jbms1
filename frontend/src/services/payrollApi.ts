@@ -186,7 +186,7 @@ export const payrollApi = {
   updateSalaryPayment: async (id: string, paymentData: UpdateSalaryPaymentRequest): Promise<SalaryPayment> => {
     return withApiLogging('payrollApi.updateSalaryPayment', async () => {
       // Calculate overtime amount if overtime data is being updated
-      let updateData = { ...paymentData };
+      let updateData: any = { ...paymentData };
       if (paymentData.overtime_hours !== undefined || paymentData.overtime_rate !== undefined) {
         updateData.overtime_amount = 
           (paymentData.overtime_hours || 0) * (paymentData.overtime_rate || 0);

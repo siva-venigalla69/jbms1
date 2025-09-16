@@ -30,7 +30,6 @@ import {
     Select,
     Tabs,
     Tab,
-    Divider,
 } from '@mui/material';
 import {
     Add,
@@ -267,11 +266,17 @@ const Expenses: React.FC = () => {
 
     const onSubmit = async (data: CreateExpenseRequest) => {
         try {
+            // Clean data - convert empty strings to undefined for UUID fields
+            const cleanedData = {
+                ...data,
+                employee_id: data.employee_id || undefined,
+            };
+
             if (editingExpense) {
-                await expensesApi.updateExpense(editingExpense.id, data);
+                await expensesApi.updateExpense(editingExpense.id, cleanedData);
                 setSuccess('Expense updated successfully');
             } else {
-                await expensesApi.createExpense(data);
+                await expensesApi.createExpense(cleanedData);
                 setSuccess('Expense created successfully');
             }
             setDialogOpen(false);

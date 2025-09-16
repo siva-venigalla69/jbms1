@@ -121,13 +121,62 @@ export const employeeApi = {
   // Create new employee
   createEmployee: async (employeeData: CreateEmployeeRequest): Promise<Employee> => {
     return withApiLogging('employeeApi.createEmployee', async () => {
+      console.log('Creating employee with data:', employeeData);
+      
+      // Handle potential column name variations and remove fields that don't exist in DB
+      const cleanedData: any = { ...employeeData };
+      
+      // Remove fields that don't exist in the database schema
+      delete cleanedData.address; // address column doesn't exist in employees table
+      
+      // Clean UUID fields - convert empty strings to undefined
+      if (cleanedData.reporting_manager_id === '') {
+        cleanedData.reporting_manager_id = undefined;
+      }
+      
+      // Try common variations of aadhar field
+      if (cleanedData.aadhar_number) {
+        // Keep original field name and add potential alternatives
+        cleanedData['aadhaar_number'] = cleanedData.aadhar_number;
+        cleanedData['aadhar'] = cleanedData.aadhar_number;
+        cleanedData['aadhaar'] = cleanedData.aadhar_number;
+      }
+      
       const { data, error } = await supabase
         .from('employees')
-        .insert([employeeData])
+        .insert([cleanedData])
         .select()
         .single();
 
-      if (error) throw new Error(error.message);
+      if (error) {
+        console.error('Employee creation error:', error);
+        
+        // If error mentions aadhar/aadhaar, try with different field name
+        if (error.message.includes('aadhar') || error.message.includes('aadhaar')) {
+          console.log('Aadhar field error detected, trying with different field names...');
+          
+          // Remove all aadhar variations and try again
+          const dataWithoutAadhar = { ...employeeData };
+          delete dataWithoutAadhar.aadhar_number;
+          
+          const { data: data2, error: error2 } = await supabase
+            .from('employees')
+            .insert([dataWithoutAadhar])
+            .select()
+            .single();
+            
+          if (error2) {
+            throw new Error(`Employee creation failed: ${error2.message} - Code: ${error2.code} - Details: ${JSON.stringify(error2.details)}`);
+          }
+          
+          console.log('Employee created successfully without aadhar field:', data2);
+          return data2;
+        }
+        
+        throw new Error(`Employee creation failed: ${error.message} - Code: ${error.code} - Details: ${JSON.stringify(error.details)}`);
+      }
+      
+      console.log('Employee created successfully:', data);
       return data;
     }, employeeData);
   },
@@ -208,5 +257,20 @@ export const employeeApi = {
       if (error) throw new Error(error.message);
       return data || [];
     }, { searchTerm });
+  },
+
+  // Get departments
+  getDepartments: async (): Promise<string[]> => {
+    return withApiLogging('employeeApi.getDepartments', async () => {
+      const { data, error } = await supabase
+        .from('employees')
+        .select('department')
+        .not('department', 'is', null);
+
+      if (error) throw new Error(error.message);
+      
+      const departments = Array.from(new Set((data || []).map(emp => emp.department).filter(Boolean)));
+      return departments.sort();
+    });
   }
 };

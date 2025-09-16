@@ -41,7 +41,6 @@ import {
     ShoppingCart,
     Business,
     CalendarToday,
-    AttachMoney,
     TrendingUp,
     PendingActions,
     CheckCircle,
@@ -54,7 +53,6 @@ import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { 
-    Purchase, 
     PurchaseWithVendor,
     CreatePurchaseRequest, 
     PurchaseDashboard,
@@ -325,11 +323,18 @@ const Purchases: React.FC = () => {
 
     const onSubmit = async (data: CreatePurchaseRequest) => {
         try {
+            // Clean data - convert empty strings to undefined for UUID fields
+            const cleanedData = {
+                ...data,
+                vendor_id: data.vendor_id || undefined,
+                requested_by: data.requested_by || undefined,
+            };
+
             if (editingPurchase) {
-                await purchasesApi.updatePurchase(editingPurchase.id, data);
+                await purchasesApi.updatePurchase(editingPurchase.id, cleanedData);
                 setSuccess('Purchase updated successfully');
             } else {
-                await purchasesApi.createPurchase(data);
+                await purchasesApi.createPurchase(cleanedData);
                 setSuccess('Purchase created successfully');
             }
             setDialogOpen(false);
