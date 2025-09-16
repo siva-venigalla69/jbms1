@@ -34,6 +34,8 @@ import Employees from './pages/Employees';
 import Payroll from './pages/Payroll';
 import Expenses from './pages/Expenses';
 import Purchases from './pages/Purchases';
+import Payments from './pages/Payments';
+import StockReconciliation from './pages/StockReconciliation';
 // import SchemaAnalysis from './pages/SchemaAnalysis'; // Commented out - not required for business operations
 import './utils/debugDatabase'; // Import debug database helpers
 import './utils/loginDebugHelper'; // Import login debug helpers
@@ -336,7 +338,17 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Layout>
-                    <APITester />
+                    <Payments />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/stock-reconciliation"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <StockReconciliation />
                   </Layout>
                 </ProtectedRoute>
               }

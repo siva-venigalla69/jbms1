@@ -43,6 +43,7 @@ import {
   PictureAsPdf,
   DateRange,
   LocalShipping,
+  AccountBalance,
 } from '@mui/icons-material';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -91,6 +92,9 @@ const GSTInvoices: React.FC = () => {
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<GST_Invoice | null>(null);
+  const [fromChallanDialogOpen, setFromChallanDialogOpen] = useState(false);
+  const [availableChallans, setAvailableChallans] = useState<any[]>([]);
+  const [selectedChallans, setSelectedChallans] = useState<string[]>([]);
 
   // Create invoice form
   const { control, handleSubmit, reset, watch, setValue, formState: { errors, isSubmitting } } = useForm({
@@ -214,8 +218,111 @@ const GSTInvoices: React.FC = () => {
     }
   };
 
-  const handleCreateFromDeliveryChallan = () => {
-    navigate('/challans');
+  const handleCreateFromDeliveryChallan = async () => {
+    try {
+      // Mock available delivery challans - in real implementation, filter by delivered status
+      const mockDeliveredChallans = [
+        {
+          id: 'dc-1',
+          challan_number: 'DC-001',
+          customer_id: 'customer-1',
+          customer: { name: 'Sample Customer', gst_number: '12ABCDE1234F1Z5' },
+          delivery_date: '2024-01-15',
+          total_value: 12500.00,
+          status: 'delivered'
+        },
+        {
+          id: 'dc-2',
+          challan_number: 'DC-002',
+          customer_id: 'customer-2',
+          customer: { name: 'Another Customer', gst_number: '12XYZEN9876F2A3' },
+          delivery_date: '2024-01-16',
+          total_value: 8750.00,
+          status: 'delivered'
+        },
+        {
+          id: 'dc-3',
+          challan_number: 'DC-003',
+          customer_id: 'customer-1',
+          customer: { name: 'Sample Customer', gst_number: '12ABCDE1234F1Z5' },
+          delivery_date: '2024-01-17',
+          total_value: 6250.00,
+          status: 'delivered'
+        }
+      ];
+
+      setAvailableChallans(mockDeliveredChallans);
+      setSelectedChallans([]);
+      setFromChallanDialogOpen(true);
+    } catch (error: any) {
+      setError('Failed to load delivery challans: ' + error.message);
+    }
+  };
+
+  const handleChallanSelectionChange = (challanId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedChallans(prev => [...prev, challanId]);
+    } else {
+      setSelectedChallans(prev => prev.filter(id => id !== challanId));
+    }
+  };
+
+  const getSelectedChallansValue = () => {
+    return availableChallans
+      .filter(challan => selectedChallans.includes(challan.id))
+      .reduce((total, challan) => total + challan.total_value, 0);
+  };
+
+  const handleCreateInvoiceFromChallans = async () => {
+    if (selectedChallans.length === 0) {
+      setError('Please select at least one delivery challan');
+      return;
+    }
+
+    try {
+      const selected = availableChallans.filter(challan => selectedChallans.includes(challan.id));
+      const totalValue = selected.reduce((sum, challan) => sum + challan.total_value, 0);
+      const taxAmount = totalValue * 0.18; // 18% GST
+      const grandTotal = totalValue + taxAmount;
+
+      // Group by customer (in case multiple customers are selected)
+      const customerGroups = selected.reduce((groups, challan) => {
+        if (!groups[challan.customer_id]) {
+          groups[challan.customer_id] = {
+            customer: challan.customer,
+            challans: [],
+            total: 0
+          };
+        }
+        groups[challan.customer_id].challans.push(challan);
+        groups[challan.customer_id].total += challan.total_value;
+        return groups;
+      }, {} as any);
+
+      // Create invoice for the first customer group (in real app, handle multiple customers properly)
+      const firstCustomerGroup = Object.values(customerGroups)[0] as any;
+      const invoiceNumber = `INV-${Date.now()}`;
+      const invoiceData = {
+        invoice_number: invoiceNumber,
+        customer_id: firstCustomerGroup.customer.id || 'mock-customer-1',
+        order_id: 'mock-order-1', // In real app, link to actual order
+        invoice_date: new Date().toISOString().split('T')[0],
+        subtotal: firstCustomerGroup.total,
+        tax_amount: firstCustomerGroup.total * 0.18,
+        total_amount: firstCustomerGroup.total * 1.18,
+        status: 'draft' as const,
+        due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days from now
+        notes: `Generated from Delivery Challans: ${firstCustomerGroup.challans.map((c: any) => c.challan_number).join(', ')}`
+      };
+
+      await gstInvoiceApi.createGSTInvoice(invoiceData);
+      setSuccess('Invoice created successfully from selected delivery challans!');
+      setFromChallanDialogOpen(false);
+      setSelectedChallans([]);
+      loadGSTInvoices();
+    } catch (error: any) {
+      setError('Failed to create invoice from challans: ' + error.message);
+    }
   };
 
   const handleViewInvoice = async (invoiceId: string) => {
@@ -254,7 +361,7 @@ const GSTInvoices: React.FC = () => {
 
   const handleUpdateInvoice = async (data: any) => {
     if (!selectedInvoice) return;
-    
+
     try {
       await gstInvoiceApi.updateGSTInvoice(selectedInvoice.id, data);
       setSuccess(`GST Invoice ${selectedInvoice.invoice_number} updated successfully`);
@@ -264,6 +371,11 @@ const GSTInvoices: React.FC = () => {
     } catch (error: any) {
       setError('Failed to update GST invoice: ' + error.message);
     }
+  };
+
+  const handleRecordPayment = (invoice: GST_Invoice) => {
+    // Navigate to payments page with invoice pre-selected
+    navigate(`/payments?invoice_id=${invoice.id}&customer_id=${invoice.customer_id}`);
   };
 
   const getStatusIcon = (status: string) => {
@@ -671,30 +783,39 @@ const GSTInvoices: React.FC = () => {
                       </TableCell>
                       <TableCell>
                         <Box sx={{ display: 'flex', gap: 1 }}>
-                          <IconButton 
-                            size="small" 
+                          <IconButton
+                            size="small"
                             onClick={() => handleViewInvoice(invoice.id)}
                             title="View Details"
                           >
                             <Visibility />
                           </IconButton>
-                          <IconButton 
-                            size="small" 
+                          <IconButton
+                            size="small"
                             onClick={() => handleEditInvoice(invoice.id)}
                             title="Edit Invoice"
                           >
                             <Edit />
                           </IconButton>
-                          <IconButton 
-                            size="small" 
+                          <IconButton
+                            size="small"
+                            onClick={() => handleRecordPayment(invoice)}
+                            title="Record Payment"
+                            color="success"
+                            disabled={invoice.status === 'paid'}
+                          >
+                            <AccountBalance />
+                          </IconButton>
+                          <IconButton
+                            size="small"
                             onClick={() => handlePrintInvoice(invoice)}
                             title="Generate PDF"
                             color="primary"
                           >
                             <PictureAsPdf />
                           </IconButton>
-                          <IconButton 
-                            size="small" 
+                          <IconButton
+                            size="small"
                             onClick={() => handlePrintInvoiceDirect(invoice)}
                             title="Print Invoice"
                             color="secondary"
@@ -1155,6 +1276,107 @@ const GSTInvoices: React.FC = () => {
             </Button>
           </DialogActions>
         </form>
+      </Dialog>
+
+      {/* Create Invoice from Delivery Challans Dialog */}
+      <Dialog open={fromChallanDialogOpen} onClose={() => setFromChallanDialogOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <LocalShipping />
+            <Typography variant="h6">Create Invoice from Delivery Challans</Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ mt: 2 }}>
+            <Alert severity="info" sx={{ mb: 3 }}>
+              Select delivery challans to consolidate into a single invoice. You can select multiple challans for the same customer.
+            </Alert>
+
+            {availableChallans.length === 0 ? (
+              <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
+                No delivered challans available for invoicing
+              </Typography>
+            ) : (
+              <>
+                <Typography variant="h6" gutterBottom>
+                  Available Delivery Challans
+                </Typography>
+                <Box sx={{ maxHeight: 400, overflowY: 'auto' }}>
+                  {availableChallans.map((challan) => (
+                    <Card key={challan.id} variant="outlined" sx={{ mb: 2 }}>
+                      <CardContent>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                            <input
+                              type="checkbox"
+                              checked={selectedChallans.includes(challan.id)}
+                              onChange={(e) => handleChallanSelectionChange(challan.id, e.target.checked)}
+                              style={{ marginRight: 8 }}
+                            />
+                          </Box>
+                          <Box sx={{ flex: 1 }}>
+                            <Typography variant="h6" gutterBottom>
+                              {challan.challan_number}
+                            </Typography>
+                            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 2 }}>
+                              <Box>
+                                <Typography variant="body2" color="text.secondary">Customer</Typography>
+                                <Typography variant="body1">{challan.customer.name}</Typography>
+                              </Box>
+                              <Box>
+                                <Typography variant="body2" color="text.secondary">Delivery Date</Typography>
+                                <Typography variant="body1">{new Date(challan.delivery_date).toLocaleDateString()}</Typography>
+                              </Box>
+                              <Box>
+                                <Typography variant="body2" color="text.secondary">Value</Typography>
+                                <Typography variant="body1" color="primary.main" fontWeight="medium">
+                                  ₹{challan.total_value.toFixed(2)}
+                                </Typography>
+                              </Box>
+                              <Box>
+                                <Typography variant="body2" color="text.secondary">Status</Typography>
+                                <Chip
+                                  label={challan.status.toUpperCase()}
+                                  color="success"
+                                  variant="outlined"
+                                  size="small"
+                                />
+                              </Box>
+                            </Box>
+                          </Box>
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </Box>
+
+                {selectedChallans.length > 0 && (
+                  <Alert severity="success" sx={{ mt: 3 }}>
+                    <Typography variant="h6" gutterBottom>
+                      Invoice Preview
+                    </Typography>
+                    <Typography variant="body2">
+                      <strong>Selected Challans:</strong> {selectedChallans.length}<br/>
+                      <strong>Subtotal:</strong> ₹{getSelectedChallansValue().toFixed(2)}<br/>
+                      <strong>GST (18%):</strong> ₹{(getSelectedChallansValue() * 0.18).toFixed(2)}<br/>
+                      <strong>Total Amount:</strong> ₹{(getSelectedChallansValue() * 1.18).toFixed(2)}
+                    </Typography>
+                  </Alert>
+                )}
+              </>
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setFromChallanDialogOpen(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={handleCreateInvoiceFromChallans}
+            disabled={selectedChallans.length === 0}
+          >
+            Create Invoice ({selectedChallans.length} challans)
+          </Button>
+        </DialogActions>
       </Dialog>
     </Box>
   );

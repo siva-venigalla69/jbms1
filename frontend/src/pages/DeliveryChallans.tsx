@@ -43,6 +43,7 @@ import {
   DateRange,
   Print,
   PictureAsPdf,
+  Factory,
 } from '@mui/icons-material';
 import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -95,6 +96,9 @@ const DeliveryChallans: React.FC = () => {
   const [selectedChallans, setSelectedChallans] = useState<string[]>([]);
   const [bulkInvoiceDialogOpen, setBulkInvoiceDialogOpen] = useState(false);
   const [gstRate, setGstRate] = useState<number>(5); // Default 5% GST
+  const [fromBatchesDialogOpen, setFromBatchesDialogOpen] = useState(false);
+  const [completedBatches, setCompletedBatches] = useState<any[]>([]);
+  const [selectedBatches, setSelectedBatches] = useState<string[]>([]);
 
   // Create challan form
   const { control, handleSubmit, reset, watch, setValue, formState: { errors, isSubmitting } } = useForm({
@@ -190,6 +194,87 @@ const DeliveryChallans: React.FC = () => {
       items: [],
     });
     setDialogOpen(true);
+  };
+
+  const handleCreateFromBatches = async () => {
+    try {
+      // Load completed production batches
+      // In real implementation, this would call productionBatchApi.getCompletedBatches()
+      const mockCompletedBatches = [
+        {
+          id: 'batch-1',
+          production_batch_number: 'PB-001',
+          order_id: 'order-1',
+          order_number: 'ORD-001',
+          customer_id: 'customer-1',
+          customer_name: 'ABC Textiles Ltd',
+          material_type: 'saree',
+          actual_quantity: 45,
+          unit_price: 85,
+          batch_status: 'completed',
+          completion_date: new Date().toISOString()
+        },
+        {
+          id: 'batch-2',
+          production_batch_number: 'PB-003',
+          order_id: 'order-1',
+          order_number: 'ORD-001',
+          customer_id: 'customer-1',
+          customer_name: 'ABC Textiles Ltd',
+          material_type: 'running_material',
+          actual_quantity: 500,
+          unit_price: 25,
+          batch_status: 'completed',
+          completion_date: new Date().toISOString()
+        }
+      ];
+      setCompletedBatches(mockCompletedBatches);
+      setFromBatchesDialogOpen(true);
+    } catch (error: any) {
+      setError('Failed to load completed batches: ' + error.message);
+    }
+  };
+
+  const handleBatchSelection = (batchId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedBatches(prev => [...prev, batchId]);
+    } else {
+      setSelectedBatches(prev => prev.filter(id => id !== batchId));
+    }
+  };
+
+  const handleCreateChallanFromBatches = () => {
+    const selectedBatchData = completedBatches.filter(batch =>
+      selectedBatches.includes(batch.id)
+    );
+
+    if (selectedBatchData.length === 0) {
+      setError('Please select at least one batch to create challan');
+      return;
+    }
+
+    // Group by customer (assuming all selected batches are from same customer for now)
+    const customer = selectedBatchData[0];
+
+    // Pre-fill challan form with batch data
+    reset({
+      customer_id: customer.customer_id,
+      delivery_date: new Date().toISOString().split('T')[0],
+      status: 'pending',
+      notes: `Delivery challan for production batches: ${selectedBatchData.map(b => b.production_batch_number).join(', ')}`,
+      items: selectedBatchData.map(batch => ({
+        order_item_id: batch.id, // This would be the actual order_item_id
+        production_batch_id: batch.id,
+        quantity: batch.actual_quantity,
+        description: `${batch.material_type} - Batch ${batch.production_batch_number}`,
+        rate: batch.unit_price,
+        amount: batch.actual_quantity * batch.unit_price
+      })),
+    });
+
+    setFromBatchesDialogOpen(false);
+    setDialogOpen(true);
+    setSuccess(`Challan pre-filled with ${selectedBatchData.length} completed batches`);
   };
 
   // Get customer orders with items
@@ -638,6 +723,9 @@ const DeliveryChallans: React.FC = () => {
               Generate Invoices ({selectedChallans.length})
             </Button>
           )}
+          <Button variant="outlined" startIcon={<Factory />} onClick={handleCreateFromBatches} sx={{ px: 3 }}>
+            From Production Batches
+          </Button>
           <Button variant="contained" startIcon={<Add />} onClick={handleCreateChallan} sx={{ px: 3 }}>
             Create Challan
           </Button>
@@ -1617,6 +1705,108 @@ const DeliveryChallans: React.FC = () => {
             color="success"
           >
             Generate 1 Consolidated Invoice
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Create Challan from Production Batches Dialog */}
+      <Dialog open={fromBatchesDialogOpen} onClose={() => setFromBatchesDialogOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>Select Completed Production Batches</DialogTitle>
+        <DialogContent>
+          <Box sx={{ pt: 2 }}>
+            <Alert severity="info" sx={{ mb: 3 }}>
+              Select completed production batches to include in the delivery challan.
+              Only batches with 'completed' status are shown.
+            </Alert>
+
+            {completedBatches.length > 0 ? (
+              <Box>
+                <Typography variant="h6" gutterBottom>
+                  Available Completed Batches ({completedBatches.length})
+                </Typography>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
+                  {completedBatches.map((batch) => (
+                    <Card key={batch.id} variant="outlined">
+                      <CardContent sx={{ display: 'flex', alignItems: 'center', py: 2 }}>
+                        <Checkbox
+                          checked={selectedBatches.includes(batch.id)}
+                          onChange={(e) => handleBatchSelection(batch.id, e.target.checked)}
+                          sx={{ mr: 2 }}
+                        />
+                        <Box sx={{ flex: 1 }}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Box>
+                              <Typography variant="subtitle1" fontWeight="bold">
+                                {batch.production_batch_number}
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                Order: {batch.order_number} • Customer: {batch.customer_name}
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                {batch.material_type} • {batch.actual_quantity} units @ ₹{batch.unit_price}
+                              </Typography>
+                            </Box>
+                            <Box sx={{ textAlign: 'right' }}>
+                              <Typography variant="h6" color="primary">
+                                ₹{(batch.actual_quantity * batch.unit_price).toLocaleString()}
+                              </Typography>
+                              <Chip
+                                label={batch.batch_status}
+                                color="success"
+                                size="small"
+                              />
+                            </Box>
+                          </Box>
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </Box>
+
+                {selectedBatches.length > 0 && (
+                  <Box sx={{ mt: 3, p: 2, bgcolor: 'primary.50', borderRadius: 1 }}>
+                    <Typography variant="subtitle2" gutterBottom>
+                      Selection Summary
+                    </Typography>
+                    <Typography variant="body2">
+                      Selected: {selectedBatches.length} batches
+                    </Typography>
+                    <Typography variant="body2">
+                      Total Value: ₹{completedBatches
+                        .filter(b => selectedBatches.includes(b.id))
+                        .reduce((sum, b) => sum + (b.actual_quantity * b.unit_price), 0)
+                        .toLocaleString()}
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
+            ) : (
+              <Box sx={{ textAlign: 'center', py: 4 }}>
+                <Factory sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
+                <Typography variant="h6" color="text.secondary">
+                  No Completed Batches Available
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Complete some production batches first to create delivery challans from them.
+                </Typography>
+              </Box>
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => {
+            setFromBatchesDialogOpen(false);
+            setSelectedBatches([]);
+          }}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleCreateChallanFromBatches}
+            disabled={selectedBatches.length === 0}
+            startIcon={<LocalShipping />}
+          >
+            Create Challan ({selectedBatches.length} batches)
           </Button>
         </DialogActions>
       </Dialog>

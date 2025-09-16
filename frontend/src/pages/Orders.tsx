@@ -117,6 +117,9 @@ const Orders: React.FC = () => {
   const [createBatchDialogOpen, setCreateBatchDialogOpen] = useState(false);
   const [selectedOrderForBatch, setSelectedOrderForBatch] = useState<string | null>(null);
   const [selectedOrderItemForBatch, setSelectedOrderItemForBatch] = useState<string | null>(null);
+  const [designAssignmentDialogOpen, setDesignAssignmentDialogOpen] = useState(false);
+  const [selectedOrderForDesign, setSelectedOrderForDesign] = useState<string | null>(null);
+  const [designAssignments, setDesignAssignments] = useState<any[]>([]);
 
   // Create order form
   const { control, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm({
@@ -488,6 +491,45 @@ const Orders: React.FC = () => {
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
+  };
+
+  const handleDesignAssignment = (orderId: string) => {
+    setSelectedOrderForDesign(orderId);
+    setDesignAssignmentDialogOpen(true);
+  };
+
+  const handleDesignAssignmentSuccess = () => {
+    setSuccess('Design assignments created successfully');
+    setDesignAssignmentDialogOpen(false);
+    setSelectedOrderForDesign(null);
+    // Refresh design assignments
+    if (selectedOrderForDesign) {
+      loadDesignAssignments(selectedOrderForDesign);
+    }
+  };
+
+  const loadDesignAssignments = async (orderId: string) => {
+    try {
+      // This would call the design assignment API
+      // const assignments = await designApi.getAssignmentsByOrder(orderId);
+      // setDesignAssignments(assignments);
+
+      // For now, we'll use mock data
+      const mockAssignments = [
+        {
+          id: 'design-1',
+          order_item_id: 'item-1',
+          designer_name: 'Priya Sharma',
+          material_type: 'saree',
+          status: 'assigned',
+          due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          priority: 'high'
+        }
+      ];
+      setDesignAssignments(mockAssignments);
+    } catch (error: any) {
+      setError('Failed to load design assignments: ' + error.message);
+    }
   };
 
   return (
@@ -908,6 +950,14 @@ const Orders: React.FC = () => {
                           </IconButton>
                           <IconButton
                             size="small"
+                            onClick={() => handleDesignAssignment(order.id)}
+                            title="Assign Design Tasks"
+                            sx={{ color: 'secondary.main' }}
+                          >
+                            <Palette />
+                          </IconButton>
+                          <IconButton
+                            size="small"
                             onClick={() => handleDeleteOrder(order.id, order.order_number)}
                             title="Delete Order"
                             sx={{ color: 'error.main' }}
@@ -1261,6 +1311,69 @@ const Orders: React.FC = () => {
                   </TableContainer>
                 </CardContent>
               </Card>
+
+              {/* Design Assignments */}
+              <Card>
+                <CardContent>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                    <Typography variant="h6">Design Assignments</Typography>
+                    <Button
+                      variant="outlined"
+                      startIcon={<Assignment />}
+                      size="small"
+                      onClick={() => selectedOrder && handleDesignAssignment(selectedOrder.id)}
+                    >
+                      Assign Designs
+                    </Button>
+                  </Box>
+
+                  {designAssignments.length > 0 ? (
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      {designAssignments.map((assignment) => (
+                        <Box key={assignment.id} sx={{
+                          p: 2,
+                          border: 1,
+                          borderColor: 'divider',
+                          borderRadius: 1,
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center'
+                        }}>
+                          <Box>
+                            <Typography variant="body1" fontWeight="bold">
+                              {assignment.material_type} - {assignment.designer_name}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              Due: {new Date(assignment.due_date).toLocaleDateString()}
+                            </Typography>
+                          </Box>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Chip
+                              label={assignment.status}
+                              size="small"
+                              color={assignment.status === 'completed' ? 'success' :
+                                     assignment.status === 'in_progress' ? 'info' : 'default'}
+                            />
+                            <Chip
+                              label={assignment.priority}
+                              size="small"
+                              color={assignment.priority === 'high' ? 'error' : 'default'}
+                              variant="outlined"
+                            />
+                          </Box>
+                        </Box>
+                      ))}
+                    </Box>
+                  ) : (
+                    <Box sx={{ textAlign: 'center', py: 3 }}>
+                      <Palette sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
+                      <Typography variant="body2" color="text.secondary">
+                        No design assignments yet. Click "Assign Designs" to create assignments for items that require custom designs.
+                      </Typography>
+                    </Box>
+                  )}
+                </CardContent>
+              </Card>
             </Box>
           )}
         </DialogContent>
@@ -1462,6 +1575,121 @@ const Orders: React.FC = () => {
         preSelectedOrderId={selectedOrderForBatch || undefined}
         preSelectedOrderItemId={selectedOrderItemForBatch || undefined}
       />
+
+      {/* Design Assignment Dialog */}
+      <Dialog open={designAssignmentDialogOpen} onClose={() => setDesignAssignmentDialogOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>Assign Design Tasks</DialogTitle>
+        <DialogContent>
+          <Box sx={{ pt: 2 }}>
+            <Alert severity="info" sx={{ mb: 3 }}>
+              Create design assignments for order items that require custom designs.
+            </Alert>
+
+            {selectedOrderForDesign && (
+              <Box>
+                <Typography variant="h6" gutterBottom>
+                  Order Items Requiring Design
+                </Typography>
+
+                {/* Mock design assignment form */}
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, mt: 2 }}>
+                  <Card variant="outlined">
+                    <CardContent>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Box>
+                          <Typography variant="subtitle1" fontWeight="bold">Saree Design</Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            Premium silk saree with zardozi work - 150 units
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                          <FormControl size="small" sx={{ minWidth: 150 }}>
+                            <InputLabel>Designer</InputLabel>
+                            <Select defaultValue="priya" label="Designer">
+                              <MenuItem value="priya">Priya Sharma</MenuItem>
+                              <MenuItem value="rahul">Rahul Kumar</MenuItem>
+                              <MenuItem value="meera">Meera Patel</MenuItem>
+                            </Select>
+                          </FormControl>
+                          <FormControl size="small" sx={{ minWidth: 150 }}>
+                            <InputLabel>Priority</InputLabel>
+                            <Select defaultValue="high" label="Priority">
+                              <MenuItem value="low">Low</MenuItem>
+                              <MenuItem value="medium">Medium</MenuItem>
+                              <MenuItem value="high">High</MenuItem>
+                              <MenuItem value="urgent">Urgent</MenuItem>
+                            </Select>
+                          </FormControl>
+                        </Box>
+                      </Box>
+                      <TextField
+                        fullWidth
+                        multiline
+                        rows={2}
+                        label="Design Requirements"
+                        placeholder="Specify design requirements, customer preferences, etc."
+                        sx={{ mt: 2 }}
+                      />
+                    </CardContent>
+                  </Card>
+
+                  <Card variant="outlined">
+                    <CardContent>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Box>
+                          <Typography variant="subtitle1" fontWeight="bold">Dupatta Design</Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            Matching dupatta with silver work - 150 units
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                          <FormControl size="small" sx={{ minWidth: 150 }}>
+                            <InputLabel>Designer</InputLabel>
+                            <Select defaultValue="rahul" label="Designer">
+                              <MenuItem value="priya">Priya Sharma</MenuItem>
+                              <MenuItem value="rahul">Rahul Kumar</MenuItem>
+                              <MenuItem value="meera">Meera Patel</MenuItem>
+                            </Select>
+                          </FormControl>
+                          <FormControl size="small" sx={{ minWidth: 150 }}>
+                            <InputLabel>Priority</InputLabel>
+                            <Select defaultValue="medium" label="Priority">
+                              <MenuItem value="low">Low</MenuItem>
+                              <MenuItem value="medium">Medium</MenuItem>
+                              <MenuItem value="high">High</MenuItem>
+                              <MenuItem value="urgent">Urgent</MenuItem>
+                            </Select>
+                          </FormControl>
+                        </Box>
+                      </Box>
+                      <TextField
+                        fullWidth
+                        multiline
+                        rows={2}
+                        label="Design Requirements"
+                        placeholder="Specify design requirements, customer preferences, etc."
+                        sx={{ mt: 2 }}
+                      />
+                    </CardContent>
+                  </Card>
+                </Box>
+              </Box>
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDesignAssignmentDialogOpen(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={() => {
+              handleDesignAssignmentSuccess();
+              // In real implementation, this would submit the assignments
+            }}
+          >
+            Create Assignments
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

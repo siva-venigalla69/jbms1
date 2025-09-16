@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   Box,
   Card,
@@ -82,6 +83,7 @@ interface PaymentWithDetails extends PaymentType {
 }
 
 const Payments: React.FC = () => {
+  const location = useLocation();
   const [payments, setPayments] = useState<PaymentWithDetails[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [invoices, setInvoices] = useState<GST_Invoice[]>([]);
@@ -183,6 +185,29 @@ const Payments: React.FC = () => {
   useEffect(() => {
     loadPayments();
   }, [loadPayments]);
+
+  // Handle URL parameters for pre-filling the payment form
+  useEffect(() => {
+    const urlParams = new URLSearchParams(location.search);
+    const invoiceId = urlParams.get('invoice_id');
+    const customerId = urlParams.get('customer_id');
+
+    if (invoiceId && customerId) {
+      // Pre-fill the form and open dialog
+      setTimeout(() => {
+        reset({
+          customer_id: customerId,
+          invoice_id: invoiceId,
+          payment_amount: 0,
+          payment_method: 'upi',
+          payment_date: new Date().toISOString().split('T')[0],
+          reference_number: '',
+          notes: `Payment for invoice from GST Invoices page`,
+        });
+        setDialogOpen(true);
+      }, 1000); // Give time for data to load
+    }
+  }, [location.search, reset]);
 
   useEffect(() => {
     if (error || success) {

@@ -41,6 +41,7 @@ import {
     AttachMoney,
     CreditCard,
     Business,
+    Payment,
     // Schema, // Removed - not needed for business operations
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -72,6 +73,8 @@ const menuItems = [
     { text: 'Inventory', icon: <Inventory />, path: '/inventory' },
     { text: 'Delivery Challans', icon: <LocalShipping />, path: '/challans' },
     { text: 'Invoices', icon: <Receipt />, path: '/invoices' },
+    { text: 'Payments', icon: <Payment />, path: '/payments' },
+    { text: 'Stock Reconciliation', icon: <Dashboard />, path: '/stock-reconciliation' },
     // Financial Management Section
     { text: 'Employees', icon: <Person />, path: '/employees' },
     { text: 'Payroll', icon: <AttachMoney />, path: '/payroll' },
