@@ -1,0 +1,839 @@
+-- ============================================================================
+-- STEP 2: CREATE SIMPLIFIED SCHEMA (11 Core Tables) - VERSION 2 FIXED
+-- ============================================================================
+-- Simplified textile management system
+-- Handles: Job Work + Own Stock + Returns + Misprints
+-- NEW: Unique IDs, Product Types, Invoice-Challan linking
+-- FIXED: All syntax errors corrected
+-- ============================================================================
+
+DO $$
+BEGIN
+  RAISE NOTICE '';
+  RAISE NOTICE '========================================================================';
+  RAISE NOTICE '🔧 CREATING SIMPLIFIED SCHEMA V2 (with unique IDs and product types)';
+  RAISE NOTICE '========================================================================';
+  RAISE NOTICE '';
+END $$;
+
+-- ============================================================================
+-- REFERENCE TABLE: MATERIAL TYPES (Product Types)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS material_types (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  type_code VARCHAR(20) UNIQUE NOT NULL,
+  type_name VARCHAR(100) NOT NULL,
+  description TEXT,
+  unit_of_measure VARCHAR(20) DEFAULT 'pieces',
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Insert your product types
+INSERT INTO material_types (type_code, type_name, description) VALUES
+  ('SAREE', 'Sarees', 'Traditional sarees'),
+  ('DUPATTA', 'Dupattas', 'Dupattas/Chunnis'),
+  ('VONI', 'Voni', 'Voni/Pallu'),
+  ('LEHENGA', 'Lehenga', 'Lehenga sets'),
+  ('RUNNING', 'Running Material', 'Running fabric by meter')
+ON CONFLICT (type_code) DO NOTHING;
+
+CREATE INDEX IF NOT EXISTS idx_material_types_code ON material_types(type_code);
+
+DO $$
+BEGIN
+  RAISE NOTICE '✅ Created: material_types table (Product Types)';
+END $$;
+
+-- ============================================================================
+-- SEQUENCE GENERATORS for Unique IDs
+-- ============================================================================
+
+-- Order number sequence (ORD-0001, ORD-0002, etc.)
+CREATE SEQUENCE IF NOT EXISTS order_number_seq START 1;
+
+-- Receipt number sequence (RCP-0001, RCP-0002, etc.)
+CREATE SEQUENCE IF NOT EXISTS receipt_number_seq START 1;
+
+-- Challan number sequence (CHN-0001, CHN-0002, etc.)
+CREATE SEQUENCE IF NOT EXISTS challan_number_seq START 1;
+
+-- Invoice number sequence (INV-0001, INV-0002, etc.)
+CREATE SEQUENCE IF NOT EXISTS invoice_number_seq START 1;
+
+-- Credit note sequence (CN-0001, CN-0002, etc.)
+CREATE SEQUENCE IF NOT EXISTS credit_note_seq START 1;
+
+-- Misprint sale sequence (MS-0001, MS-0002, etc.)
+CREATE SEQUENCE IF NOT EXISTS misprint_sale_seq START 1;
+
+DO $$
+BEGIN
+  RAISE NOTICE '✅ Created: Sequence generators for unique IDs';
+END $$;
+
+-- ============================================================================
+-- FUNCTIONS to Generate Unique IDs
+-- ============================================================================
+
+-- Generate order number
+CREATE OR REPLACE FUNCTION generate_order_number()
+RETURNS VARCHAR(50) AS $$
+BEGIN
+  RETURN 'ORD-' || TO_CHAR(CURRENT_DATE, 'YYYYMMDD') || '-' || LPAD(nextval('order_number_seq')::TEXT, 4, '0');
+END;
+$$ LANGUAGE plpgsql;
+
+-- Generate receipt number
+CREATE OR REPLACE FUNCTION generate_receipt_number()
+RETURNS VARCHAR(50) AS $$
+BEGIN
+  RETURN 'RCP-' || TO_CHAR(CURRENT_DATE, 'YYYYMMDD') || '-' || LPAD(nextval('receipt_number_seq')::TEXT, 4, '0');
+END;
+$$ LANGUAGE plpgsql;
+
+-- Generate challan number
+CREATE OR REPLACE FUNCTION generate_challan_number()
+RETURNS VARCHAR(50) AS $$
+BEGIN
+  RETURN 'CHN-' || TO_CHAR(CURRENT_DATE, 'YYYYMMDD') || '-' || LPAD(nextval('challan_number_seq')::TEXT, 4, '0');
+END;
+$$ LANGUAGE plpgsql;
+
+-- Generate invoice number
+CREATE OR REPLACE FUNCTION generate_invoice_number()
+RETURNS VARCHAR(50) AS $$
+BEGIN
+  RETURN 'INV-' || TO_CHAR(CURRENT_DATE, 'YYYYMMDD') || '-' || LPAD(nextval('invoice_number_seq')::TEXT, 4, '0');
+END;
+$$ LANGUAGE plpgsql;
+
+-- Generate credit note number
+CREATE OR REPLACE FUNCTION generate_credit_note_number()
+RETURNS VARCHAR(50) AS $$
+BEGIN
+  RETURN 'CN-' || TO_CHAR(CURRENT_DATE, 'YYYYMMDD') || '-' || LPAD(nextval('credit_note_seq')::TEXT, 4, '0');
+END;
+$$ LANGUAGE plpgsql;
+
+-- Generate misprint sale number
+CREATE OR REPLACE FUNCTION generate_misprint_sale_number()
+RETURNS VARCHAR(50) AS $$
+BEGIN
+  RETURN 'MS-' || TO_CHAR(CURRENT_DATE, 'YYYYMMDD') || '-' || LPAD(nextval('misprint_sale_seq')::TEXT, 4, '0');
+END;
+$$ LANGUAGE plpgsql;
+
+DO $$
+BEGIN
+  RAISE NOTICE '✅ Created: Unique ID generation functions';
+END $$;
+
+-- ============================================================================
+-- CORE TABLES
+-- ============================================================================
+
+-- 1. CUSTOMERS (Keep as is - already simple)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'customers' AND column_name = 'is_deleted'
+  ) THEN
+    ALTER TABLE customers ADD COLUMN is_deleted BOOLEAN DEFAULT FALSE;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'customers' AND column_name = 'updated_at'
+  ) THEN
+    ALTER TABLE customers ADD COLUMN updated_at TIMESTAMP DEFAULT NOW();
+  END IF;
+
+  RAISE NOTICE '✅ Verified: customers table';
+END $$;
+
+-- 2. ORDERS (Add ownership type + auto-generated order_number)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'orders' AND column_name = 'ownership_type'
+  ) THEN
+    ALTER TABLE orders ADD COLUMN ownership_type VARCHAR(50) DEFAULT 'customer_material'
+      CHECK (ownership_type IN ('customer_material', 'own_stock'));
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'orders' AND column_name = 'updated_at'
+  ) THEN
+    ALTER TABLE orders ADD COLUMN updated_at TIMESTAMP DEFAULT NOW();
+  END IF;
+
+  RAISE NOTICE '✅ Updated: orders table';
+END $$;
+
+-- Make order_number unique if not already
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE constraint_name = 'orders_order_number_key'
+    AND table_name = 'orders'
+  ) THEN
+    ALTER TABLE orders ADD CONSTRAINT orders_order_number_key UNIQUE (order_number);
+  END IF;
+END $$;
+
+-- Set default for order_number if column exists and has no default
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'orders' AND column_name = 'order_number'
+  ) THEN
+    ALTER TABLE orders ALTER COLUMN order_number SET DEFAULT generate_order_number();
+  END IF;
+END $$;
+
+-- 3. MATERIAL_IN (Add ownership + unique receipt_number)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'material_in' AND column_name = 'ownership'
+  ) THEN
+    ALTER TABLE material_in ADD COLUMN ownership VARCHAR(20) DEFAULT 'customer'
+      CHECK (ownership IN ('customer', 'self'));
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'material_in' AND column_name = 'receipt_number'
+  ) THEN
+    ALTER TABLE material_in ADD COLUMN receipt_number VARCHAR(50);
+  END IF;
+
+  RAISE NOTICE '✅ Updated: material_in table';
+END $$;
+
+-- Make receipt_number unique
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE constraint_name = 'material_in_receipt_number_key'
+    AND table_name = 'material_in'
+  ) THEN
+    ALTER TABLE material_in ADD CONSTRAINT material_in_receipt_number_key UNIQUE (receipt_number);
+  END IF;
+END $$;
+
+-- Set default for receipt_number
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'material_in' AND column_name = 'receipt_number'
+  ) THEN
+    ALTER TABLE material_in ALTER COLUMN receipt_number SET DEFAULT generate_receipt_number();
+  END IF;
+
+  RAISE NOTICE '✅ Set default for receipt_number';
+END $$;
+
+-- 4. MATERIAL_STOCK (Core - expand for all use cases)
+DROP TABLE IF EXISTS material_stock CASCADE;
+
+CREATE TABLE material_stock (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  customer_id UUID REFERENCES customers(id), -- NULL for own stock
+  order_id UUID REFERENCES orders(id),
+  material_type VARCHAR(50) NOT NULL,
+  stage VARCHAR(50) NOT NULL CHECK (stage IN (
+    'received',      -- Initial receipt
+    'preprocessing', -- Padding/treatment
+    'printing',      -- Printing process
+    'postprocessing',-- Washing/finishing
+    'completed',     -- Ready for delivery
+    'misprint',      -- Printing errors
+    'damaged',       -- Fabric defects
+    'sold'           -- Your stock that was sold
+  )),
+  quantity INTEGER NOT NULL CHECK (quantity >= 0),
+  ownership VARCHAR(20) DEFAULT 'customer' CHECK (ownership IN ('customer', 'self')),
+  designs_available BOOLEAN DEFAULT FALSE,
+  design_notes TEXT,
+  unit_cost DECIMAL(10,2), -- Cost per unit (for own stock)
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(customer_id, order_id, material_type, stage, ownership)
+);
+
+CREATE INDEX idx_material_stock_customer ON material_stock(customer_id);
+CREATE INDEX idx_material_stock_stage ON material_stock(stage) WHERE quantity > 0;
+CREATE INDEX idx_material_stock_ownership ON material_stock(ownership);
+CREATE INDEX idx_material_stock_lookup ON material_stock(customer_id, material_type, stage) WHERE quantity > 0;
+
+COMMENT ON TABLE material_stock IS 'Real-time stock tracking at each stage - supports both job work and own stock';
+COMMENT ON COLUMN material_stock.ownership IS 'customer = job work, self = your inventory';
+COMMENT ON COLUMN material_stock.stage IS 'Current location/stage of the stock';
+
+DO $$
+BEGIN
+  RAISE NOTICE '✅ Created: material_stock table (CORE)';
+END $$;
+
+-- ============================================================================
+-- RETURNS & ADJUSTMENTS
+-- ============================================================================
+
+-- 5. RETURNS (New table)
+CREATE TABLE IF NOT EXISTS returns (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  customer_id UUID REFERENCES customers(id),
+  order_id UUID REFERENCES orders(id),
+  return_type VARCHAR(50) NOT NULL CHECK (return_type IN (
+    'customer_return',  -- Customer returns misprints to you
+    'damaged_return'    -- You return damaged fabric to customer
+  )),
+  material_type VARCHAR(50) NOT NULL,
+  quantity INTEGER NOT NULL CHECK (quantity > 0),
+  reason TEXT,
+  return_date DATE DEFAULT CURRENT_DATE,
+  adjustment_amount DECIMAL(10,2), -- Amount to adjust in invoice
+  status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'processed', 'credited')),
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_returns_customer ON returns(customer_id);
+CREATE INDEX IF NOT EXISTS idx_returns_order ON returns(order_id);
+CREATE INDEX IF NOT EXISTS idx_returns_status ON returns(status) WHERE status != 'processed';
+
+COMMENT ON TABLE returns IS 'Track customer returns (misprints) and damaged fabric returns';
+
+DO $$
+BEGIN
+  RAISE NOTICE '✅ Created: returns table';
+END $$;
+
+-- 6. CREDIT_NOTES (New table with auto-generated number)
+CREATE TABLE IF NOT EXISTS credit_notes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  credit_note_number VARCHAR(50) UNIQUE NOT NULL DEFAULT generate_credit_note_number(),
+  customer_id UUID NOT NULL REFERENCES customers(id),
+  invoice_id UUID REFERENCES gst_invoices(id),
+  order_id UUID REFERENCES orders(id),
+  credit_amount DECIMAL(10,2) NOT NULL CHECK (credit_amount > 0),
+  reason TEXT NOT NULL,
+  status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'applied', 'cancelled')),
+  applied_to_invoice_id UUID REFERENCES gst_invoices(id), -- Which invoice was adjusted
+  applied_date DATE,
+  notes TEXT,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_credit_notes_customer ON credit_notes(customer_id);
+CREATE INDEX IF NOT EXISTS idx_credit_notes_invoice ON credit_notes(invoice_id);
+CREATE INDEX IF NOT EXISTS idx_credit_notes_status ON credit_notes(status) WHERE status = 'pending';
+
+COMMENT ON TABLE credit_notes IS 'Credit notes for adjustments (misprints, returns, errors)';
+COMMENT ON COLUMN credit_notes.credit_note_number IS 'Auto-generated unique credit note number (CN-YYYYMMDD-0001)';
+
+DO $$
+BEGIN
+  RAISE NOTICE '✅ Created: credit_notes table';
+END $$;
+
+-- ============================================================================
+-- MISPRINT SALES
+-- ============================================================================
+
+-- 7. MISPRINT_SALES (New table with auto-generated number)
+CREATE TABLE IF NOT EXISTS misprint_sales (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  sale_number VARCHAR(50) UNIQUE NOT NULL DEFAULT generate_misprint_sale_number(),
+  sale_date DATE DEFAULT CURRENT_DATE,
+  material_type VARCHAR(50) NOT NULL,
+  quantity INTEGER NOT NULL CHECK (quantity > 0),
+  unit_price DECIMAL(10,2) NOT NULL,
+  total_amount DECIMAL(10,2) NOT NULL,
+  customer_name VARCHAR(255), -- Direct sales, may not be in customers table
+  phone VARCHAR(20),
+  payment_method VARCHAR(50),
+  notes TEXT,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_misprint_sales_date ON misprint_sales(sale_date DESC);
+
+COMMENT ON TABLE misprint_sales IS 'Sales of misprinted sarees at discounted prices';
+COMMENT ON COLUMN misprint_sales.sale_number IS 'Auto-generated unique sale number (MS-YYYYMMDD-0001)';
+
+DO $$
+BEGIN
+  RAISE NOTICE '✅ Created: misprint_sales table';
+END $$;
+
+-- ============================================================================
+-- DELIVERY & FINANCIAL TABLES
+-- ============================================================================
+
+-- 8. DELIVERY_CHALLANS (Add auto-generated challan_number)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'delivery_challans' AND column_name = 'is_deleted'
+  ) THEN
+    ALTER TABLE delivery_challans ADD COLUMN is_deleted BOOLEAN DEFAULT FALSE;
+  END IF;
+
+  RAISE NOTICE '✅ Updated: delivery_challans table';
+END $$;
+
+-- Make challan_number unique
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE constraint_name = 'delivery_challans_challan_number_key'
+    AND table_name = 'delivery_challans'
+  ) THEN
+    ALTER TABLE delivery_challans ADD CONSTRAINT delivery_challans_challan_number_key UNIQUE (challan_number);
+  END IF;
+END $$;
+
+-- Set default for challan_number
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'delivery_challans' AND column_name = 'challan_number'
+  ) THEN
+    ALTER TABLE delivery_challans ALTER COLUMN challan_number SET DEFAULT generate_challan_number();
+  END IF;
+
+  RAISE NOTICE '✅ Set default for challan_number';
+END $$;
+
+-- 9. CHALLAN_ITEMS (Already exists)
+DO $$
+BEGIN
+  RAISE NOTICE '✅ Verified: challan_items table';
+END $$;
+
+-- 10. GST_INVOICES (Add invoice type + auto-generated invoice_number)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'gst_invoices' AND column_name = 'invoice_type'
+  ) THEN
+    ALTER TABLE gst_invoices ADD COLUMN invoice_type VARCHAR(20) DEFAULT 'job_work'
+      CHECK (invoice_type IN ('job_work', 'sales', 'misprint_sale'));
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'gst_invoices' AND column_name = 'is_deleted'
+  ) THEN
+    ALTER TABLE gst_invoices ADD COLUMN is_deleted BOOLEAN DEFAULT FALSE;
+  END IF;
+
+  RAISE NOTICE '✅ Updated: gst_invoices table';
+END $$;
+
+-- Make invoice_number unique
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE constraint_name = 'gst_invoices_invoice_number_key'
+    AND table_name = 'gst_invoices'
+  ) THEN
+    ALTER TABLE gst_invoices ADD CONSTRAINT gst_invoices_invoice_number_key UNIQUE (invoice_number);
+  END IF;
+END $$;
+
+-- Set default for invoice_number
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'gst_invoices' AND column_name = 'invoice_number'
+  ) THEN
+    ALTER TABLE gst_invoices ALTER COLUMN invoice_number SET DEFAULT generate_invoice_number();
+  END IF;
+
+  RAISE NOTICE '✅ Set default for invoice_number';
+END $$;
+
+-- ============================================================================
+-- INVOICE-CHALLAN LINKING TABLE (NEW!)
+-- ============================================================================
+
+-- Link invoices to multiple delivery challans
+CREATE TABLE IF NOT EXISTS invoice_challans (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  invoice_id UUID NOT NULL REFERENCES gst_invoices(id) ON DELETE CASCADE,
+  challan_id UUID NOT NULL REFERENCES delivery_challans(id) ON DELETE CASCADE,
+  created_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(invoice_id, challan_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_invoice_challans_invoice ON invoice_challans(invoice_id);
+CREATE INDEX IF NOT EXISTS idx_invoice_challans_challan ON invoice_challans(challan_id);
+
+COMMENT ON TABLE invoice_challans IS 'Links invoices to delivery challans (many-to-many)';
+
+DO $$
+BEGIN
+  RAISE NOTICE '✅ Created: invoice_challans linking table';
+END $$;
+
+-- 11. PAYMENTS (Already exists)
+DO $$
+BEGIN
+  RAISE NOTICE '✅ Verified: payments table';
+END $$;
+
+-- 12. USER_PROFILES (Optional - for multi-user)
+DO $$
+BEGIN
+  RAISE NOTICE '✅ Verified: user_profiles table';
+END $$;
+
+-- ============================================================================
+-- HELPER FUNCTIONS
+-- ============================================================================
+
+-- Function 1: Move stock between stages
+CREATE OR REPLACE FUNCTION move_stock_to_stage(
+  p_customer_id UUID,
+  p_order_id UUID,
+  p_material_type VARCHAR,
+  p_from_stage VARCHAR,
+  p_to_stage VARCHAR,
+  p_quantity INTEGER,
+  p_ownership VARCHAR DEFAULT 'customer'
+)
+RETURNS JSONB AS $$
+DECLARE
+  v_current_qty INTEGER;
+  v_result JSONB;
+BEGIN
+  -- Check if stock exists in from_stage
+  SELECT quantity INTO v_current_qty
+  FROM material_stock
+  WHERE (customer_id = p_customer_id OR (customer_id IS NULL AND p_customer_id IS NULL))
+    AND (order_id = p_order_id OR (order_id IS NULL AND p_order_id IS NULL))
+    AND material_type = p_material_type
+    AND stage = p_from_stage
+    AND ownership = p_ownership;
+
+  IF v_current_qty IS NULL OR v_current_qty < p_quantity THEN
+    RAISE EXCEPTION 'Insufficient stock in % stage. Available: %, Requested: %',
+      p_from_stage, COALESCE(v_current_qty, 0), p_quantity;
+  END IF;
+
+  -- Reduce from source stage
+  UPDATE material_stock
+  SET quantity = quantity - p_quantity,
+      updated_at = NOW()
+  WHERE (customer_id = p_customer_id OR (customer_id IS NULL AND p_customer_id IS NULL))
+    AND (order_id = p_order_id OR (order_id IS NULL AND p_order_id IS NULL))
+    AND material_type = p_material_type
+    AND stage = p_from_stage
+    AND ownership = p_ownership;
+
+  -- Add to destination stage (insert or update)
+  INSERT INTO material_stock (
+    customer_id, order_id, material_type, stage, quantity, ownership, updated_at
+  )
+  VALUES (
+    p_customer_id, p_order_id, p_material_type, p_to_stage, p_quantity, p_ownership, NOW()
+  )
+  ON CONFLICT (customer_id, order_id, material_type, stage, ownership)
+  DO UPDATE SET
+    quantity = material_stock.quantity + p_quantity,
+    updated_at = NOW();
+
+  -- Return success
+  v_result := jsonb_build_object(
+    'success', true,
+    'message', format('Moved %s %s from %s to %s', p_quantity, p_material_type, p_from_stage, p_to_stage),
+    'quantity_moved', p_quantity,
+    'from_stage', p_from_stage,
+    'to_stage', p_to_stage
+  );
+
+  RETURN v_result;
+END;
+$$ LANGUAGE plpgsql;
+
+COMMENT ON FUNCTION move_stock_to_stage IS 'Move stock from one stage to another with validation';
+
+DO $$
+BEGIN
+  RAISE NOTICE '✅ Created: move_stock_to_stage() function';
+END $$;
+
+-- Function 2: Update design availability
+CREATE OR REPLACE FUNCTION update_design_availability(
+  p_customer_id UUID,
+  p_order_id UUID,
+  p_material_type VARCHAR,
+  p_stage VARCHAR,
+  p_designs_available BOOLEAN,
+  p_design_notes TEXT DEFAULT NULL
+)
+RETURNS JSONB AS $$
+DECLARE
+  v_result JSONB;
+  v_rows_updated INTEGER;
+BEGIN
+  UPDATE material_stock
+  SET
+    designs_available = p_designs_available,
+    design_notes = COALESCE(p_design_notes, design_notes),
+    updated_at = NOW()
+  WHERE (customer_id = p_customer_id OR (customer_id IS NULL AND p_customer_id IS NULL))
+    AND (order_id = p_order_id OR (order_id IS NULL AND p_order_id IS NULL))
+    AND material_type = p_material_type
+    AND stage = p_stage;
+
+  GET DIAGNOSTICS v_rows_updated = ROW_COUNT;
+
+  IF v_rows_updated = 0 THEN
+    RAISE EXCEPTION 'Stock not found for customer %, order %, material % in stage %',
+      p_customer_id, p_order_id, p_material_type, p_stage;
+  END IF;
+
+  v_result := jsonb_build_object(
+    'success', true,
+    'message', 'Design availability updated',
+    'designs_available', p_designs_available
+  );
+
+  RETURN v_result;
+END;
+$$ LANGUAGE plpgsql;
+
+COMMENT ON FUNCTION update_design_availability IS 'Update design availability status for stock';
+
+DO $$
+BEGIN
+  RAISE NOTICE '✅ Created: update_design_availability() function';
+END $$;
+
+-- Function 3: Get customer stock summary
+CREATE OR REPLACE FUNCTION get_customer_stock_summary(p_customer_id UUID)
+RETURNS TABLE (
+  material_type VARCHAR,
+  ownership VARCHAR,
+  received INTEGER,
+  preprocessing INTEGER,
+  printing INTEGER,
+  postprocessing INTEGER,
+  completed INTEGER,
+  misprint INTEGER,
+  damaged INTEGER,
+  total_quantity BIGINT
+) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT
+    ms.material_type,
+    ms.ownership,
+    COALESCE(SUM(CASE WHEN ms.stage = 'received' THEN ms.quantity ELSE 0 END), 0)::INTEGER AS received,
+    COALESCE(SUM(CASE WHEN ms.stage = 'preprocessing' THEN ms.quantity ELSE 0 END), 0)::INTEGER AS preprocessing,
+    COALESCE(SUM(CASE WHEN ms.stage = 'printing' THEN ms.quantity ELSE 0 END), 0)::INTEGER AS printing,
+    COALESCE(SUM(CASE WHEN ms.stage = 'postprocessing' THEN ms.quantity ELSE 0 END), 0)::INTEGER AS postprocessing,
+    COALESCE(SUM(CASE WHEN ms.stage = 'completed' THEN ms.quantity ELSE 0 END), 0)::INTEGER AS completed,
+    COALESCE(SUM(CASE WHEN ms.stage = 'misprint' THEN ms.quantity ELSE 0 END), 0)::INTEGER AS misprint,
+    COALESCE(SUM(CASE WHEN ms.stage = 'damaged' THEN ms.quantity ELSE 0 END), 0)::INTEGER AS damaged,
+    COALESCE(SUM(ms.quantity), 0) AS total_quantity
+  FROM material_stock ms
+  WHERE ms.customer_id = p_customer_id
+    AND ms.quantity > 0
+  GROUP BY ms.material_type, ms.ownership
+  ORDER BY ms.material_type, ms.ownership;
+END;
+$$ LANGUAGE plpgsql;
+
+COMMENT ON FUNCTION get_customer_stock_summary IS 'Get stock summary by stage for a customer';
+
+DO $$
+BEGIN
+  RAISE NOTICE '✅ Created: get_customer_stock_summary() function';
+END $$;
+
+-- ============================================================================
+-- REPORTING VIEWS
+-- ============================================================================
+
+-- View 1: Stock by Customer
+CREATE OR REPLACE VIEW v_stock_by_customer AS
+SELECT
+  c.id AS customer_id,
+  COALESCE(c.name, 'Own Stock') AS customer_name,
+  ms.material_type,
+  ms.ownership,
+  COALESCE(SUM(CASE WHEN ms.stage = 'received' THEN ms.quantity ELSE 0 END), 0) AS received,
+  COALESCE(SUM(CASE WHEN ms.stage = 'preprocessing' THEN ms.quantity ELSE 0 END), 0) AS preprocessing,
+  COALESCE(SUM(CASE WHEN ms.stage = 'printing' THEN ms.quantity ELSE 0 END), 0) AS printing,
+  COALESCE(SUM(CASE WHEN ms.stage = 'postprocessing' THEN ms.quantity ELSE 0 END), 0) AS postprocessing,
+  COALESCE(SUM(CASE WHEN ms.stage = 'completed' THEN ms.quantity ELSE 0 END), 0) AS completed,
+  COALESCE(SUM(CASE WHEN ms.stage = 'misprint' THEN ms.quantity ELSE 0 END), 0) AS misprint,
+  COALESCE(SUM(CASE WHEN ms.stage = 'damaged' THEN ms.quantity ELSE 0 END), 0) AS damaged,
+  COALESCE(SUM(ms.quantity), 0) AS total_quantity
+FROM material_stock ms
+LEFT JOIN customers c ON ms.customer_id = c.id
+WHERE ms.quantity > 0
+GROUP BY c.id, c.name, ms.material_type, ms.ownership
+ORDER BY customer_name, ms.material_type;
+
+DO $$
+BEGIN
+  RAISE NOTICE '✅ Created: v_stock_by_customer view';
+END $$;
+
+-- View 2: Outstanding Payments
+CREATE OR REPLACE VIEW v_outstanding_payments AS
+SELECT
+  c.id AS customer_id,
+  c.name AS customer_name,
+  COALESCE(SUM(inv.total_amount), 0) AS total_invoiced,
+  COALESCE(SUM(p.amount), 0) AS total_paid,
+  COALESCE(SUM(inv.total_amount), 0) - COALESCE(SUM(p.amount), 0) AS outstanding_amount,
+  COUNT(DISTINCT inv.id) AS invoice_count
+FROM customers c
+LEFT JOIN gst_invoices inv ON c.id = inv.customer_id AND COALESCE(inv.is_deleted, FALSE) = FALSE
+LEFT JOIN payments p ON inv.id = p.invoice_id
+GROUP BY c.id, c.name
+HAVING COALESCE(SUM(inv.total_amount), 0) - COALESCE(SUM(p.amount), 0) > 0
+ORDER BY outstanding_amount DESC;
+
+DO $$
+BEGIN
+  RAISE NOTICE '✅ Created: v_outstanding_payments view';
+END $$;
+
+-- View 3: Outstanding Orders (Pending Deliveries)
+CREATE OR REPLACE VIEW v_outstanding_orders AS
+SELECT
+  c.id AS customer_id,
+  c.name AS customer_name,
+  o.id AS order_id,
+  o.order_number,
+  ms.material_type,
+  o.total_quantity,
+  COALESCE(SUM(ci.quantity), 0) AS delivered_quantity,
+  o.total_quantity - COALESCE(SUM(ci.quantity), 0) AS pending_quantity
+FROM orders o
+JOIN customers c ON o.customer_id = c.id
+LEFT JOIN material_stock ms ON o.id = ms.order_id
+LEFT JOIN delivery_challans dc ON o.id = dc.order_id AND COALESCE(dc.is_deleted, FALSE) = FALSE
+LEFT JOIN challan_items ci ON dc.id = ci.challan_id AND ci.material_type = ms.material_type
+WHERE o.status != 'completed'
+GROUP BY c.id, c.name, o.id, o.order_number, o.total_quantity, ms.material_type
+HAVING o.total_quantity - COALESCE(SUM(ci.quantity), 0) > 0
+ORDER BY c.name, o.order_number;
+
+DO $$
+BEGIN
+  RAISE NOTICE '✅ Created: v_outstanding_orders view';
+END $$;
+
+-- View 4: Misprint Stock (Available for Sale)
+CREATE OR REPLACE VIEW v_misprint_stock AS
+SELECT
+  material_type,
+  ownership,
+  SUM(quantity) AS total_quantity,
+  COALESCE(c.name, 'Own Stock') AS source
+FROM material_stock ms
+LEFT JOIN customers c ON ms.customer_id = c.id
+WHERE ms.stage = 'misprint'
+  AND ms.quantity > 0
+GROUP BY material_type, ownership, c.name
+ORDER BY material_type;
+
+DO $$
+BEGIN
+  RAISE NOTICE '✅ Created: v_misprint_stock view';
+END $$;
+
+-- ============================================================================
+-- VERIFICATION & COMPLETION
+-- ============================================================================
+
+DO $$
+DECLARE
+  table_count INTEGER;
+  function_count INTEGER;
+  view_count INTEGER;
+BEGIN
+  -- Count tables
+  SELECT COUNT(*) INTO table_count
+  FROM information_schema.tables
+  WHERE table_schema = 'public'
+    AND table_name IN (
+      'customers', 'orders', 'material_in', 'material_stock',
+      'returns', 'credit_notes', 'misprint_sales',
+      'delivery_challans', 'challan_items',
+      'gst_invoices', 'payments', 'invoice_challans', 'material_types'
+    );
+
+  -- Count functions
+  SELECT COUNT(*) INTO function_count
+  FROM information_schema.routines
+  WHERE routine_schema = 'public'
+    AND routine_name IN (
+      'move_stock_to_stage',
+      'update_design_availability',
+      'get_customer_stock_summary',
+      'generate_order_number',
+      'generate_receipt_number',
+      'generate_challan_number',
+      'generate_invoice_number',
+      'generate_credit_note_number',
+      'generate_misprint_sale_number'
+    );
+
+  -- Count views
+  SELECT COUNT(*) INTO view_count
+  FROM information_schema.views
+  WHERE table_schema = 'public'
+    AND table_name LIKE 'v_%';
+
+  RAISE NOTICE '';
+  RAISE NOTICE '========================================================================';
+  RAISE NOTICE '✅ SIMPLIFIED SCHEMA V2 COMPLETE!';
+  RAISE NOTICE '========================================================================';
+  RAISE NOTICE '';
+  RAISE NOTICE '📊 SUMMARY:';
+  RAISE NOTICE '   • Core Tables: % (including material_types & invoice_challans)', table_count;
+  RAISE NOTICE '   • Helper Functions: %', function_count;
+  RAISE NOTICE '   • Reporting Views: %', view_count;
+  RAISE NOTICE '';
+  RAISE NOTICE '✅ NEW FEATURES:';
+  RAISE NOTICE '   • Auto-generated unique IDs for orders, receipts, challans, invoices';
+  RAISE NOTICE '   • Product types table (Sarees, Dupattas, Voni, Lehenga, Running Material)';
+  RAISE NOTICE '   • Invoice-Challan linking (create invoices from delivery challans)';
+  RAISE NOTICE '   • Sequences for consistent numbering (ORD-20251220-0001, etc.)';
+  RAISE NOTICE '';
+  RAISE NOTICE '🎯 UNIQUE ID FORMATS:';
+  RAISE NOTICE '   • Orders:      ORD-YYYYMMDD-0001';
+  RAISE NOTICE '   • Receipts:    RCP-YYYYMMDD-0001';
+  RAISE NOTICE '   • Challans:    CHN-YYYYMMDD-0001';
+  RAISE NOTICE '   • Invoices:    INV-YYYYMMDD-0001';
+  RAISE NOTICE '   • Credit Notes: CN-YYYYMMDD-0001';
+  RAISE NOTICE '   • Misprint Sales: MS-YYYYMMDD-0001';
+  RAISE NOTICE '';
+  RAISE NOTICE '========================================================================';
+  RAISE NOTICE '';
+END $$;

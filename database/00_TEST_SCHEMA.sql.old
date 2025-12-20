@@ -1,0 +1,192 @@
+-- ============================================================================
+-- SCHEMA TESTING SCRIPT
+-- ============================================================================
+-- Execute this to test if the schema is working correctly
+-- This creates sample data and tests all features
+-- ============================================================================
+
+DO $$
+BEGIN
+  RAISE NOTICE '';
+  RAISE NOTICE '========================================================================';
+  RAISE NOTICE '🧪 TESTING SIMPLIFIED SCHEMA V2';
+  RAISE NOTICE '========================================================================';
+  RAISE NOTICE '';
+END $$;
+
+-- ============================================================================
+-- TEST 1: Check if all tables exist
+-- ============================================================================
+
+DO $$
+DECLARE
+  v_table_name TEXT;
+  v_count INTEGER := 0;
+  v_expected_tables TEXT[] := ARRAY[
+    'customers', 'orders', 'material_in', 'material_stock',
+    'returns', 'credit_notes', 'misprint_sales',
+    'delivery_challans', 'challan_items',
+    'gst_invoices', 'payments', 'invoice_challans', 'material_types'
+  ];
+BEGIN
+  RAISE NOTICE '🔍 TEST 1: Checking if all tables exist...';
+
+  FOREACH v_table_name IN ARRAY v_expected_tables
+  LOOP
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = v_table_name AND table_schema = 'public') THEN
+      v_count := v_count + 1;
+      RAISE NOTICE '   ✅ Table exists: %', v_table_name;
+    ELSE
+      RAISE NOTICE '   ❌ Table missing: %', v_table_name;
+    END IF;
+  END LOOP;
+
+  RAISE NOTICE '';
+  RAISE NOTICE '   Result: % / % tables exist', v_count, array_length(v_expected_tables, 1);
+  RAISE NOTICE '';
+END $$;
+
+-- ============================================================================
+-- TEST 2: Check if all functions exist
+-- ============================================================================
+
+DO $$
+DECLARE
+  v_function_name TEXT;
+  v_count INTEGER := 0;
+  v_expected_functions TEXT[] := ARRAY[
+    'generate_order_number',
+    'generate_receipt_number',
+    'generate_challan_number',
+    'generate_invoice_number',
+    'generate_credit_note_number',
+    'generate_misprint_sale_number',
+    'move_stock_to_stage',
+    'update_design_availability',
+    'get_customer_stock_summary'
+  ];
+BEGIN
+  RAISE NOTICE '🔍 TEST 2: Checking if all functions exist...';
+
+  FOREACH v_function_name IN ARRAY v_expected_functions
+  LOOP
+    IF EXISTS (SELECT 1 FROM information_schema.routines WHERE routine_name = v_function_name AND routine_schema = 'public') THEN
+      v_count := v_count + 1;
+      RAISE NOTICE '   ✅ Function exists: %', v_function_name;
+    ELSE
+      RAISE NOTICE '   ❌ Function missing: %', v_function_name;
+    END IF;
+  END LOOP;
+
+  RAISE NOTICE '';
+  RAISE NOTICE '   Result: % / % functions exist', v_count, array_length(v_expected_functions, 1);
+  RAISE NOTICE '';
+END $$;
+
+-- ============================================================================
+-- TEST 3: Check if all views exist
+-- ============================================================================
+
+DO $$
+DECLARE
+  v_view_name TEXT;
+  v_count INTEGER := 0;
+  v_expected_views TEXT[] := ARRAY[
+    'v_stock_by_customer',
+    'v_outstanding_payments',
+    'v_outstanding_orders',
+    'v_misprint_stock'
+  ];
+BEGIN
+  RAISE NOTICE '🔍 TEST 3: Checking if all views exist...';
+
+  FOREACH v_view_name IN ARRAY v_expected_views
+  LOOP
+    IF EXISTS (SELECT 1 FROM information_schema.views WHERE table_name = v_view_name AND table_schema = 'public') THEN
+      v_count := v_count + 1;
+      RAISE NOTICE '   ✅ View exists: %', v_view_name;
+    ELSE
+      RAISE NOTICE '   ❌ View missing: %', v_view_name;
+    END IF;
+  END LOOP;
+
+  RAISE NOTICE '';
+  RAISE NOTICE '   Result: % / % views exist', v_count, array_length(v_expected_views, 1);
+  RAISE NOTICE '';
+END $$;
+
+-- ============================================================================
+-- TEST 4: Test auto-generated numbers
+-- ============================================================================
+
+DO $$
+DECLARE
+  v_order_num TEXT;
+  v_receipt_num TEXT;
+  v_challan_num TEXT;
+  v_invoice_num TEXT;
+BEGIN
+  RAISE NOTICE '🔍 TEST 4: Testing auto-generated numbers...';
+
+  SELECT generate_order_number() INTO v_order_num;
+  RAISE NOTICE '   ✅ Order number: %', v_order_num;
+
+  SELECT generate_receipt_number() INTO v_receipt_num;
+  RAISE NOTICE '   ✅ Receipt number: %', v_receipt_num;
+
+  SELECT generate_challan_number() INTO v_challan_num;
+  RAISE NOTICE '   ✅ Challan number: %', v_challan_num;
+
+  SELECT generate_invoice_number() INTO v_invoice_num;
+  RAISE NOTICE '   ✅ Invoice number: %', v_invoice_num;
+
+  RAISE NOTICE '';
+END $$;
+
+-- ============================================================================
+-- TEST 5: Check product types
+-- ============================================================================
+
+DO $$
+DECLARE
+  v_count INTEGER;
+BEGIN
+  RAISE NOTICE '🔍 TEST 5: Checking product types...';
+
+  SELECT COUNT(*) INTO v_count FROM material_types WHERE is_active = TRUE;
+
+  IF v_count >= 5 THEN
+    RAISE NOTICE '   ✅ Product types loaded: % types', v_count;
+
+    FOR rec IN (SELECT type_code, type_name FROM material_types WHERE is_active = TRUE ORDER BY type_name)
+    LOOP
+      RAISE NOTICE '      - % (%)  ', rec.type_name, rec.type_code;
+    END LOOP;
+  ELSE
+    RAISE NOTICE '   ❌ Product types not loaded properly (found: %)', v_count;
+  END IF;
+
+  RAISE NOTICE '';
+END $$;
+
+-- ============================================================================
+-- FINAL SUMMARY
+-- ============================================================================
+
+DO $$
+BEGIN
+  RAISE NOTICE '';
+  RAISE NOTICE '========================================================================';
+  RAISE NOTICE '✅ SCHEMA TESTING COMPLETE!';
+  RAISE NOTICE '========================================================================';
+  RAISE NOTICE '';
+  RAISE NOTICE 'If all tests passed, your schema is ready to use!';
+  RAISE NOTICE '';
+  RAISE NOTICE 'Next steps:';
+  RAISE NOTICE '1. Start using the simplified API in your frontend';
+  RAISE NOTICE '2. Create the 9 frontend pages';
+  RAISE NOTICE '3. Test the complete workflow';
+  RAISE NOTICE '';
+  RAISE NOTICE '========================================================================';
+  RAISE NOTICE '';
+END $$;

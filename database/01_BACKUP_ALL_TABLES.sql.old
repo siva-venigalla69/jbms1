@@ -1,0 +1,311 @@
+-- ============================================================================
+-- STEP 1: BACKUP ALL EXISTING TABLES
+-- ============================================================================
+-- Execute this in Supabase SQL Editor BEFORE any changes
+-- This creates backup copies of all tables with data
+-- ============================================================================
+
+-- Create schema for backups
+CREATE SCHEMA IF NOT EXISTS backup_schema;
+
+-- Set search path
+SET search_path TO public, backup_schema;
+
+DO $$
+BEGIN
+  RAISE NOTICE '';
+  RAISE NOTICE '========================================================================';
+  RAISE NOTICE '🔄 STARTING COMPLETE DATABASE BACKUP';
+  RAISE NOTICE '========================================================================';
+  RAISE NOTICE '';
+END $$;
+
+-- ============================================================================
+-- BACKUP: Design Management Tables (12 tables)
+-- ============================================================================
+
+DO $$ BEGIN
+  IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'design_submissions') THEN
+    EXECUTE 'CREATE TABLE backup_schema.design_submissions AS SELECT * FROM public.design_submissions';
+    RAISE NOTICE '✅ Backed up: design_submissions';
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'design_files') THEN
+    EXECUTE 'CREATE TABLE backup_schema.design_files AS SELECT * FROM public.design_files';
+    RAISE NOTICE '✅ Backed up: design_files';
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'design_status') THEN
+    EXECUTE 'CREATE TABLE backup_schema.design_status AS SELECT * FROM public.design_status';
+    RAISE NOTICE '✅ Backed up: design_status';
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'design_status_history') THEN
+    EXECUTE 'CREATE TABLE backup_schema.design_status_history AS SELECT * FROM public.design_status_history';
+    RAISE NOTICE '✅ Backed up: design_status_history';
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'customer_designs') THEN
+    EXECUTE 'CREATE TABLE backup_schema.customer_designs AS SELECT * FROM public.customer_designs';
+    RAISE NOTICE '✅ Backed up: customer_designs';
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'design_library') THEN
+    EXECUTE 'CREATE TABLE backup_schema.design_library AS SELECT * FROM public.design_library';
+    RAISE NOTICE '✅ Backed up: design_library';
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'material_design_mapping') THEN
+    EXECUTE 'CREATE TABLE backup_schema.material_design_mapping AS SELECT * FROM public.material_design_mapping';
+    RAISE NOTICE '✅ Backed up: material_design_mapping';
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'design_printing_queue') THEN
+    EXECUTE 'CREATE TABLE backup_schema.design_printing_queue AS SELECT * FROM public.design_printing_queue';
+    RAISE NOTICE '✅ Backed up: design_printing_queue';
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'design_material_requirements') THEN
+    EXECUTE 'CREATE TABLE backup_schema.design_material_requirements AS SELECT * FROM public.design_material_requirements';
+    RAISE NOTICE '✅ Backed up: design_material_requirements';
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'designer_assignments') THEN
+    EXECUTE 'CREATE TABLE backup_schema.designer_assignments AS SELECT * FROM public.designer_assignments';
+    RAISE NOTICE '✅ Backed up: designer_assignments';
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'assignment_history') THEN
+    EXECUTE 'CREATE TABLE backup_schema.assignment_history AS SELECT * FROM public.assignment_history';
+    RAISE NOTICE '✅ Backed up: assignment_history';
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'customer_design_summary') THEN
+    EXECUTE 'CREATE TABLE backup_schema.customer_design_summary AS SELECT * FROM public.customer_design_summary';
+    RAISE NOTICE '✅ Backed up: customer_design_summary';
+  END IF;
+END $$;
+
+-- ============================================================================
+-- BACKUP: Production Scheduling Tables (8 tables)
+-- ============================================================================
+
+DO $$ BEGIN
+  IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'production_schedule') THEN
+    EXECUTE 'CREATE TABLE backup_schema.production_schedule AS SELECT * FROM public.production_schedule';
+    RAISE NOTICE '✅ Backed up: production_schedule';
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'production_dependencies') THEN
+    EXECUTE 'CREATE TABLE backup_schema.production_dependencies AS SELECT * FROM public.production_dependencies';
+    RAISE NOTICE '✅ Backed up: production_dependencies';
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'production_stage_progress') THEN
+    EXECUTE 'CREATE TABLE backup_schema.production_stage_progress AS SELECT * FROM public.production_stage_progress';
+    RAISE NOTICE '✅ Backed up: production_stage_progress';
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'production_batches') THEN
+    EXECUTE 'CREATE TABLE backup_schema.production_batches AS SELECT * FROM public.production_batches';
+    RAISE NOTICE '✅ Backed up: production_batches';
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'order_items') THEN
+    EXECUTE 'CREATE TABLE backup_schema.order_items AS SELECT * FROM public.order_items';
+    RAISE NOTICE '✅ Backed up: order_items';
+  END IF;
+END $$;
+
+-- ============================================================================
+-- BACKUP: Invoice Complexity Tables (6 tables)
+-- ============================================================================
+
+DO $$ BEGIN
+  IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'invoice_line_items') THEN
+    EXECUTE 'CREATE TABLE backup_schema.invoice_line_items AS SELECT * FROM public.invoice_line_items';
+    RAISE NOTICE '✅ Backed up: invoice_line_items';
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'invoice_challans') THEN
+    EXECUTE 'CREATE TABLE backup_schema.invoice_challans AS SELECT * FROM public.invoice_challans';
+    RAISE NOTICE '✅ Backed up: invoice_challans';
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'invoice_approvals') THEN
+    EXECUTE 'CREATE TABLE backup_schema.invoice_approvals AS SELECT * FROM public.invoice_approvals';
+    RAISE NOTICE '✅ Backed up: invoice_approvals';
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'invoice_revisions') THEN
+    EXECUTE 'CREATE TABLE backup_schema.invoice_revisions AS SELECT * FROM public.invoice_revisions';
+    RAISE NOTICE '✅ Backed up: invoice_revisions';
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'invoice_templates') THEN
+    EXECUTE 'CREATE TABLE backup_schema.invoice_templates AS SELECT * FROM public.invoice_templates';
+    RAISE NOTICE '✅ Backed up: invoice_templates';
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'invoice_sources_enhanced') THEN
+    EXECUTE 'CREATE TABLE backup_schema.invoice_sources_enhanced AS SELECT * FROM public.invoice_sources_enhanced';
+    RAISE NOTICE '✅ Backed up: invoice_sources_enhanced';
+  END IF;
+END $$;
+
+-- ============================================================================
+-- BACKUP: Employee/Payroll Tables (5 tables)
+-- ============================================================================
+
+DO $$ BEGIN
+  IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'employees') THEN
+    EXECUTE 'CREATE TABLE backup_schema.employees AS SELECT * FROM public.employees';
+    RAISE NOTICE '✅ Backed up: employees';
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'salary_payments') THEN
+    EXECUTE 'CREATE TABLE backup_schema.salary_payments AS SELECT * FROM public.salary_payments';
+    RAISE NOTICE '✅ Backed up: salary_payments';
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'expenses') THEN
+    EXECUTE 'CREATE TABLE backup_schema.expenses AS SELECT * FROM public.expenses';
+    RAISE NOTICE '✅ Backed up: expenses';
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'purchases') THEN
+    EXECUTE 'CREATE TABLE backup_schema.purchases AS SELECT * FROM public.purchases';
+    RAISE NOTICE '✅ Backed up: purchases';
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'purchase_items') THEN
+    EXECUTE 'CREATE TABLE backup_schema.purchase_items AS SELECT * FROM public.purchase_items';
+    RAISE NOTICE '✅ Backed up: purchase_items';
+  END IF;
+END $$;
+
+-- ============================================================================
+-- BACKUP: Audit/Logging Tables (4 tables)
+-- ============================================================================
+
+DO $$ BEGIN
+  IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'audit_trail') THEN
+    EXECUTE 'CREATE TABLE backup_schema.audit_trail AS SELECT * FROM public.audit_trail';
+    RAISE NOTICE '✅ Backed up: audit_trail';
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'user_activity_log') THEN
+    EXECUTE 'CREATE TABLE backup_schema.user_activity_log AS SELECT * FROM public.user_activity_log';
+    RAISE NOTICE '✅ Backed up: user_activity_log';
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'user_notifications') THEN
+    EXECUTE 'CREATE TABLE backup_schema.user_notifications AS SELECT * FROM public.user_notifications';
+    RAISE NOTICE '✅ Backed up: user_notifications';
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'system_settings') THEN
+    EXECUTE 'CREATE TABLE backup_schema.system_settings AS SELECT * FROM public.system_settings';
+    RAISE NOTICE '✅ Backed up: system_settings';
+  END IF;
+END $$;
+
+-- ============================================================================
+-- VERIFICATION
+-- ============================================================================
+
+DO $$
+DECLARE
+  backup_count INTEGER;
+  original_count INTEGER;
+BEGIN
+  -- Count tables in backup schema
+  SELECT COUNT(*) INTO backup_count
+  FROM information_schema.tables
+  WHERE table_schema = 'backup_schema';
+
+  -- Count tables in public schema
+  SELECT COUNT(*) INTO original_count
+  FROM information_schema.tables
+  WHERE table_schema = 'public';
+
+  RAISE NOTICE '';
+  RAISE NOTICE '========================================================================';
+  RAISE NOTICE '✅ BACKUP COMPLETE!';
+  RAISE NOTICE '========================================================================';
+  RAISE NOTICE '';
+  RAISE NOTICE '📊 BACKUP SUMMARY:';
+  RAISE NOTICE '   • Tables backed up: %', backup_count;
+  RAISE NOTICE '   • Original tables: %', original_count;
+  RAISE NOTICE '   • Backup location: backup_schema';
+  RAISE NOTICE '';
+  RAISE NOTICE '⚠️  IMPORTANT:';
+  RAISE NOTICE '   • Backups are in backup_schema';
+  RAISE NOTICE '   • To restore: COPY from backup_schema to public';
+  RAISE NOTICE '   • Keep backups until migration is verified';
+  RAISE NOTICE '';
+  RAISE NOTICE '========================================================================';
+  RAISE NOTICE '';
+END $$;
+
+-- List all backed up tables
+SELECT
+  table_name,
+  (SELECT COUNT(*) FROM backup_schema.|| table_name ||) AS row_count
+FROM information_schema.tables
+WHERE table_schema = 'backup_schema'
+ORDER BY table_name;

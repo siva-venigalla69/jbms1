@@ -1,0 +1,192 @@
+-- ============================================================================
+-- STEP 3: DROP UNUSED TABLES (After Backup & Simplified Schema Creation)
+-- ============================================================================
+-- Execute this ONLY AFTER:
+-- 1. Step 1 (Backup) is complete
+-- 2. Step 2 (Simplified Schema) is complete
+-- 3. You've verified backups are in backup_schema
+-- ============================================================================
+
+-- Set search path
+SET search_path TO public;
+
+DO $$
+BEGIN
+  RAISE NOTICE '';
+  RAISE NOTICE '========================================================================';
+  RAISE NOTICE '🗑️  STARTING CLEANUP OF UNUSED TABLES';
+  RAISE NOTICE '========================================================================';
+  RAISE NOTICE '';
+  RAISE NOTICE '⚠️  WARNING: This will drop 40+ tables from public schema';
+  RAISE NOTICE '   Backups are available in backup_schema';
+  RAISE NOTICE '';
+END $$;
+
+-- ============================================================================
+-- DROP: Design Management Tables (12 tables) - NOT NEEDED
+-- ============================================================================
+
+DO $$ BEGIN
+  RAISE NOTICE '📦 Dropping Design Management Tables...';
+END $$;
+
+DROP TABLE IF EXISTS public.design_submissions CASCADE;
+DROP TABLE IF EXISTS public.design_files CASCADE;
+DROP TABLE IF EXISTS public.design_status CASCADE;
+DROP TABLE IF EXISTS public.design_status_history CASCADE;
+DROP TABLE IF EXISTS public.customer_designs CASCADE;
+DROP TABLE IF EXISTS public.design_library CASCADE;
+DROP TABLE IF EXISTS public.material_design_mapping CASCADE;
+DROP TABLE IF EXISTS public.design_printing_queue CASCADE;
+DROP TABLE IF EXISTS public.design_material_requirements CASCADE;
+DROP TABLE IF EXISTS public.designer_assignments CASCADE;
+DROP TABLE IF EXISTS public.assignment_history CASCADE;
+DROP TABLE IF EXISTS public.customer_design_summary CASCADE;
+
+DO $$ BEGIN
+  RAISE NOTICE '✅ Dropped 12 design management tables';
+END $$;
+
+-- ============================================================================
+-- DROP: Production Scheduling Tables (8 tables) - NOT NEEDED
+-- ============================================================================
+
+DO $$ BEGIN
+  RAISE NOTICE '📦 Dropping Production Scheduling Tables...';
+END $$;
+
+DROP TABLE IF EXISTS public.production_schedule CASCADE;
+DROP TABLE IF EXISTS public.production_dependencies CASCADE;
+DROP TABLE IF EXISTS public.production_stage_progress CASCADE;
+DROP TABLE IF EXISTS public.production_batches CASCADE;
+DROP TABLE IF EXISTS public.order_items CASCADE;
+
+DO $$ BEGIN
+  RAISE NOTICE '✅ Dropped 5 production scheduling tables';
+END $$;
+
+-- ============================================================================
+-- DROP: Invoice Complexity Tables (6 tables) - NOT NEEDED
+-- ============================================================================
+
+DO $$ BEGIN
+  RAISE NOTICE '📦 Dropping Invoice Complexity Tables...';
+END $$;
+
+DROP TABLE IF EXISTS public.invoice_line_items CASCADE;
+DROP TABLE IF EXISTS public.invoice_challans CASCADE;
+DROP TABLE IF EXISTS public.invoice_approvals CASCADE;
+DROP TABLE IF EXISTS public.invoice_revisions CASCADE;
+DROP TABLE IF EXISTS public.invoice_templates CASCADE;
+DROP TABLE IF EXISTS public.invoice_sources_enhanced CASCADE;
+
+DO $$ BEGIN
+  RAISE NOTICE '✅ Dropped 6 invoice complexity tables';
+END $$;
+
+-- ============================================================================
+-- DROP: Employee/Payroll Tables (5 tables) - NOT NEEDED
+-- ============================================================================
+
+DO $$ BEGIN
+  RAISE NOTICE '📦 Dropping Employee/Payroll Tables...';
+END $$;
+
+DROP TABLE IF EXISTS public.employees CASCADE;
+DROP TABLE IF EXISTS public.salary_payments CASCADE;
+DROP TABLE IF EXISTS public.expenses CASCADE;
+DROP TABLE IF EXISTS public.purchases CASCADE;
+DROP TABLE IF EXISTS public.purchase_items CASCADE;
+
+DO $$ BEGIN
+  RAISE NOTICE '✅ Dropped 5 employee/payroll tables';
+END $$;
+
+-- ============================================================================
+-- DROP: Audit/Logging Tables (4 tables) - OPTIONAL (Keep if needed)
+-- ============================================================================
+
+-- UNCOMMENT BELOW IF YOU WANT TO DROP AUDIT TABLES
+-- (Recommended to keep user_activity_log and system_settings)
+
+-- DO $$ BEGIN
+--   RAISE NOTICE '📦 Dropping Audit/Logging Tables...';
+-- END $$;
+
+-- DROP TABLE IF EXISTS public.audit_trail CASCADE;
+-- DROP TABLE IF EXISTS public.user_activity_log CASCADE;
+-- DROP TABLE IF EXISTS public.user_notifications CASCADE;
+-- DROP TABLE IF EXISTS public.system_settings CASCADE;
+
+-- DO $$ BEGIN
+--   RAISE NOTICE '✅ Dropped 4 audit/logging tables';
+-- END $$;
+
+-- ============================================================================
+-- KEEP: Core Business Tables (11 tables)
+-- ============================================================================
+
+-- These tables are KEPT and used in simplified system:
+-- 1. customers
+-- 2. orders
+-- 3. material_in
+-- 4. material_stock (recreated in step 2)
+-- 5. delivery_challans
+-- 6. challan_items
+-- 7. gst_invoices
+-- 8. payments
+-- 9. returns (new - created in step 2)
+-- 10. credit_notes (new - created in step 2)
+-- 11. misprint_sales (new - created in step 2)
+
+-- ALSO KEEP:
+-- - user_profiles (for authentication)
+-- - user_activity_log (optional - for audit)
+-- - system_settings (optional - for configuration)
+
+-- ============================================================================
+-- VERIFICATION
+-- ============================================================================
+
+DO $$
+DECLARE
+  public_count INTEGER;
+  backup_count INTEGER;
+BEGIN
+  -- Count tables in public schema
+  SELECT COUNT(*) INTO public_count
+  FROM information_schema.tables
+  WHERE table_schema = 'public';
+
+  -- Count tables in backup schema
+  SELECT COUNT(*) INTO backup_count
+  FROM information_schema.tables
+  WHERE table_schema = 'backup_schema';
+
+  RAISE NOTICE '';
+  RAISE NOTICE '========================================================================';
+  RAISE NOTICE '✅ CLEANUP COMPLETE!';
+  RAISE NOTICE '========================================================================';
+  RAISE NOTICE '';
+  RAISE NOTICE '📊 FINAL SUMMARY:';
+  RAISE NOTICE '   • Tables in public schema: %', public_count;
+  RAISE NOTICE '   • Tables in backup_schema: %', backup_count;
+  RAISE NOTICE '   • Simplified system ready!';
+  RAISE NOTICE '';
+  RAISE NOTICE '⚠️  IMPORTANT:';
+  RAISE NOTICE '   • All dropped tables are backed up in backup_schema';
+  RAISE NOTICE '   • To restore: COPY from backup_schema to public';
+  RAISE NOTICE '   • Keep backup_schema until new system is verified';
+  RAISE NOTICE '';
+  RAISE NOTICE '========================================================================';
+  RAISE NOTICE '';
+END $$;
+
+-- List remaining tables in public schema
+SELECT
+  table_name,
+  (SELECT COUNT(*) FROM information_schema.columns
+   WHERE table_schema = 'public' AND table_name = t.table_name) AS column_count
+FROM information_schema.tables t
+WHERE table_schema = 'public'
+ORDER BY table_name;

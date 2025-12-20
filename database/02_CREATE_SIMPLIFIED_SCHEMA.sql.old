@@ -1,0 +1,535 @@
+-- ============================================================================
+-- STEP 2: CREATE SIMPLIFIED SCHEMA (11 Core Tables)
+-- ============================================================================
+-- Simplified textile management system
+-- Handles: Job Work + Own Stock + Returns + Misprints
+-- ============================================================================
+
+DO $$
+BEGIN
+  RAISE NOTICE '';
+  RAISE NOTICE '========================================================================';
+  RAISE NOTICE '🔧 CREATING SIMPLIFIED SCHEMA';
+  RAISE NOTICE '========================================================================';
+  RAISE NOTICE '';
+END $$;
+
+-- ============================================================================
+-- CORE TABLES
+-- ============================================================================
+
+-- 1. CUSTOMERS (Keep as is - already simple)
+-- Already exists, just ensure it has what we need
+ALTER TABLE customers
+ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE;
+
+RAISE NOTICE '✅ Verified: customers table';
+
+-- 2. ORDERS (Add ownership type)
+ALTER TABLE orders
+ADD COLUMN IF NOT EXISTS ownership_type VARCHAR(50) DEFAULT 'customer_material'
+  CHECK (ownership_type IN ('customer_material', 'own_stock'));
+
+COMMENT ON COLUMN orders.ownership_type IS 'customer_material = job work, own_stock = your inventory';
+
+RAISE NOTICE '✅ Updated: orders table';
+
+-- 3. MATERIAL_IN (Add ownership)
+ALTER TABLE material_in
+ADD COLUMN IF NOT EXISTS ownership VARCHAR(20) DEFAULT 'customer'
+  CHECK (ownership IN ('customer', 'self'));
+
+COMMENT ON COLUMN material_in.ownership IS 'customer = job work material, self = your own stock';
+
+RAISE NOTICE '✅ Updated: material_in table';
+
+-- 4. MATERIAL_STOCK (Core - expand for all use cases)
+-- Drop existing if needed and recreate
+DROP TABLE IF EXISTS material_stock CASCADE;
+
+CREATE TABLE material_stock (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  customer_id UUID REFERENCES customers(id), -- NULL for own stock
+  order_id UUID REFERENCES orders(id),
+  material_type VARCHAR(50) NOT NULL,
+  stage VARCHAR(50) NOT NULL CHECK (stage IN (
+    'received',      -- Initial receipt
+    'preprocessing', -- Padding/treatment
+    'printing',      -- Printing process
+    'postprocessing',-- Washing/finishing
+    'completed',     -- Ready for delivery
+    'misprint',      -- Printing errors
+    'damaged',       -- Fabric defects
+    'sold'           -- Your stock that was sold
+  )),
+  quantity INTEGER NOT NULL CHECK (quantity >= 0),
+  ownership VARCHAR(20) DEFAULT 'customer' CHECK (ownership IN ('customer', 'self')),
+  design_available BOOLEAN DEFAULT FALSE,
+  design_notes TEXT,
+  unit_cost DECIMAL(10,2), -- Cost per unit (for own stock)
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(customer_id, order_id, material_type, stage, ownership)
+);
+
+CREATE INDEX idx_material_stock_customer ON material_stock(customer_id);
+CREATE INDEX idx_material_stock_stage ON material_stock(stage) WHERE quantity > 0;
+CREATE INDEX idx_material_stock_ownership ON material_stock(ownership);
+CREATE INDEX idx_material_stock_lookup ON material_stock(customer_id, material_type, stage) WHERE quantity > 0;
+
+COMMENT ON TABLE material_stock IS 'Real-time stock tracking at each stage - supports both job work and own stock';
+COMMENT ON COLUMN material_stock.ownership IS 'customer = job work, self = your inventory';
+COMMENT ON COLUMN material_stock.stage IS 'Current location/stage of the stock';
+
+RAISE NOTICE '✅ Created: material_stock table (CORE)';
+
+-- ============================================================================
+-- RETURNS & ADJUSTMENTS
+-- ============================================================================
+
+-- 5. RETURNS (New table)
+CREATE TABLE IF NOT EXISTS returns (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  customer_id UUID REFERENCES customers(id),
+  order_id UUID REFERENCES orders(id),
+  return_type VARCHAR(50) NOT NULL CHECK (return_type IN (
+    'customer_return',  -- Customer returns misprints to you
+    'damaged_return'    -- You return damaged fabric to customer
+  )),
+  material_type VARCHAR(50) NOT NULL,
+  quantity INTEGER NOT NULL CHECK (quantity > 0),
+  reason TEXT,
+  return_date DATE DEFAULT CURRENT_DATE,
+  adjustment_amount DECIMAL(10,2), -- Amount to adjust in invoice
+  status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'processed', 'credited')),
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_returns_customer ON returns(customer_id);
+CREATE INDEX idx_returns_order ON returns(order_id);
+CREATE INDEX idx_returns_status ON returns(status) WHERE status != 'processed';
+
+COMMENT ON TABLE returns IS 'Track customer returns (misprints) and damaged fabric returns';
+
+RAISE NOTICE '✅ Created: returns table';
+
+-- 6. CREDIT_NOTES (New table)
+CREATE TABLE IF NOT EXISTS credit_notes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  credit_note_number VARCHAR(50) UNIQUE NOT NULL,
+  customer_id UUID NOT NULL REFERENCES customers(id),
+  invoice_id UUID REFERENCES gst_invoices(id),
+  order_id UUID REFERENCES orders(id),
+  credit_amount DECIMAL(10,2) NOT NULL CHECK (credit_amount > 0),
+  reason TEXT NOT NULL,
+  status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'applied', 'cancelled')),
+  applied_to_invoice_id UUID REFERENCES gst_invoices(id), -- Which invoice was adjusted
+  applied_date DATE,
+  notes TEXT,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_credit_notes_customer ON credit_notes(customer_id);
+CREATE INDEX idx_credit_notes_invoice ON credit_notes(invoice_id);
+CREATE INDEX idx_credit_notes_status ON credit_notes(status) WHERE status = 'pending';
+
+COMMENT ON TABLE credit_notes IS 'Credit notes for adjustments (misprints, returns, errors)';
+
+RAISE NOTICE '✅ Created: credit_notes table';
+
+-- ============================================================================
+-- MISPRINT SALES
+-- ============================================================================
+
+-- 7. MISPRINT_SALES (New table)
+CREATE TABLE IF NOT EXISTS misprint_sales (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  sale_number VARCHAR(50) UNIQUE NOT NULL,
+  sale_date DATE DEFAULT CURRENT_DATE,
+  material_type VARCHAR(50) NOT NULL,
+  quantity INTEGER NOT NULL CHECK (quantity > 0),
+  unit_price DECIMAL(10,2) NOT NULL,
+  total_amount DECIMAL(10,2) NOT NULL,
+  customer_name VARCHAR(255), -- Direct sales, may not be in customers table
+  phone VARCHAR(20),
+  payment_method VARCHAR(50),
+  notes TEXT,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_misprint_sales_date ON misprint_sales(sale_date DESC);
+
+COMMENT ON TABLE misprint_sales IS 'Sales of misprinted sarees at discounted prices';
+
+RAISE NOTICE '✅ Created: misprint_sales table';
+
+-- ============================================================================
+-- DELIVERY & FINANCIAL TABLES (Keep existing, minor updates)
+-- ============================================================================
+
+-- 8. DELIVERY_CHALLANS (Already exists, just verify)
+ALTER TABLE delivery_challans
+ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE;
+
+RAISE NOTICE '✅ Verified: delivery_challans table';
+
+-- 9. CHALLAN_ITEMS (Already exists)
+RAISE NOTICE '✅ Verified: challan_items table';
+
+-- 10. GST_INVOICES (Add invoice type)
+ALTER TABLE gst_invoices
+ADD COLUMN IF NOT EXISTS invoice_type VARCHAR(20) DEFAULT 'job_work'
+  CHECK (invoice_type IN ('job_work', 'sales', 'misprint_sale'));
+
+ALTER TABLE gst_invoices
+ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE;
+
+COMMENT ON COLUMN gst_invoices.invoice_type IS 'job_work = service invoice, sales = product sale, misprint_sale = discounted sale';
+
+RAISE NOTICE '✅ Updated: gst_invoices table';
+
+-- 11. PAYMENTS (Already exists)
+RAISE NOTICE '✅ Verified: payments table';
+
+-- 12. USER_PROFILES (Optional - for multi-user)
+RAISE NOTICE '✅ Verified: user_profiles table';
+
+-- ============================================================================
+-- HELPER FUNCTIONS
+-- ============================================================================
+
+-- Function 1: Get stock summary for a customer
+CREATE OR REPLACE FUNCTION get_customer_stock_summary(p_customer_id UUID DEFAULT NULL, p_ownership VARCHAR DEFAULT NULL)
+RETURNS TABLE(
+  customer_id UUID,
+  customer_name VARCHAR,
+  material_type VARCHAR,
+  stage VARCHAR,
+  quantity INTEGER,
+  ownership VARCHAR,
+  design_available BOOLEAN,
+  design_notes TEXT
+) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT
+    ms.customer_id,
+    c.name AS customer_name,
+    ms.material_type,
+    ms.stage,
+    ms.quantity,
+    ms.ownership,
+    ms.design_available,
+    ms.design_notes
+  FROM material_stock ms
+  LEFT JOIN customers c ON ms.customer_id = c.id
+  WHERE ms.quantity > 0
+    AND (p_customer_id IS NULL OR ms.customer_id = p_customer_id)
+    AND (p_ownership IS NULL OR ms.ownership = p_ownership)
+  ORDER BY
+    COALESCE(c.name, 'Own Stock'),
+    ms.material_type,
+    CASE ms.stage
+      WHEN 'received' THEN 1
+      WHEN 'preprocessing' THEN 2
+      WHEN 'printing' THEN 3
+      WHEN 'postprocessing' THEN 4
+      WHEN 'completed' THEN 5
+      WHEN 'misprint' THEN 6
+      WHEN 'damaged' THEN 7
+      WHEN 'sold' THEN 8
+    END;
+END;
+$$ LANGUAGE plpgsql;
+
+RAISE NOTICE '✅ Created: get_customer_stock_summary()';
+
+-- Function 2: Move stock between stages
+CREATE OR REPLACE FUNCTION move_stock_to_stage(
+  p_customer_id UUID,
+  p_order_id UUID,
+  p_material_type VARCHAR,
+  p_from_stage VARCHAR,
+  p_to_stage VARCHAR,
+  p_quantity INTEGER,
+  p_ownership VARCHAR DEFAULT 'customer'
+) RETURNS JSONB AS $$
+DECLARE
+  v_current_qty INTEGER;
+  v_result JSONB;
+BEGIN
+  -- Validate stages
+  IF p_from_stage NOT IN ('received', 'preprocessing', 'printing', 'postprocessing', 'completed', 'misprint', 'damaged') THEN
+    RAISE EXCEPTION 'Invalid from_stage: %', p_from_stage;
+  END IF;
+
+  IF p_to_stage NOT IN ('received', 'preprocessing', 'printing', 'postprocessing', 'completed', 'misprint', 'damaged', 'sold') THEN
+    RAISE EXCEPTION 'Invalid to_stage: %', p_to_stage;
+  END IF;
+
+  -- Get current quantity at from_stage
+  SELECT quantity INTO v_current_qty
+  FROM material_stock
+  WHERE (customer_id = p_customer_id OR (customer_id IS NULL AND p_customer_id IS NULL))
+    AND (order_id = p_order_id OR (order_id IS NULL AND p_order_id IS NULL))
+    AND material_type = p_material_type
+    AND stage = p_from_stage
+    AND ownership = p_ownership;
+
+  IF v_current_qty IS NULL OR v_current_qty < p_quantity THEN
+    RAISE EXCEPTION 'Insufficient stock at % stage. Available: %, Requested: %',
+      p_from_stage, COALESCE(v_current_qty, 0), p_quantity;
+  END IF;
+
+  -- Reduce from source stage
+  UPDATE material_stock
+  SET quantity = quantity - p_quantity,
+      updated_at = NOW()
+  WHERE (customer_id = p_customer_id OR (customer_id IS NULL AND p_customer_id IS NULL))
+    AND (order_id = p_order_id OR (order_id IS NULL AND p_order_id IS NULL))
+    AND material_type = p_material_type
+    AND stage = p_from_stage
+    AND ownership = p_ownership;
+
+  -- Add to destination stage (upsert)
+  INSERT INTO material_stock (customer_id, order_id, material_type, stage, quantity, ownership)
+  VALUES (p_customer_id, p_order_id, p_material_type, p_to_stage, p_quantity, p_ownership)
+  ON CONFLICT (customer_id, order_id, material_type, stage, ownership)
+  DO UPDATE SET
+    quantity = material_stock.quantity + p_quantity,
+    updated_at = NOW();
+
+  -- Clean up zero quantities
+  DELETE FROM material_stock WHERE quantity = 0;
+
+  v_result := jsonb_build_object(
+    'success', true,
+    'message', format('Moved %s %s from %s to %s', p_quantity, p_material_type, p_from_stage, p_to_stage),
+    'from_stage', p_from_stage,
+    'to_stage', p_to_stage,
+    'quantity', p_quantity
+  );
+
+  RETURN v_result;
+END;
+$$ LANGUAGE plpgsql;
+
+RAISE NOTICE '✅ Created: move_stock_to_stage()';
+
+-- Function 3: Update design availability
+CREATE OR REPLACE FUNCTION update_design_availability(
+  p_customer_id UUID,
+  p_order_id UUID,
+  p_material_type VARCHAR,
+  p_stage VARCHAR,
+  p_design_available BOOLEAN,
+  p_design_notes TEXT DEFAULT NULL
+) RETURNS VOID AS $$
+BEGIN
+  UPDATE material_stock
+  SET design_available = p_design_available,
+      design_notes = COALESCE(p_design_notes, design_notes),
+      updated_at = NOW()
+  WHERE (customer_id = p_customer_id OR (customer_id IS NULL AND p_customer_id IS NULL))
+    AND (order_id = p_order_id OR (order_id IS NULL AND p_order_id IS NULL))
+    AND material_type = p_material_type
+    AND stage = p_stage;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Stock not found for customer %, order %, material %, stage %',
+      p_customer_id, p_order_id, p_material_type, p_stage;
+  END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+RAISE NOTICE '✅ Created: update_design_availability()';
+
+-- ============================================================================
+-- REPORTING VIEWS
+-- ============================================================================
+
+-- View 1: Stock by Customer
+CREATE OR REPLACE VIEW v_stock_by_customer AS
+SELECT
+  COALESCE(c.id, '00000000-0000-0000-0000-000000000000'::UUID) AS customer_id,
+  COALESCE(c.name, 'Own Stock') AS customer_name,
+  COALESCE(c.phone, '-') AS customer_phone,
+  o.order_number,
+  ms.material_type,
+  ms.stage,
+  ms.quantity,
+  ms.ownership,
+  ms.design_available,
+  ms.design_notes,
+  ms.updated_at,
+  CASE
+    WHEN ms.stage = 'misprint' THEN '🔴 Misprint'
+    WHEN ms.stage = 'damaged' THEN '⚠️ Damaged'
+    WHEN ms.stage = 'completed' THEN '✅ Completed'
+    WHEN ms.stage = 'printing' THEN '🖨️ Printing'
+    WHEN ms.stage = 'preprocessing' THEN '🔧 Preprocessing'
+    WHEN ms.stage = 'postprocessing' THEN '✂️ Post-processing'
+    WHEN ms.stage = 'received' THEN '📦 Received'
+    WHEN ms.stage = 'sold' THEN '💰 Sold'
+    ELSE ms.stage
+  END AS stage_label
+FROM material_stock ms
+LEFT JOIN customers c ON ms.customer_id = c.id
+LEFT JOIN orders o ON ms.order_id = o.id
+WHERE ms.quantity > 0
+ORDER BY
+  COALESCE(c.name, 'ZZZ_Own Stock'), -- Own stock appears last
+  o.order_number,
+  ms.material_type,
+  CASE ms.stage
+    WHEN 'received' THEN 1
+    WHEN 'preprocessing' THEN 2
+    WHEN 'printing' THEN 3
+    WHEN 'postprocessing' THEN 4
+    WHEN 'completed' THEN 5
+    WHEN 'misprint' THEN 6
+    WHEN 'damaged' THEN 7
+    WHEN 'sold' THEN 8
+  END;
+
+RAISE NOTICE '✅ Created: v_stock_by_customer view';
+
+-- View 2: Outstanding Payments
+CREATE OR REPLACE VIEW v_outstanding_payments AS
+SELECT
+  c.id AS customer_id,
+  c.name AS customer_name,
+  c.phone AS customer_phone,
+  i.id AS invoice_id,
+  i.invoice_number,
+  i.invoice_date,
+  i.total_amount,
+  i.due_date,
+  COALESCE(SUM(p.payment_amount), 0) AS paid_amount,
+  i.total_amount - COALESCE(SUM(p.payment_amount), 0) AS outstanding_amount,
+  CASE
+    WHEN i.due_date < CURRENT_DATE THEN CURRENT_DATE - i.due_date
+    ELSE 0
+  END AS days_overdue,
+  i.status
+FROM gst_invoices i
+JOIN customers c ON i.customer_id = c.id
+LEFT JOIN payments p ON p.invoice_id = i.id
+WHERE i.is_deleted = FALSE
+  AND i.status != 'paid'
+GROUP BY c.id, c.name, c.phone, i.id, i.invoice_number, i.invoice_date, i.total_amount, i.due_date, i.status
+HAVING i.total_amount - COALESCE(SUM(p.payment_amount), 0) > 0
+ORDER BY days_overdue DESC, i.invoice_date;
+
+RAISE NOTICE '✅ Created: v_outstanding_payments view';
+
+-- View 3: Outstanding Orders (Pending Production/Delivery)
+CREATE OR REPLACE VIEW v_outstanding_orders AS
+SELECT
+  c.id AS customer_id,
+  c.name AS customer_name,
+  o.id AS order_id,
+  o.order_number,
+  o.order_date,
+  ms.material_type,
+  SUM(ms.quantity) FILTER (WHERE ms.stage != 'completed' AND ms.stage != 'sold') AS pending_quantity,
+  SUM(ms.quantity) FILTER (WHERE ms.stage = 'completed') AS completed_quantity,
+  SUM(ms.quantity) AS total_quantity,
+  STRING_AGG(DISTINCT ms.stage, ', ') AS current_stages,
+  BOOL_OR(ms.design_available) AS any_designs_available,
+  MAX(ms.updated_at) AS last_updated
+FROM orders o
+JOIN customers c ON o.customer_id = c.id
+JOIN material_stock ms ON ms.order_id = o.id
+WHERE o.is_deleted = FALSE
+  AND o.status != 'completed'
+GROUP BY c.id, c.name, o.id, o.order_number, o.order_date, ms.material_type
+HAVING SUM(ms.quantity) FILTER (WHERE ms.stage != 'completed' AND ms.stage != 'sold') > 0
+ORDER BY o.order_date;
+
+RAISE NOTICE '✅ Created: v_outstanding_orders view';
+
+-- View 4: Misprint Stock (Available for Sale)
+CREATE OR REPLACE VIEW v_misprint_stock AS
+SELECT
+  COALESCE(c.name, 'Own Stock') AS source,
+  ms.material_type,
+  ms.quantity,
+  ms.ownership,
+  CASE
+    WHEN ms.ownership = 'customer' THEN 50  -- Typical price for customer misprints
+    WHEN ms.ownership = 'self' THEN 100     -- Typical price for own stock misprints
+  END AS suggested_price,
+  ms.created_at,
+  ms.updated_at
+FROM material_stock ms
+LEFT JOIN customers c ON ms.customer_id = c.id
+WHERE ms.stage = 'misprint'
+  AND ms.quantity > 0
+ORDER BY ms.created_at;
+
+RAISE NOTICE '✅ Created: v_misprint_stock view';
+
+-- ============================================================================
+-- SUMMARY & COMPLETION
+-- ============================================================================
+
+DO $$
+DECLARE
+  table_count INTEGER;
+  function_count INTEGER;
+  view_count INTEGER;
+BEGIN
+  -- Count objects created
+  SELECT COUNT(*) INTO table_count
+  FROM information_schema.tables
+  WHERE table_schema = 'public'
+    AND table_name IN (
+      'customers', 'orders', 'material_in', 'material_stock',
+      'returns', 'credit_notes', 'misprint_sales',
+      'delivery_challans', 'challan_items',
+      'gst_invoices', 'payments', 'user_profiles'
+    );
+
+  SELECT COUNT(*) INTO function_count
+  FROM information_schema.routines
+  WHERE routine_schema = 'public'
+    AND routine_name IN (
+      'get_customer_stock_summary',
+      'move_stock_to_stage',
+      'update_design_availability'
+    );
+
+  SELECT COUNT(*) INTO view_count
+  FROM information_schema.views
+  WHERE table_schema = 'public'
+    AND table_name IN (
+      'v_stock_by_customer',
+      'v_outstanding_payments',
+      'v_outstanding_orders',
+      'v_misprint_stock'
+    );
+
+  RAISE NOTICE '';
+  RAISE NOTICE '========================================================================';
+  RAISE NOTICE '✅ SIMPLIFIED SCHEMA CREATED SUCCESSFULLY!';
+  RAISE NOTICE '========================================================================';
+  RAISE NOTICE '';
+  RAISE NOTICE '📊 SUMMARY:';
+  RAISE NOTICE '   • Core Tables: % (customers, orders, material_stock, etc.)', table_count;
+  RAISE NOTICE '   • Helper Functions: % (move_stock, update_design, etc.)', function_count;
+  RAISE NOTICE '   • Reporting Views: % (stock, payments, orders, misprints)', view_count;
+  RAISE NOTICE '';
+  RAISE NOTICE '🎯 KEY FEATURES:';
+  RAISE NOTICE '   ✅ Track customer material vs own stock';
+  RAISE NOTICE '   ✅ Stage-based stock tracking (8 stages)';
+  RAISE NOTICE '   ✅ Handle misprints & returns';
+  RAISE NOTICE '   ✅ Credit notes for adjustments';
+  RAISE NOTICE '   ✅ Sell misprints at discount';
+  RAISE NOTICE '   ✅ Outstanding payment reports';
+  RAISE NOTICE '   ✅ Outstanding order reports';
+  RAISE NOTICE '';
+  RAISE NOTICE '🚀 READY TO USE!';
+  RAISE NOTICE '========================================================================';
+  RAISE NOTICE '';
+END $$;
