@@ -1,0 +1,87 @@
+#!/bin/bash
+
+echo "=========================================="
+echo "FINDING YOUR NETLIFY DEPLOYMENT"
+echo "=========================================="
+echo ""
+
+# Check if Netlify CLI is installed
+if command -v netlify &> /dev/null; then
+    echo "✅ Netlify CLI is installed"
+    echo ""
+    echo "Checking login status..."
+    netlify status
+else
+    echo "❌ Netlify CLI is not installed"
+    echo ""
+    echo "Installing Netlify CLI..."
+    npm install -g netlify-cli
+    echo ""
+    echo "✅ Netlify CLI installed!"
+    echo ""
+    echo "Now login to Netlify..."
+    netlify login
+fi
+
+echo ""
+echo "=========================================="
+echo "OPTION 1: Find via Netlify CLI"
+echo "=========================================="
+echo ""
+echo "Run these commands:"
+echo ""
+echo "  netlify login          # Login to Netlify"
+echo "  netlify sites:list     # List all your sites"
+echo "  netlify status         # Show current site info"
+echo ""
+
+echo "=========================================="
+echo "OPTION 2: Find via Netlify Dashboard"
+echo "=========================================="
+echo ""
+echo "1. Go to: https://app.netlify.com"
+echo "2. Sign in with your account"
+echo "3. Look for site named: 'jbms1' or 'textile-printing'"
+echo "4. Your URL will be: https://YOUR-SITE-NAME.netlify.app"
+echo ""
+
+echo "=========================================="
+echo "OPTION 3: Deploy Now (if not deployed yet)"
+echo "=========================================="
+echo ""
+echo "If you haven't deployed yet, run:"
+echo ""
+echo "  cd frontend"
+echo "  npm run build"
+echo "  netlify deploy --prod"
+echo ""
+echo "The CLI will show you your deployment URL!"
+echo ""
+
+echo "=========================================="
+echo "OPTION 4: Check GitHub Repository Settings"
+echo "=========================================="
+echo ""
+echo "Your GitHub repo: https://github.com/siva-venigalla69/jbms1"
+echo ""
+echo "1. Go to your repo on GitHub"
+echo "2. Click 'Settings' tab"
+echo "3. Look for 'Pages' or 'Environments' section"
+echo "4. Check if there's a deployment URL listed"
+echo ""
+
+echo "=========================================="
+echo "QUICK DEPLOY COMMAND"
+echo "=========================================="
+echo ""
+echo "To deploy right now:"
+echo ""
+echo "  cd /home/siva/sandboxes/jbms1"
+echo "  cd frontend"
+echo "  npm install"
+echo "  npm run build"
+echo "  netlify login"
+echo "  netlify deploy --prod"
+echo ""
+
+echo "=========================================="

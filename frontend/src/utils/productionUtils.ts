@@ -307,24 +307,30 @@ export const getStageProgress = (stage: ProductionStage): number => {
 
 /**
  * Check if an item can move to next production stage
+ * UPDATED: Allows pre-treatment without design ready
  */
 export const canProgressToNextStage = (item: OrderItem): boolean => {
   const designStatus = parseDesignStatus(item.customization_details, item)
   const productionStatus = parseProductionStatus(item.customization_details, item)
-  
-  // Design must be ready to start production
-  if (designStatus !== 'design_ready') {
-    return false
-  }
-  
+
   // Check production status progression
   switch (productionStatus) {
     case 'pending':
-      return true // Can move to printing
+      return true // Can ALWAYS start pre-treatment
+
+    case 'pre_treatment':
+      // Can move to printing ONLY if design is ready
+      return designStatus === 'design_ready'
+
     case 'printing':
       return true // Can move to post_process
+
     case 'post_process':
+      return true // Can move to completed
+
+    case 'completed':
       return false // Final stage
+
     default:
       return false
   }
@@ -370,6 +376,182 @@ export const getNextStage = (currentStage: ProductionStage): ProductionStage | n
     'printing': 'post_process',
     'post_process': null
   }
-  
+
   return stageFlow[currentStage] || null
+}
+
+/**
+ * Get detailed information about next stage progression
+ * NEW: Includes blocking reason and recommended action
+ */
+export const getNextStageInfo = (item: OrderItem): {
+  canProgress: boolean
+  nextStage: ProductionStatus | null
+  blockingReason: string | null
+  action: string
+  urgency: 'high' | 'medium' | 'low'
+} => {
+  const designStatus = parseDesignStatus(item.customization_details, item)
+  const productionStatus = parseProductionStatus(item.customization_details, item)
+
+  // Pending → Pre-treatment
+  if (productionStatus === 'pending') {
+    return {
+      canProgress: true,
+      nextStage: 'pre_treatment',
+      blockingReason: null,
+      action: 'Start pre-treatment/padding process',
+      urgency: 'medium'
+    }
+  }
+
+  // Pre-treatment → Printing (CRITICAL: Requires design ready)
+  if (productionStatus === 'pre_treatment') {
+    if (designStatus !== 'design_ready') {
+      return {
+        canProgress: false,
+        nextStage: 'printing',
+        blockingReason: `Pre-treatment completed. Waiting for design approval. Current design status: ${getDesignStatusLabel(undefined, { design_status: designStatus })}`,
+        action: designStatus === 'pending_from_customer'
+          ? 'Follow up with customer for design submission'
+          : 'Review and approve the design to start printing',
+        urgency: 'high' // This is blocking!
+      }
+    }
+    return {
+      canProgress: true,
+      nextStage: 'printing',
+      blockingReason: null,
+      action: '✅ Both pre-treatment and design ready. Start printing immediately!',
+      urgency: 'high'
+    }
+  }
+
+  // Printing → Post-processing
+  if (productionStatus === 'printing') {
+    return {
+      canProgress: true,
+      nextStage: 'post_process',
+      blockingReason: null,
+      action: 'Move to post-processing and quality control',
+      urgency: 'medium'
+    }
+  }
+
+  // Post-processing → Completed
+  if (productionStatus === 'post_process') {
+    return {
+      canProgress: true,
+      nextStage: 'completed',
+      blockingReason: null,
+      action: 'Complete quality check and mark as ready for delivery',
+      urgency: 'medium'
+    }
+  }
+
+  // Completed
+  return {
+    canProgress: false,
+    nextStage: null,
+    blockingReason: 'Production completed',
+    action: 'Create delivery challan',
+    urgency: 'low'
+  }
+}
+
+/**
+ * Get combined status information for UI display
+ * NEW: Provides color, icon, priority, and blocking status
+ */
+export const getCombinedStatusInfo = (item: OrderItem): {
+  label: string
+  color: 'success' | 'warning' | 'error' | 'info' | 'default'
+  icon: string
+  priority: number
+  isBlocked: boolean
+} => {
+  const designStatus = parseDesignStatus(item.customization_details, item)
+  const productionStatus = parseProductionStatus(item.customization_details, item)
+
+  // High priority: Ready for action
+  if (designStatus === 'design_ready' && productionStatus === 'pre_treatment') {
+    return {
+      label: '✅ Ready for Printing',
+      color: 'success',
+      icon: '🚀',
+      priority: 1,
+      isBlocked: false
+    }
+  }
+
+  // High priority: Blocked situation
+  if (designStatus !== 'design_ready' && productionStatus === 'pre_treatment') {
+    return {
+      label: '⚠️ Padding Done, Waiting for Design',
+      color: 'warning',
+      icon: '⏳',
+      priority: 2,
+      isBlocked: true
+    }
+  }
+
+  // Active work in progress
+  if (productionStatus === 'printing') {
+    return {
+      label: 'Printing in Progress',
+      color: 'info',
+      icon: '🖨️',
+      priority: 3,
+      isBlocked: false
+    }
+  }
+
+  if (productionStatus === 'post_process') {
+    return {
+      label: 'Post-Processing',
+      color: 'info',
+      icon: '✂️',
+      priority: 4,
+      isBlocked: false
+    }
+  }
+
+  // Work starting
+  if (productionStatus === 'pending') {
+    if (designStatus === 'design_ready') {
+      return {
+        label: 'Design Ready, Start Padding',
+        color: 'info',
+        icon: '▶️',
+        priority: 5,
+        isBlocked: false
+      }
+    }
+    return {
+      label: 'Pending Start',
+      color: 'default',
+      icon: '⏸️',
+      priority: 6,
+      isBlocked: false
+    }
+  }
+
+  // Completed
+  if (productionStatus === 'completed') {
+    return {
+      label: 'Production Complete',
+      color: 'success',
+      icon: '✅',
+      priority: 7,
+      isBlocked: false
+    }
+  }
+
+  return {
+    label: 'Unknown Status',
+    color: 'default',
+    icon: '❓',
+    priority: 99,
+    isBlocked: false
+  }
 }
