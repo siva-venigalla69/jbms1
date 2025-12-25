@@ -246,8 +246,10 @@ CREATE TABLE material_stock (
   design_notes TEXT,
   unit_cost DECIMAL(10,2),
   created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW(),
-  UNIQUE(customer_id, order_id, material_type, stage, ownership)
+  updated_at TIMESTAMP DEFAULT NOW()
+  -- NOTE: NO UNIQUE constraint on (customer_id, order_id, material_type, stage, ownership)
+  -- Multiple batches CAN exist in same stage (Inventory Transaction Log pattern)
+  -- See: STOCK_TRACKING_PATTERN_ANALYSIS.md
 );
 
 CREATE INDEX IF NOT EXISTS idx_material_stock_customer ON material_stock(customer_id);

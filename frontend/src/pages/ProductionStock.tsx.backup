@@ -1,0 +1,663 @@
+import React, { useState, useEffect } from 'react';
+import {
+  Box,
+  Card,
+  CardContent,
+  Typography,
+  Button,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Chip,
+  CircularProgress,
+  Alert,
+  TextField,
+  InputAdornment,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  IconButton,
+  Tabs,
+  Tab,
+  Grid,
+  Paper,
+} from '@mui/material';
+import {
+  Search,
+  MoveDown,
+  CheckCircle,
+  Factory,
+  Refresh,
+  Info,
+  Clear,
+  Image as ImageIcon,
+} from '@mui/icons-material';
+import { simplifiedApi, MaterialStock, SIMPLE_ENUMS } from '../services/simplifiedApi';
+
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
+
+function TabPanel(props: TabPanelProps) {
+  const { children, value, index, ...other } = props;
+  return (
+    <div role="tabpanel" hidden={value !== index} {...other}>
+      {value === index && <Box sx={{ py: 3 }}>{children}</Box>}
+    </div>
+  );
+}
+
+const ProductionStock: React.FC = () => {
+  const [stockData, setStockData] = useState<MaterialStock[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [currentTab, setCurrentTab] = useState(0);
+  const [materialTypeFilter, setMaterialTypeFilter] = useState<string>('all');
+
+  // Dialog states
+  const [moveStockDialogOpen, setMoveStockDialogOpen] = useState(false);
+  const [designDialogOpen, setDesignDialogOpen] = useState(false);
+  const [selectedStock, setSelectedStock] = useState<MaterialStock | null>(null);
+
+  // Move stock form
+  const [moveToStage, setMoveToStage] = useState<string>('');
+  const [moveQuantity, setMoveQuantity] = useState<number>(0);
+
+  // Design form
+  const [designsAvailable, setDesignsAvailable] = useState(false);
+  const [designNotes, setDesignNotes] = useState('');
+
+  // Material types (from database)
+  const [materialTypes, setMaterialTypes] = useState<string[]>([]);
+
+  useEffect(() => {
+    loadStockData();
+    loadMaterialTypes();
+  }, []);
+
+  const loadMaterialTypes = async () => {
+    try {
+      const types = await simplifiedApi.materialTypes.getAll();
+      setMaterialTypes(types.map(t => t.type_code));
+    } catch (err: any) {
+      console.error('Failed to load material types:', err);
+    }
+  };
+
+  const loadStockData = async () => {
+    try {
+      setLoading(true);
+      const data = await simplifiedApi.stock.getAll();
+      setStockData(data);
+      setError(null);
+    } catch (err: any) {
+      setError('Failed to load stock data: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleMoveStock = async () => {
+    if (!selectedStock || !moveToStage || moveQuantity <= 0) {
+      setError('Please fill in all required fields');
+      return;
+    }
+
+    try {
+      await simplifiedApi.stock.moveToStage({
+        customer_id: selectedStock.customer_id,
+        order_id: selectedStock.order_id,
+        material_type: selectedStock.material_type,
+        from_stage: selectedStock.stage,
+        to_stage: moveToStage,
+        quantity: moveQuantity,
+        ownership: selectedStock.ownership
+      });
+
+      setSuccess(`Successfully moved ${moveQuantity} ${selectedStock.material_type} from ${selectedStock.stage} to ${moveToStage}`);
+      setMoveStockDialogOpen(false);
+      setSelectedStock(null);
+      setMoveToStage('');
+      setMoveQuantity(0);
+      loadStockData();
+    } catch (err: any) {
+      setError('Failed to move stock: ' + err.message);
+    }
+  };
+
+  const handleUpdateDesign = async () => {
+    if (!selectedStock) return;
+
+    try {
+      await simplifiedApi.stock.updateDesignStatus({
+        customer_id: selectedStock.customer_id,
+        order_id: selectedStock.order_id,
+        material_type: selectedStock.material_type,
+        stage: selectedStock.stage,
+        designs_available: designsAvailable,
+        design_notes: designNotes
+      });
+
+      setSuccess(`Design status updated for ${selectedStock.material_type}`);
+      setDesignDialogOpen(false);
+      setSelectedStock(null);
+      loadStockData();
+    } catch (err: any) {
+      setError('Failed to update design status: ' + err.message);
+    }
+  };
+
+  const openMoveDialog = (stock: MaterialStock) => {
+    setSelectedStock(stock);
+    setMoveQuantity(stock.quantity);
+
+    // Suggest next stage
+    const nextStage = getNextStage(stock.stage);
+    setMoveToStage(nextStage);
+
+    setMoveStockDialogOpen(true);
+  };
+
+  const openDesignDialog = (stock: MaterialStock) => {
+    setSelectedStock(stock);
+    setDesignsAvailable(stock.designs_available);
+    setDesignNotes(stock.design_notes || '');
+    setDesignDialogOpen(true);
+  };
+
+  const getNextStage = (currentStage: string): string => {
+    const stages = [
+      SIMPLE_ENUMS.STAGE.RECEIVED,
+      SIMPLE_ENUMS.STAGE.PREPROCESSING,
+      SIMPLE_ENUMS.STAGE.PRINTING,
+      SIMPLE_ENUMS.STAGE.POSTPROCESSING,
+      SIMPLE_ENUMS.STAGE.COMPLETED
+    ];
+    const currentIndex = stages.indexOf(currentStage as any);
+    return currentIndex >= 0 && currentIndex < stages.length - 1 ? stages[currentIndex + 1] : currentStage;
+  };
+
+  const getStageColor = (stage: string) => {
+    switch (stage) {
+      case SIMPLE_ENUMS.STAGE.RECEIVED:
+        return 'default';
+      case SIMPLE_ENUMS.STAGE.PREPROCESSING:
+        return 'info';
+      case SIMPLE_ENUMS.STAGE.PRINTING:
+        return 'primary';
+      case SIMPLE_ENUMS.STAGE.POSTPROCESSING:
+        return 'secondary';
+      case SIMPLE_ENUMS.STAGE.COMPLETED:
+        return 'success';
+      case SIMPLE_ENUMS.STAGE.MISPRINT:
+        return 'error';
+      case SIMPLE_ENUMS.STAGE.DAMAGED:
+        return 'warning';
+      default:
+        return 'default';
+    }
+  };
+
+  // Filter stock by current tab (stage)
+  const getStockByTab = (tabIndex: number): MaterialStock[] => {
+    let stageFilter: string | null = null;
+
+    switch (tabIndex) {
+      case 0: stageFilter = null; break; // All
+      case 1: stageFilter = SIMPLE_ENUMS.STAGE.RECEIVED; break;
+      case 2: stageFilter = SIMPLE_ENUMS.STAGE.PREPROCESSING; break;
+      case 3: stageFilter = SIMPLE_ENUMS.STAGE.PRINTING; break;
+      case 4: stageFilter = SIMPLE_ENUMS.STAGE.POSTPROCESSING; break;
+      case 5: stageFilter = SIMPLE_ENUMS.STAGE.COMPLETED; break;
+      case 6: stageFilter = SIMPLE_ENUMS.STAGE.MISPRINT; break;
+    }
+
+    return stockData.filter(stock => {
+      const matchesStage = !stageFilter || stock.stage === stageFilter;
+      const matchesMaterial = materialTypeFilter === 'all' || stock.material_type === materialTypeFilter;
+      const matchesSearch = !searchTerm ||
+        stock.material_type.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        stock.design_notes?.toLowerCase().includes(searchTerm.toLowerCase());
+
+      return matchesStage && matchesMaterial && matchesSearch;
+    });
+  };
+
+  // Calculate summary statistics
+  const getSummaryStats = () => {
+    const stats = {
+      received: 0,
+      preprocessing: 0,
+      printing: 0,
+      postprocessing: 0,
+      completed: 0,
+      misprint: 0,
+      total: 0,
+      designReady: 0,
+      designPending: 0
+    };
+
+    stockData.forEach(stock => {
+      stats.total += stock.quantity;
+
+      switch (stock.stage) {
+        case SIMPLE_ENUMS.STAGE.RECEIVED:
+          stats.received += stock.quantity;
+          break;
+        case SIMPLE_ENUMS.STAGE.PREPROCESSING:
+          stats.preprocessing += stock.quantity;
+          break;
+        case SIMPLE_ENUMS.STAGE.PRINTING:
+          stats.printing += stock.quantity;
+          break;
+        case SIMPLE_ENUMS.STAGE.POSTPROCESSING:
+          stats.postprocessing += stock.quantity;
+          break;
+        case SIMPLE_ENUMS.STAGE.COMPLETED:
+          stats.completed += stock.quantity;
+          break;
+        case SIMPLE_ENUMS.STAGE.MISPRINT:
+          stats.misprint += stock.quantity;
+          break;
+      }
+
+      if (stock.designs_available) {
+        stats.designReady += stock.quantity;
+      } else {
+        stats.designPending += stock.quantity;
+      }
+    });
+
+    return stats;
+  };
+
+  const stats = getSummaryStats();
+  const filteredStock = getStockByTab(currentTab);
+
+  return (
+    <Box>
+      {/* Header */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Typography variant="h4" fontWeight="bold">
+          Production Stock Management
+        </Typography>
+        <Button
+          variant="outlined"
+          startIcon={<Refresh />}
+          onClick={loadStockData}
+          disabled={loading}
+        >
+          Refresh
+        </Button>
+      </Box>
+
+      {/* Alerts */}
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+          {error}
+        </Alert>
+      )}
+      {success && (
+        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess(null)}>
+          {success}
+        </Alert>
+      )}
+
+      {/* Summary Cards */}
+      <Grid container spacing={2} sx={{ mb: 3 }}>
+        <Grid item xs={12} sm={6} md={3}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" color="text.secondary" gutterBottom>
+                Total Stock
+              </Typography>
+              <Typography variant="h4" fontWeight="bold">
+                {stats.total}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                All materials in production
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid item xs={12} sm={6} md={3}>
+          <Card sx={{ bgcolor: 'success.50' }}>
+            <CardContent>
+              <Typography variant="h6" color="text.secondary" gutterBottom>
+                Design Ready
+              </Typography>
+              <Typography variant="h4" fontWeight="bold" color="success.main">
+                {stats.designReady}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Ready for production
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid item xs={12} sm={6} md={3}>
+          <Card sx={{ bgcolor: 'warning.50' }}>
+            <CardContent>
+              <Typography variant="h6" color="text.secondary" gutterBottom>
+                In Production
+              </Typography>
+              <Typography variant="h4" fontWeight="bold" color="warning.main">
+                {stats.preprocessing + stats.printing + stats.postprocessing}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Currently being processed
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid item xs={12} sm={6} md={3}>
+          <Card sx={{ bgcolor: 'info.50' }}>
+            <CardContent>
+              <Typography variant="h6" color="text.secondary" gutterBottom>
+                Completed
+              </Typography>
+              <Typography variant="h4" fontWeight="bold" color="info.main">
+                {stats.completed}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Ready for delivery
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+
+      {/* Search and Filters */}
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', md: 'row' } }}>
+            <TextField
+              fullWidth
+              placeholder="Search by material type or notes..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Search />
+                  </InputAdornment>
+                ),
+                endAdornment: searchTerm && (
+                  <InputAdornment position="end">
+                    <IconButton size="small" onClick={() => setSearchTerm('')}>
+                      <Clear />
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
+              sx={{ flex: 2 }}
+            />
+
+            <FormControl sx={{ minWidth: 200 }}>
+              <InputLabel>Material Type</InputLabel>
+              <Select
+                value={materialTypeFilter}
+                onChange={(e) => setMaterialTypeFilter(e.target.value)}
+                label="Material Type"
+              >
+                <MenuItem value="all">All Materials</MenuItem>
+                {materialTypes.map(type => (
+                  <MenuItem key={type} value={type}>{type.toUpperCase()}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Box>
+        </CardContent>
+      </Card>
+
+      {/* Stage Tabs */}
+      <Card>
+        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+          <Tabs
+            value={currentTab}
+            onChange={(e, newValue) => setCurrentTab(newValue)}
+            variant="scrollable"
+            scrollButtons="auto"
+          >
+            <Tab label={`All (${stats.total})`} />
+            <Tab label={`Received (${stats.received})`} />
+            <Tab label={`Preprocessing (${stats.preprocessing})`} />
+            <Tab label={`Printing (${stats.printing})`} />
+            <Tab label={`Postprocessing (${stats.postprocessing})`} />
+            <Tab label={`Completed (${stats.completed})`} />
+            <Tab label={`Misprint (${stats.misprint})`} />
+          </Tabs>
+        </Box>
+
+        {/* Stock Table */}
+        <TabPanel value={currentTab} index={currentTab}>
+          {loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress />
+            </Box>
+          ) : filteredStock.length === 0 ? (
+            <Box sx={{ textAlign: 'center', py: 8 }}>
+              <Factory sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
+              <Typography variant="h6" color="text.secondary">
+                No stock found
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {searchTerm || materialTypeFilter !== 'all'
+                  ? 'Try adjusting your filters'
+                  : 'Stock will appear here when material is received'}
+              </Typography>
+            </Box>
+          ) : (
+            <TableContainer sx={{ maxHeight: '60vh' }}>
+              <Table stickyHeader>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Material Type</TableCell>
+                    <TableCell>Quantity</TableCell>
+                    <TableCell>Stage</TableCell>
+                    <TableCell>Ownership</TableCell>
+                    <TableCell>Design Status</TableCell>
+                    <TableCell>Design Notes</TableCell>
+                    <TableCell align="right">Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {filteredStock.map((stock) => (
+                    <TableRow key={stock.id} hover>
+                      <TableCell>
+                        <Typography variant="body2" fontWeight="medium">
+                          {stock.material_type.toUpperCase()}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={stock.quantity}
+                          color="primary"
+                          variant="outlined"
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={stock.stage.replace('_', ' ').toUpperCase()}
+                          color={getStageColor(stock.stage) as any}
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={stock.ownership.toUpperCase()}
+                          variant="outlined"
+                          size="small"
+                          color={stock.ownership === 'customer' ? 'info' : 'secondary'}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={stock.designs_available ? 'Ready' : 'Pending'}
+                          color={stock.designs_available ? 'success' : 'warning'}
+                          size="small"
+                          icon={stock.designs_available ? <CheckCircle /> : <Info />}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" color="text.secondary" noWrap sx={{ maxWidth: 200 }}>
+                          {stock.design_notes || '-'}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="right">
+                        <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+                          <IconButton
+                            size="small"
+                            onClick={() => openDesignDialog(stock)}
+                            title="Update Design Status"
+                            color="secondary"
+                          >
+                            <ImageIcon />
+                          </IconButton>
+                          <IconButton
+                            size="small"
+                            onClick={() => openMoveDialog(stock)}
+                            title="Move to Next Stage"
+                            color="primary"
+                          >
+                            <MoveDown />
+                          </IconButton>
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </TabPanel>
+      </Card>
+
+      {/* Move Stock Dialog */}
+      <Dialog open={moveStockDialogOpen} onClose={() => setMoveStockDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <MoveDown />
+            <Typography variant="h6">Move Stock to Next Stage</Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          {selectedStock && (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, mt: 2 }}>
+              <Alert severity="info">
+                Moving <strong>{selectedStock.material_type.toUpperCase()}</strong> from <strong>{selectedStock.stage}</strong>
+              </Alert>
+
+              <TextField
+                label="Quantity to Move"
+                type="number"
+                value={moveQuantity}
+                onChange={(e) => setMoveQuantity(Number(e.target.value))}
+                inputProps={{ min: 1, max: selectedStock.quantity }}
+                fullWidth
+                helperText={`Available: ${selectedStock.quantity}`}
+              />
+
+              <FormControl fullWidth>
+                <InputLabel>Move to Stage</InputLabel>
+                <Select
+                  value={moveToStage}
+                  onChange={(e) => setMoveToStage(e.target.value)}
+                  label="Move to Stage"
+                >
+                  <MenuItem value={SIMPLE_ENUMS.STAGE.PREPROCESSING}>Preprocessing</MenuItem>
+                  <MenuItem value={SIMPLE_ENUMS.STAGE.PRINTING}>Printing</MenuItem>
+                  <MenuItem value={SIMPLE_ENUMS.STAGE.POSTPROCESSING}>Postprocessing</MenuItem>
+                  <MenuItem value={SIMPLE_ENUMS.STAGE.COMPLETED}>Completed</MenuItem>
+                  <MenuItem value={SIMPLE_ENUMS.STAGE.MISPRINT}>Misprint</MenuItem>
+                  <MenuItem value={SIMPLE_ENUMS.STAGE.DAMAGED}>Damaged</MenuItem>
+                </Select>
+              </FormControl>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setMoveStockDialogOpen(false)}>Cancel</Button>
+          <Button onClick={handleMoveStock} variant="contained" color="primary">
+            Move Stock
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Design Status Dialog */}
+      <Dialog open={designDialogOpen} onClose={() => setDesignDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <ImageIcon />
+            <Typography variant="h6">Update Design Status</Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          {selectedStock && (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, mt: 2 }}>
+              <Alert severity="info">
+                Updating design status for <strong>{selectedStock.material_type.toUpperCase()}</strong>
+              </Alert>
+
+              <FormControl fullWidth>
+                <InputLabel>Design Availability</InputLabel>
+                <Select
+                  value={designsAvailable ? 'ready' : 'pending'}
+                  onChange={(e) => setDesignsAvailable(e.target.value === 'ready')}
+                  label="Design Availability"
+                >
+                  <MenuItem value="pending">
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Info color="warning" />
+                      Design Pending
+                    </Box>
+                  </MenuItem>
+                  <MenuItem value="ready">
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <CheckCircle color="success" />
+                      Design Ready
+                    </Box>
+                  </MenuItem>
+                </Select>
+              </FormControl>
+
+              <TextField
+                label="Design Notes"
+                value={designNotes}
+                onChange={(e) => setDesignNotes(e.target.value)}
+                multiline
+                rows={4}
+                fullWidth
+                placeholder="Add notes about the design status, files received, etc."
+              />
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDesignDialogOpen(false)}>Cancel</Button>
+          <Button onClick={handleUpdateDesign} variant="contained" color="primary">
+            Update Design
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
+};
+
+export default ProductionStock;

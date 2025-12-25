@@ -9,11 +9,13 @@ import { apiLogger, performance } from '../utils/debug'
 // TABLE NAMES for Simplified Schema (11 core tables)
 // ============================================================================
 export const SIMPLE_TABLES = {
-  // Core Business (4 tables)
+  // Core Business (6 tables)
   CUSTOMERS: 'customers',
   ORDERS: 'orders',
+  ORDER_ITEMS: 'order_items',
   MATERIAL_IN: 'material_in',
   MATERIAL_STOCK: 'material_stock',
+  MATERIAL_DESIGN_TRACKING: 'material_design_tracking',
 
   // Returns & Adjustments (2 tables)
   RETURNS: 'returns',
@@ -49,6 +51,7 @@ export const SIMPLE_ENUMS = {
     PRINTING: 'printing',
     POSTPROCESSING: 'postprocessing',
     COMPLETED: 'completed',
+    DELIVERED: 'delivered',
     MISPRINT: 'misprint',
     DAMAGED: 'damaged',
     SOLD: 'sold'
@@ -111,14 +114,30 @@ export interface Order {
   updated_at?: string
 }
 
+export interface OrderItem {
+  id: string
+  order_id: string
+  material_type: string
+  quantity: number
+  unit_price?: number
+  notes?: string
+  created_at: string
+  updated_at?: string
+}
+
+export interface OrderWithItems extends Order {
+  items: OrderItem[]
+}
+
 export interface MaterialIn {
   id: string
   customer_id: string | null
   order_id: string | null
   material_type: string
   quantity: number
-  ownership: 'customer' | 'self'
-  receipt_date: string
+  ownership?: 'customer' | 'self'
+  received_date: string
+  receipt_number?: string
   notes?: string
   created_at: string
 }
@@ -131,7 +150,22 @@ export interface MaterialStock {
   ownership: 'customer' | 'self'
   stage: string
   quantity: number
+  is_active: boolean
   designs_available: boolean
+  notes?: string
+  created_at: string
+  updated_at?: string
+}
+
+export interface MaterialDesignTracking {
+  id: string
+  customer_id: string
+  material_type: string
+  material_in_id?: string
+  batch_identifier?: string
+  total_quantity: number
+  designs_given: number
+  designs_pending: number
   design_notes?: string
   created_at: string
   updated_at?: string
@@ -142,7 +176,7 @@ export interface DeliveryChallan {
   challan_number: string
   customer_id: string
   order_id: string
-  delivery_date: string
+  challan_date: string
   status: string
   notes?: string
   created_at: string
@@ -151,6 +185,7 @@ export interface DeliveryChallan {
 export interface ChallanItem {
   id: string
   challan_id: string
+  order_id: string  // ✅ Required - links item to specific order
   material_type: string
   quantity: number
   notes?: string
@@ -393,6 +428,18 @@ export const customersApi = {
       if (error) throw new Error(error.message)
       return data || []
     }, { searchTerm })
+  },
+
+  delete: async (id: string): Promise<void> => {
+    return withApiLogging('customers.delete', async () => {
+      // Soft delete - mark as inactive instead of hard delete
+      const { error } = await supabase
+        .from(SIMPLE_TABLES.CUSTOMERS)
+        .update({ is_active: false, updated_at: new Date().toISOString() })
+        .eq('id', id)
+
+      if (error) throw new Error(error.message)
+    }, { id })
   }
 }
 
@@ -467,6 +514,74 @@ export const ordersApi = {
 }
 
 // ============================================================================
+// ORDER ITEMS API
+// ============================================================================
+export const orderItemsApi = {
+  getByOrder: async (orderId: string): Promise<OrderItem[]> => {
+    return withApiLogging('orderItems.getByOrder', async () => {
+      const { data, error } = await supabase
+        .from(SIMPLE_TABLES.ORDER_ITEMS)
+        .select('*')
+        .eq('order_id', orderId)
+        .order('created_at', { ascending: true })
+
+      if (error) throw new Error(error.message)
+      return data || []
+    }, { orderId })
+  },
+
+  create: async (item: Omit<OrderItem, 'id' | 'created_at'>): Promise<OrderItem> => {
+    return withApiLogging('orderItems.create', async () => {
+      const { data, error } = await supabase
+        .from(SIMPLE_TABLES.ORDER_ITEMS)
+        .insert(item)
+        .select()
+        .single()
+
+      if (error) throw new Error(error.message)
+      return data
+    }, item)
+  },
+
+  createMultiple: async (items: Omit<OrderItem, 'id' | 'created_at'>[]): Promise<OrderItem[]> => {
+    return withApiLogging('orderItems.createMultiple', async () => {
+      const { data, error } = await supabase
+        .from(SIMPLE_TABLES.ORDER_ITEMS)
+        .insert(items)
+        .select()
+
+      if (error) throw new Error(error.message)
+      return data || []
+    }, { count: items.length })
+  },
+
+  update: async (id: string, item: Partial<OrderItem>): Promise<OrderItem> => {
+    return withApiLogging('orderItems.update', async () => {
+      const { data, error } = await supabase
+        .from(SIMPLE_TABLES.ORDER_ITEMS)
+        .update({ ...item, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select()
+        .single()
+
+      if (error) throw new Error(error.message)
+      return data
+    }, { id, item })
+  },
+
+  delete: async (id: string): Promise<void> => {
+    return withApiLogging('orderItems.delete', async () => {
+      const { error } = await supabase
+        .from(SIMPLE_TABLES.ORDER_ITEMS)
+        .delete()
+        .eq('id', id)
+
+      if (error) throw new Error(error.message)
+    }, { id })
+  }
+}
+
+// ============================================================================
 // MATERIAL RECEIPT API
 // ============================================================================
 export const materialInApi = {
@@ -485,9 +600,10 @@ export const materialInApi = {
         customer_id: receipt.customer_id,
         order_id: receipt.order_id,
         material_type: receipt.material_type,
-        ownership: receipt.ownership,
+        ownership: receipt.ownership || 'customer',
         stage: SIMPLE_ENUMS.STAGE.RECEIVED,
         quantity: receipt.quantity,
+        is_active: true,
         designs_available: false
       })
 
@@ -500,7 +616,7 @@ export const materialInApi = {
       const { data, error } = await supabase
         .from(SIMPLE_TABLES.MATERIAL_IN)
         .select('*')
-        .order('receipt_date', { ascending: false })
+        .order('received_date', { ascending: false })
 
       if (error) throw new Error(error.message)
       return data || []
@@ -513,7 +629,7 @@ export const materialInApi = {
         .from(SIMPLE_TABLES.MATERIAL_IN)
         .select('*')
         .eq('customer_id', customerId)
-        .order('receipt_date', { ascending: false })
+        .order('received_date', { ascending: false })
 
       if (error) throw new Error(error.message)
       return data || []
@@ -666,22 +782,30 @@ export const stockApi = {
 export const deliveriesApi = {
   createChallan: async (
     challan: Omit<DeliveryChallan, 'id' | 'created_at'>,
-    items: Omit<ChallanItem, 'id' | 'challan_id'>[]
+    items: Omit<ChallanItem, 'id' | 'challan_id' | 'order_id'>[]
   ) => {
     return withApiLogging('deliveries.createChallan', async () => {
-      // Create challan
+      // 1. Create delivery challan
       const { data: challanData, error: challanError } = await supabase
         .from(SIMPLE_TABLES.DELIVERY_CHALLANS)
-        .insert(challan)
+        .insert({
+          customer_id: challan.customer_id,
+          order_id: challan.order_id,
+          challan_date: challan.challan_date,
+          notes: challan.notes
+        })
         .select()
         .single()
 
       if (challanError) throw new Error(challanError.message)
 
-      // Create challan items
+      // 2. Create challan items with order_id
       const itemsWithChallanId = items.map(item => ({
-        ...item,
-        challan_id: challanData.id
+        challan_id: challanData.id,
+        order_id: challan.order_id,  // ✅ Include order_id for reference
+        material_type: item.material_type,
+        quantity: item.quantity,
+        notes: item.notes
       }))
 
       const { error: itemsError } = await supabase
@@ -690,18 +814,19 @@ export const deliveriesApi = {
 
       if (itemsError) throw new Error(itemsError.message)
 
-      // Reduce stock from 'completed' stage
+      // 3. Move stock to 'delivered' stage for each item using RPC
       for (const item of items) {
-        await supabase
-          .from(SIMPLE_TABLES.MATERIAL_STOCK)
-          .update({
-            quantity: supabase.raw('quantity - ?', [item.quantity]),
-            updated_at: new Date().toISOString()
-          })
-          .eq('customer_id', challan.customer_id)
-          .eq('order_id', challan.order_id)
-          .eq('material_type', item.material_type)
-          .eq('stage', SIMPLE_ENUMS.STAGE.COMPLETED)
+        const { error: moveError } = await supabase.rpc('move_stock_to_stage', {
+          p_customer_id: challan.customer_id,
+          p_order_id: challan.order_id,
+          p_material_type: item.material_type,
+          p_from_stage: 'completed',
+          p_to_stage: 'delivered',
+          p_quantity: item.quantity,
+          p_ownership: 'customer'
+        })
+
+        if (moveError) throw new Error(`Failed to move ${item.material_type} to delivered: ${moveError.message}`)
       }
 
       return challanData
@@ -713,7 +838,7 @@ export const deliveriesApi = {
       const { data, error } = await supabase
         .from(SIMPLE_TABLES.DELIVERY_CHALLANS)
         .select('*, challan_items(*)')
-        .order('delivery_date', { ascending: false })
+        .order('challan_date', { ascending: false })
 
       if (error) throw new Error(error.message)
       return data || []
@@ -726,11 +851,25 @@ export const deliveriesApi = {
         .from(SIMPLE_TABLES.DELIVERY_CHALLANS)
         .select('*, challan_items(*)')
         .eq('customer_id', customerId)
-        .order('delivery_date', { ascending: false })
+        .order('challan_date', { ascending: false })
 
       if (error) throw new Error(error.message)
       return data || []
     }, { customerId })
+  },
+
+  // Get challan details for printing (uses v_delivery_challan_details view)
+  getChallanDetails: async (challanNumber: string) => {
+    return withApiLogging('deliveries.getChallanDetails', async () => {
+      const { data, error } = await supabase
+        .from('v_delivery_challan_details')
+        .select('*')
+        .eq('challan_number', challanNumber)
+        .order('material_type')
+
+      if (error) throw new Error(error.message)
+      return data || []
+    }, { challanNumber })
   }
 }
 
@@ -870,6 +1009,7 @@ export const returnsApi = {
           ownership: SIMPLE_ENUMS.OWNERSHIP.CUSTOMER,
           stage: SIMPLE_ENUMS.STAGE.MISPRINT,
           quantity: returnItem.quantity,
+          is_active: true,
           designs_available: true
         })
       }
@@ -962,10 +1102,21 @@ export const misprintSalesApi = {
       if (error) throw new Error(error.message)
 
       // Reduce misprint stock
+      // Get current stock
+      const { data: stockData, error: stockError } = await supabase
+        .from(SIMPLE_TABLES.MATERIAL_STOCK)
+        .select('quantity')
+        .eq('material_type', sale.material_type)
+        .eq('stage', SIMPLE_ENUMS.STAGE.MISPRINT)
+        .single()
+
+      if (stockError) throw new Error(stockError.message)
+
+      // Update with reduced quantity
       await supabase
         .from(SIMPLE_TABLES.MATERIAL_STOCK)
         .update({
-          quantity: supabase.raw('quantity - ?', [sale.quantity]),
+          quantity: stockData.quantity - sale.quantity,
           updated_at: new Date().toISOString()
         })
         .eq('material_type', sale.material_type)
@@ -1101,6 +1252,102 @@ export const materialTypesApi = {
 }
 
 // ============================================================================
+// DESIGN TRACKING API
+// ============================================================================
+export interface PendingDesign {
+  customer_id: string
+  customer_name: string
+  customer_phone: string
+  order_id: string
+  order_number: string
+  order_date: string
+  material_type: string
+  total_quantity: number
+  designs_given: number
+  designs_pending: number
+  design_completion_pct: number
+  design_notes?: string
+  batch_identifier?: string
+  tracking_started: string
+  last_updated: string
+}
+
+export const designTrackingApi = {
+  // Add designs to an order using RPC
+  addDesigns: async (params: {
+    customer_id: string
+    order_id: string
+    material_type: string
+    designs_to_add: number
+    batch_identifier?: string
+  }) => {
+    return withApiLogging('designTracking.addDesigns', async () => {
+      const { error } = await supabase.rpc('update_design_count', {
+        p_customer_id: params.customer_id,
+        p_order_id: params.order_id,
+        p_material_type: params.material_type,
+        p_designs_to_add: params.designs_to_add,
+        p_batch_identifier: params.batch_identifier || null
+      })
+
+      if (error) throw new Error(error.message)
+    }, params)
+  },
+
+  // Get all pending designs (designs_pending > 0)
+  getPendingDesigns: async (): Promise<PendingDesign[]> => {
+    return withApiLogging('designTracking.getPendingDesigns', async () => {
+      const { data, error } = await supabase
+        .from('v_pending_designs')
+        .select('*')
+
+      if (error) throw new Error(error.message)
+      return data || []
+    })
+  },
+
+  // Get pending designs for a specific customer
+  getPendingDesignsByCustomer: async (customerId: string): Promise<PendingDesign[]> => {
+    return withApiLogging('designTracking.getPendingDesignsByCustomer', async () => {
+      const { data, error } = await supabase
+        .from('v_pending_designs')
+        .select('*')
+        .eq('customer_id', customerId)
+
+      if (error) throw new Error(error.message)
+      return data || []
+    }, { customerId })
+  },
+
+  // Get all design tracking records (including completed)
+  getAllDesignTracking: async (): Promise<MaterialDesignTracking[]> => {
+    return withApiLogging('designTracking.getAll', async () => {
+      const { data, error } = await supabase
+        .from(SIMPLE_TABLES.MATERIAL_DESIGN_TRACKING)
+        .select('*')
+        .order('updated_at', { ascending: false })
+
+      if (error) throw new Error(error.message)
+      return data || []
+    })
+  },
+
+  // Get design tracking for a specific order
+  getByOrder: async (orderId: string): Promise<MaterialDesignTracking[]> => {
+    return withApiLogging('designTracking.getByOrder', async () => {
+      const { data, error } = await supabase
+        .from(SIMPLE_TABLES.MATERIAL_DESIGN_TRACKING)
+        .select('*')
+        .eq('order_id', orderId)
+        .order('material_type')
+
+      if (error) throw new Error(error.message)
+      return data || []
+    }, { orderId })
+  }
+}
+
+// ============================================================================
 // INVOICE-CHALLAN LINKING API
 // ============================================================================
 export interface InvoiceChallan {
@@ -1161,7 +1408,7 @@ export const invoiceChallanApi = {
     return withApiLogging('invoiceChallan.getInvoiceByChallan', async () => {
       const { data, error } = await supabase
         .from('invoice_challans')
-        .select('gst_invoices(*)')
+        .select('invoice_id')
         .eq('challan_id', challanId)
         .single()
 
@@ -1169,7 +1416,19 @@ export const invoiceChallanApi = {
         if (error.code === 'PGRST116') return null // Not found
         throw new Error(error.message)
       }
-      return data?.gst_invoices || null
+
+      if (!data?.invoice_id) return null
+
+      // Fetch the actual invoice
+      const { data: invoice, error: invoiceError } = await supabase
+        .from(SIMPLE_TABLES.GST_INVOICES)
+        .select('*')
+        .eq('id', data.invoice_id)
+        .single()
+
+      if (invoiceError) throw new Error(invoiceError.message)
+
+      return invoice
     }, { challanId })
   },
 
@@ -1216,6 +1475,7 @@ export const simplifiedApi = {
   auth: authApi,
   customers: customersApi,
   orders: ordersApi,
+  orderItems: orderItemsApi,
   materialIn: materialInApi,
   stock: stockApi,
   deliveries: deliveriesApi,
@@ -1226,6 +1486,7 @@ export const simplifiedApi = {
   misprintSales: misprintSalesApi,
   reports: reportsApi,
   materialTypes: materialTypesApi,
+  designTracking: designTrackingApi,
   invoiceChallan: invoiceChallanApi
 }
 

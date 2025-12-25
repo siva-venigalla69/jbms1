@@ -53,34 +53,18 @@ interface LayoutProps {
     children: React.ReactNode;
 }
 
+// Simplified menu items - matches simplified 13-table schema routes
 const menuItems = [
     { text: 'Dashboard', icon: <Dashboard />, path: '/dashboard' },
-    { text: 'Executive Dashboard', icon: <TrendingUp />, path: '/dashboard/advanced' },
-    { text: 'Workflow Management', icon: <AccountTree />, path: '/workflow' },
-    { text: 'Business Intelligence', icon: <Analytics />, path: '/business-intelligence' },
     { text: 'Customers', icon: <People />, path: '/customers' },
     { text: 'Orders', icon: <ShoppingCart />, path: '/orders' },
-    { text: 'Production', icon: <Factory />, path: '/production' },
-    // Designer Management Section
-    { text: 'Designer Dashboard', icon: <Assignment />, path: '/designer-dashboard' },
-    { text: 'Designer Workload', icon: <Person />, path: '/designer-workload' },
-    { text: 'Design Library', icon: <PaletteOutlined />, path: '/design-library' },
-    { text: 'My Assignments', icon: <Assignment />, path: '/my-assignments' },
-    // End Designer Section
-    // { text: 'Schema Analysis', icon: <Schema />, path: '/schema-analysis' }, // Commented out - not needed for business operations
-    { text: 'Materials', icon: <Palette />, path: '/materials' },
-    { text: 'Customer Stock', icon: <Inventory2 />, path: '/customer-stock' },
-    { text: 'Inventory', icon: <Inventory />, path: '/inventory' },
-    { text: 'Delivery Challans', icon: <LocalShipping />, path: '/challans' },
+    { text: 'Production Stock', icon: <Factory />, path: '/production-stock' },
+    { text: 'Material Receipt', icon: <Inventory />, path: '/material-receipt' },
+    { text: 'Deliveries', icon: <LocalShipping />, path: '/deliveries' },
     { text: 'Invoices', icon: <Receipt />, path: '/invoices' },
     { text: 'Payments', icon: <Payment />, path: '/payments' },
-    { text: 'Stock Reconciliation', icon: <Dashboard />, path: '/stock-reconciliation' },
-    // Financial Management Section
-    { text: 'Employees', icon: <Person />, path: '/employees' },
-    { text: 'Payroll', icon: <AttachMoney />, path: '/payroll' },
-    { text: 'Expenses', icon: <CreditCard />, path: '/expenses' },
-    { text: 'Purchases', icon: <Business />, path: '/purchases' },
-    // End Financial Section
+    { text: 'Returns', icon: <AccountTree />, path: '/returns' },
+    { text: 'Misprint Sales', icon: <Assignment />, path: '/misprint-sales' },
     { text: 'Reports', icon: <Assessment />, path: '/reports' },
 ];
 
@@ -118,7 +102,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         handleProfileMenuClose();
     };
 
-    const getUserInitials = (fullName: string) => {
+    const getUserInitials = (fullName?: string) => {
+        if (!fullName) return 'U';
         return fullName
             .split(' ')
             .map(name => name[0])

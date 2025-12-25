@@ -1,484 +1,407 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-    Box,
-    Card,
-    CardContent,
-    Typography,
-    Button,
-    TextField,
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogActions,
-    IconButton,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
-    Paper,
-    Chip,
-    InputAdornment,
-    Alert,
-    CircularProgress,
-    Menu,
-    MenuItem,
-    Grid,
+  Box,
+  Card,
+  CardContent,
+  Typography,
+  Button,
+  TextField,
+  Alert,
+  CircularProgress,
+  Grid,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  IconButton,
+  Chip,
+  InputAdornment,
 } from '@mui/material';
 import {
-    Add,
-    Search,
-    Edit,
-    Delete,
-    MoreVert,
-    Person,
-    Phone,
-    Email,
-    Business,
-    LocationOn,
+  Add,
+  Edit,
+  Delete,
+  Search,
+  Refresh,
+  Phone,
+  Email,
+  Business,
 } from '@mui/icons-material';
-import { useForm, Controller } from 'react-hook-form';
-import { yupResolver } from '@hookform/resolvers/yup';
-import * as yup from 'yup';
-import { Customer, CustomerCreate } from '../types';
-import { customerApi } from '../services/supabaseApi';
-
-const customerSchema: yup.ObjectSchema<CustomerCreate> = yup.object({
-    name: yup.string().required('Customer name is required'),
-    phone: yup.string().matches(/^[0-9]*$/, 'Phone number must contain only digits').optional(),
-    email: yup.string().email('Invalid email format').optional(),
-    address: yup.string().optional(),
-    gst_number: yup.string().optional(),
-});
+import { simplifiedApi, Customer } from '../services/simplifiedApi';
 
 const Customers: React.FC = () => {
-    const [customers, setCustomers] = useState<Customer[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [searchTerm, setSearchTerm] = useState('');
-    const [dialogOpen, setDialogOpen] = useState(false);
-    const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
-    const [error, setError] = useState<string | null>(null);
-    const [success, setSuccess] = useState<string | null>(null);
-    const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-    const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
 
-    const {
-        control,
-        handleSubmit,
-        reset,
-        formState: { errors, isSubmitting },
-    } = useForm<CustomerCreate>({
-        resolver: yupResolver(customerSchema),
-        defaultValues: {
-            name: '',
-            phone: '',
-            email: '',
-            address: '',
-            gst_number: '',
-        },
+  // Dialog state
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+
+  // Form state
+  const [formData, setFormData] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    address: '',
+    gst_number: '',
+  });
+
+  useEffect(() => {
+    loadCustomers();
+  }, []);
+
+  useEffect(() => {
+    // Filter customers based on search term
+    if (searchTerm) {
+      const filtered = customers.filter(
+        (c) =>
+          c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          c.phone?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          c.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          c.gst_number?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      setFilteredCustomers(filtered);
+    } else {
+      setFilteredCustomers(customers);
+    }
+  }, [searchTerm, customers]);
+
+  const loadCustomers = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await simplifiedApi.customers.getAll();
+      setCustomers(data);
+      setFilteredCustomers(data);
+    } catch (err: any) {
+      setError('Failed to load customers: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOpenDialog = (customer?: Customer) => {
+    if (customer) {
+      setEditMode(true);
+      setSelectedCustomer(customer);
+      setFormData({
+        name: customer.name,
+        phone: customer.phone || '',
+        email: customer.email || '',
+        address: customer.address || '',
+        gst_number: customer.gst_number || '',
+      });
+    } else {
+      setEditMode(false);
+      setSelectedCustomer(null);
+      setFormData({
+        name: '',
+        phone: '',
+        email: '',
+        address: '',
+        gst_number: '',
+      });
+    }
+    setDialogOpen(true);
+  };
+
+  const handleCloseDialog = () => {
+    setDialogOpen(false);
+    setFormData({
+      name: '',
+      phone: '',
+      email: '',
+      address: '',
+      gst_number: '',
     });
+    setSelectedCustomer(null);
+  };
 
-    // Load customers
-    const loadCustomers = useCallback(async () => {
-        try {
-            setLoading(true);
-            const data = await customerApi.getCustomers({ search: searchTerm });
-            setCustomers(data);
-        } catch (error: any) {
-            setError('Failed to load customers');
-        } finally {
-            setLoading(false);
-        }
-    }, [searchTerm]);
+  const handleSubmit = async () => {
+    if (!formData.name || !formData.phone) {
+      setError('Name and Phone are required');
+      return;
+    }
 
-    useEffect(() => {
-        loadCustomers();
-    }, [loadCustomers]);
+    try {
+      setLoading(true);
+      setError(null);
 
-    // Clear messages after 5 seconds
-    useEffect(() => {
-        if (error || success) {
-            const timer = setTimeout(() => {
-                setError(null);
-                setSuccess(null);
-            }, 5000);
-            return () => clearTimeout(timer);
-        }
-    }, [error, success]);
-
-    const handleCreateCustomer = () => {
-        setEditingCustomer(null);
-        reset({
-            name: '',
-            phone: '',
-            email: '',
-            address: '',
-            gst_number: '',
+      if (editMode && selectedCustomer) {
+        await simplifiedApi.customers.update(selectedCustomer.id, formData);
+        setSuccess('Customer updated successfully');
+      } else {
+        await simplifiedApi.customers.create({
+          ...formData,
+          is_active: true,
         });
-        setDialogOpen(true);
-    };
+        setSuccess('Customer created successfully');
+      }
 
-    const handleEditCustomer = (customer: Customer) => {
-        setEditingCustomer(customer);
-        reset({
-            name: customer.name,
-            phone: customer.phone || '',
-            email: customer.email || '',
-            address: customer.address || '',
-            gst_number: customer.gst_number || '',
-        });
-        setDialogOpen(true);
-    };
+      handleCloseDialog();
+      loadCustomers();
 
-    const handleDeleteCustomer = async (customer: Customer) => {
-        if (window.confirm(`Are you sure you want to delete ${customer.name}?`)) {
-            try {
-                await customerApi.deleteCustomer(customer.id);
-                setSuccess('Customer deleted successfully');
-                loadCustomers();
-            } catch (error: any) {
-                setError('Failed to delete customer');
-            }
-        }
-    };
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (err: any) {
+      setError('Failed to save customer: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    const onSubmit = async (data: CustomerCreate) => {
-        try {
-            if (editingCustomer) {
-                await customerApi.updateCustomer(editingCustomer.id, data);
-                setSuccess('Customer updated successfully');
-            } else {
-                await customerApi.createCustomer(data);
-                setSuccess('Customer created successfully');
-            }
-            setDialogOpen(false);
-            loadCustomers();
-        } catch (error: any) {
-            setError(
-                error.response?.data?.detail || 'Failed to save customer'
-            );
-        }
-    };
+  const handleDelete = async (customer: Customer) => {
+    if (!window.confirm(`Are you sure you want to delete ${customer.name}?`)) {
+      return;
+    }
 
-    const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, customer: Customer) => {
-        setAnchorEl(event.currentTarget);
-        setSelectedCustomer(customer);
-    };
+    try {
+      setLoading(true);
+      setError(null);
+      await simplifiedApi.customers.delete(customer.id);
+      setSuccess('Customer deleted successfully');
+      loadCustomers();
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (err: any) {
+      setError('Failed to delete customer: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    const handleMenuClose = () => {
-        setAnchorEl(null);
-        setSelectedCustomer(null);
-    };
-
-    const filteredCustomers = customers.filter(
-        (customer) =>
-            customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (customer.phone && customer.phone.includes(searchTerm))
-    );
-
+  if (loading && customers.length === 0) {
     return (
-        <Box>
-            {/* Header */}
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                <Typography variant="h4" fontWeight="bold">
-                    Customer Management
-                </Typography>
-                <Button
-                    variant="contained"
-                    startIcon={<Add />}
-                    onClick={handleCreateCustomer}
-                    sx={{ px: 3 }}
-                >
-                    Add Customer
-                </Button>
-            </Box>
-
-            {/* Alerts */}
-            {error && (
-                <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-                    {error}
-                </Alert>
-            )}
-            {success && (
-                <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess(null)}>
-                    {success}
-                </Alert>
-            )}
-
-            {/* Search */}
-            <Card sx={{ mb: 3 }}>
-                <CardContent>
-                    <TextField
-                        fullWidth
-                        placeholder="Search customers by name or phone..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        InputProps={{
-                            startAdornment: (
-                                <InputAdornment position="start">
-                                    <Search />
-                                </InputAdornment>
-                            ),
-                        }}
-                    />
-                </CardContent>
-            </Card>
-
-            {/* Customers Table */}
-            <Card>
-                <CardContent>
-                    {loading ? (
-                        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                            <CircularProgress />
-                        </Box>
-                    ) : (
-                        <TableContainer component={Paper} elevation={0}>
-                            <Table>
-                                <TableHead>
-                                    <TableRow>
-                                        <TableCell>
-                                            <Typography fontWeight="600">Customer</Typography>
-                                        </TableCell>
-                                        <TableCell>
-                                            <Typography fontWeight="600">Contact</Typography>
-                                        </TableCell>
-                                        <TableCell>
-                                            <Typography fontWeight="600">Address</Typography>
-                                        </TableCell>
-                                        <TableCell>
-                                            <Typography fontWeight="600">GST Number</Typography>
-                                        </TableCell>
-                                        <TableCell>
-                                            <Typography fontWeight="600">Created</Typography>
-                                        </TableCell>
-                                        <TableCell align="center">
-                                            <Typography fontWeight="600">Actions</Typography>
-                                        </TableCell>
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    {filteredCustomers.length === 0 ? (
-                                        <TableRow>
-                                            <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
-                                                <Typography color="text.secondary">
-                                                    {searchTerm ? 'No customers found matching your search' : 'No customers found'}
-                                                </Typography>
-                                            </TableCell>
-                                        </TableRow>
-                                    ) : (
-                                        filteredCustomers.map((customer) => (
-                                            <TableRow key={customer.id} hover>
-                                                <TableCell>
-                                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                                        <Person sx={{ mr: 1, color: 'primary.main' }} />
-                                                        <Typography fontWeight="500">{customer.name}</Typography>
-                                                    </Box>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Box>
-                                                        {customer.phone && (
-                                                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
-                                                                <Phone sx={{ fontSize: 16, mr: 1, color: 'text.secondary' }} />
-                                                                <Typography variant="body2">{customer.phone}</Typography>
-                                                            </Box>
-                                                        )}
-                                                        {customer.email && (
-                                                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                                                <Email sx={{ fontSize: 16, mr: 1, color: 'text.secondary' }} />
-                                                                <Typography variant="body2">{customer.email}</Typography>
-                                                            </Box>
-                                                        )}
-                                                    </Box>
-                                                </TableCell>
-                                                <TableCell>
-                                                    {customer.address ? (
-                                                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                                            <LocationOn sx={{ fontSize: 16, mr: 1, color: 'text.secondary' }} />
-                                                            <Typography variant="body2">{customer.address}</Typography>
-                                                        </Box>
-                                                    ) : (
-                                                        <Typography variant="body2" color="text.secondary">
-                                                            -
-                                                        </Typography>
-                                                    )}
-                                                </TableCell>
-                                                <TableCell>
-                                                    {customer.gst_number ? (
-                                                        <Chip
-                                                            label={customer.gst_number}
-                                                            variant="outlined"
-                                                            size="small"
-                                                            icon={<Business />}
-                                                        />
-                                                    ) : (
-                                                        <Typography variant="body2" color="text.secondary">
-                                                            -
-                                                        </Typography>
-                                                    )}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Typography variant="body2">
-                                                        {new Date(customer.created_at).toLocaleDateString()}
-                                                    </Typography>
-                                                </TableCell>
-                                                <TableCell align="center">
-                                                    <IconButton
-                                                        onClick={(e) => handleMenuOpen(e, customer)}
-                                                        size="small"
-                                                    >
-                                                        <MoreVert />
-                                                    </IconButton>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
-                    )}
-                </CardContent>
-            </Card>
-
-            {/* Actions Menu */}
-            <Menu
-                anchorEl={anchorEl}
-                open={Boolean(anchorEl)}
-                onClose={handleMenuClose}
-            >
-                <MenuItem
-                    onClick={() => {
-                        if (selectedCustomer) {
-                            handleEditCustomer(selectedCustomer);
-                        }
-                        handleMenuClose();
-                    }}
-                >
-                    <Edit sx={{ mr: 1 }} />
-                    Edit
-                </MenuItem>
-                <MenuItem
-                    onClick={() => {
-                        if (selectedCustomer) {
-                            handleDeleteCustomer(selectedCustomer);
-                        }
-                        handleMenuClose();
-                    }}
-                    sx={{ color: 'error.main' }}
-                >
-                    <Delete sx={{ mr: 1 }} />
-                    Delete
-                </MenuItem>
-            </Menu>
-
-            {/* Create/Edit Dialog */}
-            <Dialog
-                open={dialogOpen}
-                onClose={() => setDialogOpen(false)}
-                maxWidth="md"
-                fullWidth
-            >
-                <DialogTitle>
-                    {editingCustomer ? 'Edit Customer' : 'Add New Customer'}
-                </DialogTitle>
-                <form onSubmit={handleSubmit(onSubmit)}>
-                    <DialogContent>
-                        <Grid container spacing={2} sx={{ mt: 1 }}>
-                            <Grid size={{ xs: 12, md: 6 }}>
-                                <Controller
-                                    name="name"
-                                    control={control}
-                                    render={({ field }) => (
-                                        <TextField
-                                            {...field}
-                                            fullWidth
-                                            label="Customer Name *"
-                                            error={!!errors.name}
-                                            helperText={errors.name?.message}
-                                        />
-                                    )}
-                                />
-                            </Grid>
-                            <Grid size={{ xs: 12, md: 6 }}>
-                                <Controller
-                                    name="phone"
-                                    control={control}
-                                    render={({ field }) => (
-                                        <TextField
-                                            {...field}
-                                            fullWidth
-                                            label="Phone Number"
-                                            error={!!errors.phone}
-                                            helperText={errors.phone?.message}
-                                        />
-                                    )}
-                                />
-                            </Grid>
-                            <Grid size={{ xs: 12, md: 6 }}>
-                                <Controller
-                                    name="email"
-                                    control={control}
-                                    render={({ field }) => (
-                                        <TextField
-                                            {...field}
-                                            fullWidth
-                                            label="Email Address"
-                                            type="email"
-                                            error={!!errors.email}
-                                            helperText={errors.email?.message}
-                                        />
-                                    )}
-                                />
-                            </Grid>
-                            <Grid size={{ xs: 12, md: 6 }}>
-                                <Controller
-                                    name="gst_number"
-                                    control={control}
-                                    render={({ field }) => (
-                                        <TextField
-                                            {...field}
-                                            fullWidth
-                                            label="GST Number"
-                                            error={!!errors.gst_number}
-                                            helperText={errors.gst_number?.message}
-                                        />
-                                    )}
-                                />
-                            </Grid>
-                            <Grid size={12}>
-                                <Controller
-                                    name="address"
-                                    control={control}
-                                    render={({ field }) => (
-                                        <TextField
-                                            {...field}
-                                            fullWidth
-                                            label="Address"
-                                            multiline
-                                            rows={3}
-                                            error={!!errors.address}
-                                            helperText={errors.address?.message}
-                                        />
-                                    )}
-                                />
-                            </Grid>
-                        </Grid>
-                    </DialogContent>
-                    <DialogActions sx={{ p: 3 }}>
-                        <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
-                        <Button
-                            type="submit"
-                            variant="contained"
-                            disabled={isSubmitting}
-                            startIcon={isSubmitting ? <CircularProgress size={16} /> : null}
-                        >
-                            {editingCustomer ? 'Update' : 'Create'}
-                        </Button>
-                    </DialogActions>
-                </form>
-            </Dialog>
-        </Box>
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
+        <CircularProgress />
+      </Box>
     );
+  }
+
+  return (
+    <Box>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Typography variant="h4" gutterBottom>
+          Customers
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <Button
+            variant="outlined"
+            startIcon={<Refresh />}
+            onClick={loadCustomers}
+            disabled={loading}
+          >
+            Refresh
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<Add />}
+            onClick={() => handleOpenDialog()}
+          >
+            Add Customer
+          </Button>
+        </Box>
+      </Box>
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+          {error}
+        </Alert>
+      )}
+
+      {success && (
+        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess(null)}>
+          {success}
+        </Alert>
+      )}
+
+      {/* Search Bar */}
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <TextField
+            fullWidth
+            placeholder="Search by name, phone, email, or GST number..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Search />
+                </InputAdornment>
+              ),
+            }}
+          />
+        </CardContent>
+      </Card>
+
+      {/* Customers Table */}
+      <TableContainer component={Paper}>
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableCell>Name</TableCell>
+              <TableCell>Phone</TableCell>
+              <TableCell>Email</TableCell>
+              <TableCell>Address</TableCell>
+              <TableCell>GST Number</TableCell>
+              <TableCell>Status</TableCell>
+              <TableCell align="right">Actions</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {filteredCustomers.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} align="center">
+                  <Typography variant="body2" color="textSecondary">
+                    {searchTerm ? 'No customers found matching your search' : 'No customers yet. Click "Add Customer" to create one.'}
+                  </Typography>
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredCustomers.map((customer) => (
+                <TableRow key={customer.id} hover>
+                  <TableCell>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Business fontSize="small" color="action" />
+                      <Typography variant="body2" fontWeight="medium">
+                        {customer.name}
+                      </Typography>
+                    </Box>
+                  </TableCell>
+                  <TableCell>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Phone fontSize="small" color="action" />
+                      {customer.phone || '-'}
+                    </Box>
+                  </TableCell>
+                  <TableCell>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Email fontSize="small" color="action" />
+                      {customer.email || '-'}
+                    </Box>
+                  </TableCell>
+                  <TableCell>{customer.address || '-'}</TableCell>
+                  <TableCell>{customer.gst_number || '-'}</TableCell>
+                  <TableCell>
+                    <Chip
+                      label={customer.is_active ? 'Active' : 'Inactive'}
+                      color={customer.is_active ? 'success' : 'default'}
+                      size="small"
+                    />
+                  </TableCell>
+                  <TableCell align="right">
+                    <IconButton
+                      size="small"
+                      color="primary"
+                      onClick={() => handleOpenDialog(customer)}
+                      title="Edit"
+                    >
+                      <Edit fontSize="small" />
+                    </IconButton>
+                    <IconButton
+                      size="small"
+                      color="error"
+                      onClick={() => handleDelete(customer)}
+                      title="Delete"
+                    >
+                      <Delete fontSize="small" />
+                    </IconButton>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Typography variant="body2" color="textSecondary">
+          Total: {filteredCustomers.length} customer{filteredCustomers.length !== 1 ? 's' : ''}
+          {searchTerm && ` (filtered from ${customers.length})`}
+        </Typography>
+      </Box>
+
+      {/* Add/Edit Customer Dialog */}
+      <Dialog open={dialogOpen} onClose={handleCloseDialog} maxWidth="md" fullWidth>
+        <DialogTitle>
+          {editMode ? 'Edit Customer' : 'Add New Customer'}
+        </DialogTitle>
+        <DialogContent>
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                required
+                label="Customer Name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="Enter customer name"
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                required
+                label="Phone"
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                placeholder="Enter phone number"
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="Email"
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                placeholder="Enter email address"
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="GST Number"
+                value={formData.gst_number}
+                onChange={(e) => setFormData({ ...formData, gst_number: e.target.value })}
+                placeholder="Enter GST number (optional)"
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Address"
+                multiline
+                rows={3}
+                value={formData.address}
+                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                placeholder="Enter full address"
+              />
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDialog} disabled={loading}>
+            Cancel
+          </Button>
+          <Button onClick={handleSubmit} variant="contained" disabled={loading}>
+            {loading ? <CircularProgress size={24} /> : editMode ? 'Update' : 'Create'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
 };
 
-export default Customers; 
+export default Customers;

@@ -1,0 +1,133 @@
+================================================================================
+🧪 SIMPLIFIED TEXTILE SYSTEM - COMPREHENSIVE TEST
+================================================================================
+Supabase URL: https://pvatfzwzfgioypdnqjay.supabase.co
+Testing Date: 2025-12-21T10:41:12.396Z
+================================================================================
+
+
+📋 TEST 1: Verifying Core Tables Exist...
+--------------------------------------------------------------------------------
+✅ Table: customers
+   Table accessible
+✅ Table: orders
+   Table accessible
+✅ Table: material_in
+   Table accessible
+✅ Table: material_stock
+   Table accessible
+✅ Table: delivery_challans
+   Table accessible
+✅ Table: challan_items
+   Table accessible
+✅ Table: gst_invoices
+   Table accessible
+✅ Table: payments
+   Table accessible
+✅ Table: returns
+   Table accessible
+✅ Table: credit_notes
+   Table accessible
+✅ Table: misprint_sales
+   Table accessible
+✅ Table: material_types
+   Table accessible
+✅ Table: invoice_challans
+   Table accessible
+
+📊 TEST 2: Verifying Reporting Views...
+--------------------------------------------------------------------------------
+✅ View: v_stock_by_customer
+   View accessible
+✅ View: v_outstanding_payments
+   View accessible
+✅ View: v_outstanding_orders
+   View accessible
+✅ View: v_misprint_stock
+   View accessible
+
+🧵 TEST 3: Checking Material Types...
+--------------------------------------------------------------------------------
+✅ Material Types Query
+   Found 5 material types
+   - Dupattas (DUPATTA)
+   - Lehenga (LEHENGA)
+   - Running Material (RUNNING)
+   - Sarees (SAREE)
+   - Voni (VONI)
+
+👥 TEST 4: Checking Customers...
+--------------------------------------------------------------------------------
+✅ Customers Query
+   Found 96 active customers
+   - Test Customer 1 (9876543210)
+   - Test Customer 2 (9876543211)
+   - Test Customer 1755435190174 (9190174997)
+   - Updated Service Test Customer (7777777777)
+   - Test Customer 1755435190379 (9190379213)
+
+📦 TEST 5: Checking Orders...
+--------------------------------------------------------------------------------
+✅ Orders Query
+   Found 11 orders
+   - ORD-FLOW-1755434042916 (customer_material) - completed
+   - ORD-TEST-1755435190487-850 (customer_material) - completed
+   - SRV-TEST-1755429013097 (customer_material) - pending
+   - ORD-TEST-1755433696244 (customer_material) - in_progress
+   - ORD-TEST-1755435443839-451 (customer_material) - completed
+
+📦 TEST 6: Checking Material Stock...
+--------------------------------------------------------------------------------
+✅ Material Stock Query
+   Found 3 stock entries
+   Stock by Stage:
+   - received: 50 units
+   - completed: 50 units
+   - misprint: 5 units
+
+📊 TEST 7: Testing Stock by Customer Report...
+--------------------------------------------------------------------------------
+✅ Stock by Customer Report
+   Found 1 customer stock records
+   - Own Stock: 105 units
+
+💰 TEST 8: Testing Outstanding Payments Report...
+--------------------------------------------------------------------------------
+✅ Outstanding Payments Report
+   Found 1 outstanding records
+   - Test Customer 1755435443839: ₹15000
+
+⚙️  TEST 9: Testing RPC Functions...
+--------------------------------------------------------------------------------
+✅ Function: move_stock_to_stage
+   Function exists (expected param error)
+✅ Function: update_design_availability
+   Function exists (expected param error)
+✅ Function: get_customer_stock_summary
+   Function exists (expected param error)
+
+🔢 TEST 10: Testing Auto-Generated Number Functions...
+--------------------------------------------------------------------------------
+✅ Function: generate_order_number
+   Generated: ORD-20251221-0005
+✅ Function: generate_receipt_number
+   Generated: RCP-20251221-0005
+✅ Function: generate_challan_number
+   Generated: CHN-20251221-0004
+✅ Function: generate_invoice_number
+   Generated: INV-20251221-0004
+✅ Function: generate_credit_note_number
+   Generated: CN-20251221-0005
+✅ Function: generate_misprint_sale_number
+   Generated: MS-20251221-0005
+
+================================================================================
+📊 TEST SUMMARY
+================================================================================
+Total Tests: 32
+✅ Passed: 32
+❌ Failed: 0
+Success Rate: 100.0%
+================================================================================
+
+🎉 ALL TESTS PASSED! System is ready for use.

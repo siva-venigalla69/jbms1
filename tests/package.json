@@ -1,0 +1,16 @@
+{
+  "name": "jbms-api-tests",
+  "version": "1.0.0",
+  "description": "Automated API tests for Digital Textile Printing System",
+  "main": "api-tests.js",
+  "scripts": {
+    "test": "node api-tests.js",
+    "test:watch": "nodemon api-tests.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}
